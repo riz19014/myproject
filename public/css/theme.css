@@ -1,0 +1,285 @@
+/* Hosting theme - Light mode with Orange accents */
+:root {
+    --bg-light: #f8fafc;
+    --bg-lighter: #ffffff;
+    --accent-orange: #f97316;
+    --accent-orange-hover: #ea580c;
+    --text-dark: #0f172a;
+    --text-muted: #64748b;
+    --border-dark: rgba(15, 23, 42, 0.12);
+    --card-bg: #ffffff;
+    --input-bg: #ffffff;
+}
+
+* {
+    color: var(--text-dark);
+}
+
+body {
+    background: var(--bg-light) !important;
+    color: var(--text-dark) !important;
+    min-height: 100vh;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70%;
+    background: radial-gradient(ellipse at 70% 30%, rgba(249, 115, 22, 0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+main {
+    position: relative;
+    z-index: 1;
+}
+
+/* Top bar */
+.top-bar {
+    background: var(--bg-lighter);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+/* Navbar */
+.navbar-theme {
+    background: var(--bg-lighter) !important;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.navbar-theme .navbar-brand {
+    color: var(--text-dark) !important;
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: -0.5px;
+}
+
+.navbar-theme .nav-link {
+    color: var(--text-dark) !important;
+    opacity: 0.9;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+}
+
+.navbar-theme .nav-link:hover {
+    color: var(--accent-orange) !important;
+    opacity: 1;
+}
+
+/* Primary button - orange */
+.btn-pink {
+    background: var(--accent-orange) !important;
+    border: none !important;
+    color: #ffffff !important;
+}
+
+.btn-pink:hover {
+    background: var(--accent-orange-hover) !important;
+    color: #ffffff !important;
+}
+
+/* Secondary button - outline */
+.btn-outline-theme {
+    background: transparent !important;
+    border: 1px solid var(--text-dark) !important;
+    color: var(--text-dark) !important;
+}
+
+.btn-outline-theme:hover {
+    background: var(--text-dark) !important;
+    color: var(--bg-lighter) !important;
+}
+
+/* Card */
+.card-theme,
+.card-theme .card-body {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-dark);
+    border-radius: 8px;
+    color: var(--text-dark) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.card-theme .card-body {
+    border: none;
+}
+
+.card-theme .table,
+.card-theme .table th,
+.card-theme .table td {
+    background: transparent !important;
+    color: var(--text-dark) !important;
+}
+
+/* Table */
+.table-theme {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text-dark);
+    --bs-table-border-color: var(--border-dark);
+}
+
+.table-theme,
+.table-theme thead,
+.table-theme tbody,
+.table-theme th,
+.table-theme td,
+.table-theme tr {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: var(--text-dark) !important;
+    border-color: var(--border-dark) !important;
+}
+
+.table-theme thead th {
+    font-weight: 600;
+}
+
+.table-theme tbody tr:hover td {
+    background: rgba(15, 23, 42, 0.03) !important;
+}
+
+.table-theme.table-striped tbody tr:nth-of-type(odd) td {
+    background: rgba(15, 23, 42, 0.02) !important;
+}
+
+.table-theme.table-striped tbody tr:nth-of-type(odd):hover td {
+    background: rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Form controls */
+.form-control-theme,
+.form-select-theme {
+    background: var(--input-bg) !important;
+    border: 1px solid var(--border-dark) !important;
+    color: var(--text-dark) !important;
+}
+
+.form-control-theme::placeholder {
+    color: var(--text-muted);
+}
+
+.form-control-theme:focus,
+.form-select-theme:focus {
+    background: var(--input-bg) !important;
+    border-color: var(--accent-orange) !important;
+    color: var(--text-dark) !important;
+    box-shadow: 0 0 0 0.2rem rgba(249, 115, 22, 0.25);
+}
+
+.form-select-theme option {
+    background: var(--card-bg);
+    color: var(--text-dark);
+}
+
+.form-label {
+    color: var(--text-dark) !important;
+}
+
+.form-check-input {
+    background-color: var(--input-bg);
+    border-color: var(--border-dark);
+}
+
+.form-check-input:checked {
+    background-color: var(--accent-orange);
+    border-color: var(--accent-orange);
+}
+
+.form-check-label {
+    color: var(--text-dark);
+}
+
+/* Badges */
+.badge-pink {
+    background: var(--accent-orange) !important;
+    color: #ffffff;
+}
+
+.badge-outline {
+    background: transparent;
+    border: 1px solid var(--border-dark);
+    color: var(--text-dark);
+}
+
+/* Alerts */
+.alert-theme-success {
+    background: rgba(249, 115, 22, 0.12);
+    border: 1px solid var(--accent-orange);
+    color: var(--text-dark);
+}
+
+.alert-theme-danger {
+    background: rgba(249, 115, 22, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.4);
+    color: var(--text-dark);
+}
+
+.alert-theme-success .btn-close,
+.alert-theme-danger .btn-close {
+    filter: none;
+}
+
+/* Pagination */
+.pagination .page-link {
+    background: var(--input-bg);
+    border-color: var(--border-dark);
+    color: var(--text-dark);
+}
+
+.pagination .page-link:hover {
+    background: var(--accent-orange);
+    border-color: var(--accent-orange);
+    color: #ffffff;
+}
+
+.pagination .page-item.active .page-link {
+    background: var(--accent-orange);
+    border-color: var(--accent-orange);
+    color: #ffffff;
+}
+
+.pagination .page-item.disabled .page-link {
+    background: var(--bg-light);
+    color: var(--text-muted);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-dark) !important;
+}
+
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.invalid-feedback {
+    color: #ea580c;
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid {
+    border-color: var(--accent-orange) !important;
+}
+
+.btn-sm.btn-pink,
+.btn-sm.btn-outline-theme {
+    padding: 0.25rem 0.5rem;
+}
+
+.btn-danger-theme {
+    background: rgba(249, 115, 22, 0.12) !important;
+    border: 1px solid var(--accent-orange) !important;
+    color: var(--accent-orange) !important;
+}
+
+.btn-danger-theme:hover {
+    background: var(--accent-orange) !important;
+    color: #ffffff !important;
+}
