@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DayBookEntry extends Model
 {
-    protected $fillable = ['entry_date', 'type', 'amount', 'description', 'link_type', 'link_id'];
+    protected $fillable = ['entry_date', 'type', 'amount', 'description', 'link_type', 'link_id', 'project_id'];
 
     protected function casts(): array
     {
@@ -14,6 +15,11 @@ class DayBookEntry extends Model
             'entry_date' => 'date',
             'amount' => 'decimal:2',
         ];
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public const TYPE_CASH_IN = 'cash_in';
@@ -25,6 +31,7 @@ class DayBookEntry extends Model
     public const LINK_PLOT = 'plot';
     public const LINK_FACTORY = 'factory';
     public const LINK_CUSTOMER = 'customer';
+    public const LINK_PARTY = 'party';
 
     public function getLinkModel(): ?Model
     {
@@ -37,6 +44,7 @@ class DayBookEntry extends Model
             'plot' => Plot::find($this->link_id),
             'factory' => Factory::find($this->link_id),
             'customer' => Customer::find($this->link_id),
+            'party' => Party::find($this->link_id),
             default => null,
         };
     }
@@ -52,6 +60,9 @@ class DayBookEntry extends Model
         }
         if ($m instanceof Plot) {
             return 'Plot: ' . $m->plot_number . ' (' . $m->land->name . ')';
+        }
+        if ($m instanceof Party) {
+            return 'Party: ' . ($m->name ?? ('#' . $this->link_id));
         }
         return $m->name ?? ('#' . $this->link_id);
     }

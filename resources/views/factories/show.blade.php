@@ -35,7 +35,7 @@
                 @forelse($expenses as $e)
                     <tr>
                         <td>{{ $e->entry_date->format('d M Y') }}</td>
-                        <td>{{ $e->type === 'cash_in' ? 'Cash In' : 'Cash Out' }}</td>
+                        <td>{{ $e->type === 'cash_in' ? 'Payment in' : 'Payment out' }}</td>
                         <td>{{ number_format($e->amount) }}</td>
                         <td>{{ $e->description ?? '—' }}</td>
                     </tr>

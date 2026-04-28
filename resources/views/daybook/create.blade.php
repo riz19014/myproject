@@ -20,10 +20,10 @@
                     @error('entry_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label for="type" class="form-label">Type <span class="text-danger">*</span></label>
+                    <label for="type" class="form-label">Payment <span class="text-danger">*</span></label>
                     <select id="type" name="type" class="form-select form-select-theme" required>
-                        <option value="cash_in" {{ old('type') === 'cash_in' ? 'selected' : '' }}>Cash In</option>
-                        <option value="cash_out" {{ old('type') === 'cash_out' ? 'selected' : '' }}>Cash Out</option>
+                        <option value="cash_in" {{ old('type') === 'cash_in' ? 'selected' : '' }}>Payment in</option>
+                        <option value="cash_out" {{ old('type') === 'cash_out' ? 'selected' : '' }}>Payment out</option>
                     </select>
                 </div>
                 <div class="col-md-4 mb-3">

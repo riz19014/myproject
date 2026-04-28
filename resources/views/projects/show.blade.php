@@ -3,13 +3,50 @@
 @section('title', $project->name)
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>{{ $project->name }}</h1>
-    <div class="d-flex gap-2">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h1 class="mb-0">{{ $project->name }}</h1>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-pink">Download ledger PDF</a>
         <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-theme">Edit</a>
         <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">Back to List</a>
     </div>
 </div>
+
+@if($project->land_area !== null || $project->field_type || $project->landType)
+<div class="card card-theme mb-4">
+    <div class="card-body py-3">
+        <h5 class="mb-2">Land</h5>
+        <dl class="row mb-0 small">
+            @if($project->land_area !== null && $project->land_area !== '')
+                <dt class="col-sm-3 text-muted">Area</dt>
+                <dd class="col-sm-9 mb-1">{{ rtrim(rtrim(number_format((float) $project->land_area, 4, '.', ''), '0'), '.') ?: '0' }}
+                    @if($project->land_area_unit)
+                        @php
+                            $u = $project->land_area_unit;
+                            $uLabel = match ($u) {
+                                'acre' => 'acre',
+                                'kanal' => 'kanal',
+                                'marla' => 'marla',
+                                'sqft' => 'sq ft',
+                                default => $u,
+                            };
+                        @endphp
+                        {{ $uLabel }}
+                    @endif
+                </dd>
+            @endif
+            @if($project->field_type)
+                <dt class="col-sm-3 text-muted">Field type</dt>
+                <dd class="col-sm-9 mb-1 text-capitalize">{{ $project->field_type }}</dd>
+            @endif
+            @if($project->landType)
+                <dt class="col-sm-3 text-muted">Land type</dt>
+                <dd class="col-sm-9 mb-0">{{ $project->landType->name }}</dd>
+            @endif
+        </dl>
+    </div>
+</div>
+@endif
 
 @if($project->description || $project->notes)
 <div class="card card-theme mb-4">
@@ -158,35 +195,91 @@
     </div>
 </div>
 
-{{-- Payments linked to this project (from DayBook) --}}
+{{-- DayBook ledger for this project — grouped by party --}}
 <div class="card card-theme">
     <div class="card-body">
-        <h5 class="mb-3">Payments for this project (from DayBook)</h5>
-        <p class="text-muted small">All payments entered in DayBook with link “Project → {{ $project->name }}” appear here. Enter once in DayBook; no need to enter again here.</p>
-        <table class="table table-striped table-theme">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($payments as $e)
-                    <tr>
-                        <td>{{ $e->entry_date->format('d M Y') }}</td>
-                        <td>{{ $e->type === 'cash_in' ? 'Cash In' : 'Cash Out' }}</td>
-                        <td>{{ number_format($e->amount) }}</td>
-                        <td>{{ $e->description ?? '—' }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="4" class="text-center">No payments linked yet. <a href="{{ route('daybook.create') }}">Add entry in DayBook</a> and link to this project.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                <h5 class="mb-1">DayBook — {{ $project->name }}</h5>
+                <p class="text-muted small mb-0">All lines tied to this project (project link, or party with this project selected in DayBook). Grouped by party; “General” is project-only entries.</p>
+            </div>
+            <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-sm btn-outline-theme">Ledger PDF</a>
+        </div>
+
+        @if($entries->isEmpty())
+            <p class="text-muted mb-0">No daybook entries yet. Add them from <a href="{{ route('daybook.index') }}">Daybook</a> and choose this project (and optionally a party).</p>
+        @else
+            <div class="row g-2 mb-3">
+                <div class="col-sm-4">
+                    <div class="border rounded p-2 small bg-light">
+                        <span class="text-muted d-block">Total payment in</span>
+                        <span class="text-success fw-semibold">Rs {{ number_format($ledgerTotalIn, 2) }}</span>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="border rounded p-2 small bg-light">
+                        <span class="text-muted d-block">Total payment out</span>
+                        <span class="text-danger fw-semibold">Rs {{ number_format($ledgerTotalOut, 2) }}</span>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="border rounded p-2 small bg-light">
+                        <span class="text-muted d-block">Net (in − out)</span>
+                        <span class="fw-semibold">Rs {{ number_format($ledgerNetFlow, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            @foreach($ledgerSections as $section)
+                <div class="mb-4">
+                    <h6 class="text-uppercase small text-muted mb-2" style="letter-spacing: 0.06em;">{{ $section['heading'] }}</h6>
+                    @if(!empty($section['subtitle']))
+                        <p class="small text-muted mb-2">{{ $section['subtitle'] }}</p>
+                    @endif
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-theme mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Payment</th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-end">Section balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($section['lines'] as $row)
+                                    @php $e = $row['entry']; @endphp
+                                    <tr>
+                                        <td>{{ $e->entry_date->format('d M Y') }}</td>
+                                        <td>{{ $e->description ?: '—' }}</td>
+                                        <td>
+                                            @if($e->type === 'cash_in')
+                                                <span class="text-success">Payment in</span>
+                                            @else
+                                                <span class="text-danger">Payment out</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end font-monospace">
+                                            @if($e->type === 'cash_in')
+                                                +{{ number_format($e->amount, 2) }}
+                                            @else
+                                                −{{ number_format($e->amount, 2) }}
+                                            @endif
+                                        </td>
+                                        <td class="text-end font-monospace">{{ number_format($row['balance'], 2) }}</td>
+                                    </tr>
+                                @endforeach
+                                <tr class="table-light fw-semibold">
+                                    <td colspan="4" class="text-end">Net — {{ $section['heading'] }}</td>
+                                    <td class="text-end font-monospace">{{ number_format($section['net'], 2) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endforeach
+        @endif
     </div>
 </div>
 @endsection
