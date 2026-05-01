@@ -6,6 +6,28 @@
 
 @push('head')
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+    <style>
+        .ledger-loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(15, 23, 42, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .ledger-loading-overlay.d-none {
+            display: none !important;
+        }
+        .ledger-loading-overlay .ledger-loading-overlay__label {
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin: 0;
+        }
+    </style>
 @endpush
 
 @section('content')
@@ -58,13 +80,18 @@
         </form>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-outline-theme" onclick="window.print()">Print</button>
-            <a class="btn btn-outline-theme" href="{{ route('daybook.ledger.pdf', $pdfQuery) }}">Download PDF</a>
+            <a class="btn btn-outline-theme" id="ledger-pdf-link" href="{{ route('daybook.ledger.pdf', $pdfQuery) }}">Download PDF</a>
             <a class="btn btn-outline-theme" href="{{ route('daybook.index') }}">Daybook</a>
         </div>
     </div>
     <script type="application/json" id="ledger-form-parties-json">@json($parties->map(function ($p) {
         return ['id' => $p->id, 'label' => $p->name];
     })->values())</script>
+</div>
+
+<div id="ledger-loading-overlay" class="ledger-loading-overlay d-none no-print" role="status" aria-live="polite" aria-busy="true" aria-hidden="true">
+    <div class="spinner-border text-light" style="width: 2.75rem; height: 2.75rem;" aria-hidden="true"></div>
+    <p class="ledger-loading-overlay__label" id="ledger-loading-overlay-label">Loading…</p>
 </div>
 
 <div class="card card-theme daybook-ledger-print mb-4">
@@ -112,6 +139,91 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script>
+(function () {
+    var overlay = document.getElementById('ledger-loading-overlay');
+    var overlayLabel = document.getElementById('ledger-loading-overlay-label');
+    var form = document.getElementById('ledger-filter-form');
+    var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+    var submitHtml = submitBtn ? submitBtn.innerHTML : '';
+
+    function showOverlay(text) {
+        if (overlayLabel && text) overlayLabel.textContent = text;
+        if (overlay) {
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function hideOverlay() {
+        if (overlay) {
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+        }
+        if (overlayLabel) overlayLabel.textContent = 'Loading…';
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = submitHtml;
+        }
+    }
+
+    if (form && submitBtn) {
+        form.addEventListener('submit', function () {
+            showOverlay('Loading ledger…');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Loading…';
+        });
+    }
+
+    window.addEventListener('pageshow', function () {
+        hideOverlay();
+    });
+
+    var pdfLink = document.getElementById('ledger-pdf-link');
+    if (pdfLink) {
+        pdfLink.addEventListener('click', function (e) {
+            e.preventDefault();
+            var href = pdfLink.getAttribute('href');
+            if (!href) return;
+            showOverlay('Preparing PDF…');
+            fetch(href, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('pdf');
+                    var cd = res.headers.get('Content-Disposition');
+                    var fname = 'daybook-ledger.pdf';
+                    if (cd) {
+                        var mStar = /filename\*\s*=\s*UTF-8''([^;\s]+)/i.exec(cd);
+                        var mQuot = /filename\s*=\s*"([^"]+)"/i.exec(cd);
+                        var mPlain = /filename\s*=\s*([^;\s]+)/i.exec(cd);
+                        if (mStar) fname = decodeURIComponent(mStar[1].replace(/"/g, ''));
+                        else if (mQuot) fname = mQuot[1];
+                        else if (mPlain) fname = mPlain[1].replace(/"/g, '');
+                    }
+                    return res.blob().then(function (blob) {
+                        return { blob: blob, fname: fname };
+                    });
+                })
+                .then(function (o) {
+                    var url = URL.createObjectURL(o.blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = o.fname;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(function () {
+                        URL.revokeObjectURL(url);
+                    }, 2000);
+                })
+                .catch(function () {
+                    window.location.href = href;
+                })
+                .finally(function () {
+                    hideOverlay();
+                });
+        });
+    }
+})();
+
 (function () {
     if (typeof flatpickr === 'undefined') return;
     var opts = { dateFormat: 'Y-m-d', allowInput: false, disableMobile: true, clickOpens: true };

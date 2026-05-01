@@ -306,6 +306,15 @@ class DayBookController extends Controller
             $dateLabel = $d->format('d M Y');
 
             if ($partyId !== null) {
+                $partyOpen = (float) $block['party_running_open'];
+                $rows[] = [
+                    'date' => $dateLabel,
+                    'payment' => '—',
+                    'amount' => number_format($partyOpen, 0),
+                    'description' => 'Opening balance',
+                    'balance' => $partyOpen,
+                    'is_meta' => true,
+                ];
                 foreach ($block['tableRows'] as $tr) {
                     $rows[] = [
                         'date' => $dateLabel,
@@ -320,8 +329,8 @@ class DayBookController extends Controller
                 $rows[] = [
                     'date' => $dateLabel,
                     'payment' => '—',
-                    'amount' => '—',
-                    'description' => 'Opening balance (carried)',
+                    'amount' => number_format((float) $block['openingAmount'], 0),
+                    'description' => 'Opening balance',
                     'balance' => (float) $block['openingAmount'],
                     'is_meta' => true,
                 ];
