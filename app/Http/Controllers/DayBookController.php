@@ -410,6 +410,26 @@ class DayBookController extends Controller
     }
 
     /**
+     * Right-aligned totals block under the ledger table (web + PDF).
+     *
+     * @return list<array{label: string, value: string}>
+     */
+    private function ledgerTableFooterRows(float $openingBalanceSummary, float $grandCashIn, float $grandCashOut, array $ledgerRows): array
+    {
+        $closing = $openingBalanceSummary;
+        if ($ledgerRows !== []) {
+            $closing = (float) end($ledgerRows)['balance'];
+        }
+
+        return [
+            ['label' => 'Opening Balance', 'value' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary)],
+            ['label' => 'Total Received', 'value' => 'Rs '.number_format($grandCashIn, 0)],
+            ['label' => 'Total Given', 'value' => 'Rs '.number_format($grandCashOut, 0)],
+            ['label' => 'Closing Balance', 'value' => $this->formatLedgerOpeningSummaryLine($closing)],
+        ];
+    }
+
+    /**
      * Carried cash opening on the first day of the ledger range (for summary line, not table rows).
      */
     private function ledgerOpeningBalanceForSummary(Carbon $from): float
@@ -503,6 +523,7 @@ class DayBookController extends Controller
         $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
         [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
         $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
+        $ledgerFooter = $this->ledgerTableFooterRows($openingBalanceSummary, $grandCashIn, $grandCashOut, $ledgerRows);
 
         $selectedParty = $partyId !== null ? Party::query()->find($partyId) : null;
         $parties = Party::query()->orderBy('name')->get();
@@ -518,6 +539,7 @@ class DayBookController extends Controller
             'grandCashOut' => $grandCashOut,
             'openingBalanceSummary' => $openingBalanceSummary,
             'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary),
+            'ledgerFooter' => $ledgerFooter,
         ]);
     }
 
@@ -531,6 +553,7 @@ class DayBookController extends Controller
         $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
         [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
         $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
+        $ledgerFooter = $this->ledgerTableFooterRows($openingBalanceSummary, $grandCashIn, $grandCashOut, $ledgerRows);
 
         $generatedAt = now();
         $selectedParty = $partyId !== null ? Party::query()->find($partyId) : null;
@@ -545,6 +568,7 @@ class DayBookController extends Controller
             'grandCashOut' => $grandCashOut,
             'openingBalanceSummary' => $openingBalanceSummary,
             'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary),
+            'ledgerFooter' => $ledgerFooter,
             'generatedAt' => $generatedAt,
         ]);
         $pdf->setPaper('a4', 'portrait');

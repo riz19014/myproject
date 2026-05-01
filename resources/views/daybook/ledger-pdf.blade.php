@@ -70,6 +70,23 @@
             background: #fafafa;
         }
 
+        .ledger-table tfoot td.ledger-footer-totals {
+            text-align: right;
+            font-size: 9px;
+            line-height: 1.55;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 8px 10px;
+            vertical-align: top;
+        }
+        .ledger-table tfoot td.ledger-footer-spacer {
+            border: none;
+            background: transparent;
+        }
+        .ledger-table tfoot .ledger-footer-line + .ledger-footer-line {
+            margin-top: 2px;
+        }
+
         .signatures {
             margin-top: 48px;
             width: 100%;
@@ -126,8 +143,8 @@
             <tr>
                 <th style="width:10%">Date</th>
                 <th style="width:13%">Payment</th>
-                <th class="amt" style="width:14%">Amount (Rs.)</th>
                 <th>Description</th>
+                <th class="amt" style="width:14%">Amount (Rs.)</th>
                 <th class="amt" style="width:14%">Balance (Rs.)</th>
             </tr>
         </thead>
@@ -136,8 +153,8 @@
                 <tr @if(!empty($r['is_meta'])) class="meta" @endif>
                     <td>{{ $r['date'] }}</td>
                     <td>{{ $r['payment'] }}</td>
-                    <td class="amt">{{ $r['amount'] }}</td>
                     <td>{{ $r['description'] }}</td>
+                    <td class="amt">{{ $r['amount'] }}</td>
                     <td class="amt">{{ $r['balance_display'] }}</td>
                 </tr>
             @empty
@@ -148,6 +165,16 @@
                 </tr>
             @endforelse
         </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3" class="ledger-footer-spacer"></td>
+                <td colspan="2" class="ledger-footer-totals">
+                    @foreach($ledgerFooter as $line)
+                        <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
+                    @endforeach
+                </td>
+            </tr>
+        </tfoot>
     </table>
 
     <div class="signatures">

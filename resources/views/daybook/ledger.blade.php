@@ -27,6 +27,15 @@
             font-weight: 500;
             margin: 0;
         }
+        .daybook-ledger-statement tfoot .ledger-footer-totals {
+            vertical-align: top;
+            background: #f8fafc;
+            line-height: 1.55;
+            font-size: 0.8125rem;
+        }
+        .daybook-ledger-statement tfoot .ledger-footer-line + .ledger-footer-line {
+            margin-top: 0.2rem;
+        }
     </style>
 @endpush
 
@@ -112,8 +121,8 @@
                     <tr class="table-dark">
                         <th scope="col" style="width:10%">Date</th>
                         <th scope="col" style="width:12%">Payment</th>
-                        <th scope="col" class="text-end" style="width:12%">Amount (Rs.)</th>
                         <th scope="col">Description</th>
+                        <th scope="col" class="text-end" style="width:12%">Amount (Rs.)</th>
                         <th scope="col" class="text-end" style="width:12%">Balance (Rs.)</th>
                     </tr>
                 </thead>
@@ -122,8 +131,8 @@
                         <tr @class(['table-light' => !empty($r['is_meta'])])>
                             <td>{{ $r['date'] }}</td>
                             <td>{{ $r['payment'] }}</td>
-                            <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td>{{ $r['description'] }}</td>
+                            <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td class="text-end font-monospace">{{ $r['balance_display'] }}</td>
                         </tr>
                     @empty
@@ -132,6 +141,16 @@
                         </tr>
                     @endforelse
                 </tbody>
+                <tfoot>
+                    <tr class="border-top border-2">
+                        <td colspan="3" class="border-end-0 bg-transparent"></td>
+                        <td colspan="2" class="ledger-footer-totals text-end border-start">
+                            @foreach($ledgerFooter as $line)
+                                <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
+                            @endforeach
+                        </td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
