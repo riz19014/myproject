@@ -102,6 +102,8 @@
             <span class="text-success">Payment in:</span> Rs {{ number_format($grandCashIn, 0) }}
             <span class="mx-2">·</span>
             <span class="text-danger">Payment out:</span> Rs {{ number_format($grandCashOut, 0) }}
+            <span class="mx-2">·</span>
+            <span class="text-body">Opening balance:</span> Rs {{ number_format($openingBalanceSummary, 0) }}
         </p>
 
         <div class="table-responsive">

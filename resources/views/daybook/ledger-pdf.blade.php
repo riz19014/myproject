@@ -117,6 +117,8 @@
         <span class="in">Payment in (range): Rs {{ number_format($grandCashIn, 0) }}</span>
         &nbsp;&nbsp;·&nbsp;&nbsp;
         <span class="out">Payment out (range): Rs {{ number_format($grandCashOut, 0) }}</span>
+        &nbsp;&nbsp;·&nbsp;&nbsp;
+        <span style="color:#0f172a;font-weight:bold;">Opening balance: Rs {{ number_format($openingBalanceSummary, 0) }}</span>
     </div>
 
     <table class="ledger-table">

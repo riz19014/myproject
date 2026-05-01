@@ -306,15 +306,6 @@ class DayBookController extends Controller
             $dateLabel = $d->format('d M Y');
 
             if ($partyId !== null) {
-                $partyOpen = (float) $block['party_running_open'];
-                $rows[] = [
-                    'date' => $dateLabel,
-                    'payment' => '—',
-                    'amount' => number_format($partyOpen, 0),
-                    'description' => 'Opening balance',
-                    'balance' => $partyOpen,
-                    'is_meta' => true,
-                ];
                 foreach ($block['tableRows'] as $tr) {
                     $rows[] = [
                         'date' => $dateLabel,
@@ -326,14 +317,6 @@ class DayBookController extends Controller
                 }
                 $partyRunning = (float) $block['closingBalance'];
             } else {
-                $rows[] = [
-                    'date' => $dateLabel,
-                    'payment' => '—',
-                    'amount' => number_format((float) $block['openingAmount'], 0),
-                    'description' => 'Opening balance',
-                    'balance' => (float) $block['openingAmount'],
-                    'is_meta' => true,
-                ];
                 $petty = (float) $block['pettyCashAmount'];
                 $rows[] = [
                     'date' => $dateLabel,
@@ -385,6 +368,19 @@ class DayBookController extends Controller
             ->sum('amount');
 
         return [$grandCashIn, $grandCashOut];
+    }
+
+    /**
+     * Carried cash opening on the first day of the ledger range (for summary line, not table rows).
+     */
+    private function ledgerOpeningBalanceForSummary(Carbon $from): float
+    {
+        $this->syncOpeningFromPreviousDay($from);
+        $rec = DaybookOpeningBalance::query()
+            ->where('balance_date', $from->toDateString())
+            ->first();
+
+        return $rec ? (float) $rec->amount : 0.0;
     }
 
     public function index(Request $request)
@@ -467,6 +463,7 @@ class DayBookController extends Controller
 
         $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
         [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
+        $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
 
         $selectedParty = $partyId !== null ? Party::query()->find($partyId) : null;
         $parties = Party::query()->orderBy('name')->get();
@@ -480,6 +477,7 @@ class DayBookController extends Controller
             'ledgerRows' => $ledgerRows,
             'grandCashIn' => $grandCashIn,
             'grandCashOut' => $grandCashOut,
+            'openingBalanceSummary' => $openingBalanceSummary,
         ]);
     }
 
@@ -492,6 +490,7 @@ class DayBookController extends Controller
 
         $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
         [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
+        $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
 
         $generatedAt = now();
         $selectedParty = $partyId !== null ? Party::query()->find($partyId) : null;
@@ -504,6 +503,7 @@ class DayBookController extends Controller
             'ledgerRows' => $ledgerRows,
             'grandCashIn' => $grandCashIn,
             'grandCashOut' => $grandCashOut,
+            'openingBalanceSummary' => $openingBalanceSummary,
             'generatedAt' => $generatedAt,
         ]);
         $pdf->setPaper('a4', 'portrait');
