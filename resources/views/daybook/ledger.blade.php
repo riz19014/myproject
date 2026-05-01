@@ -41,8 +41,9 @@
 
 @section('content')
 @php
+    $ledger_ready = $ledger_ready ?? false;
     $pdfQuery = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
-    if ($party_id) {
+    if ($ledger_ready && $party_id) {
         $pdfQuery['party_id'] = $party_id;
     }
     $clearPartyQuery = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
@@ -50,18 +51,19 @@
 <div class="no-print mb-3">
     <div class="d-flex flex-wrap align-items-end gap-3">
         <form method="get" action="{{ route('daybook.ledger') }}" class="d-flex flex-wrap align-items-end gap-3 flex-grow-1" id="ledger-filter-form">
+            <input type="hidden" name="_ledger" value="1">
             <div style="min-width: min(100%, 220px); max-width: 320px;">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                    <label class="form-label small text-muted mb-0" for="ledger_form_party_search">Party</label>
+                    <label class="form-label small text-muted mb-0" for="ledger_form_party_search">Party <span class="text-danger">*</span></label>
                     <a href="{{ route('daybook.index') }}" class="small fw-semibold text-decoration-none">+ Create on Daybook</a>
                 </div>
                 <div class="daybook-form-combo @error('party_id') is-invalid @enderror">
-                    <input type="hidden" name="party_id" id="ledger_form_party_id" value="{{ $party_id ?: '' }}">
+                    <input type="hidden" name="party_id" id="ledger_form_party_id" value="{{ old('party_id', $party_id ?: '') }}">
                     <input
                         type="text"
                         class="form-control form-control-theme @error('party_id') is-invalid @enderror"
                         id="ledger_form_party_search"
-                        placeholder="Search party… (optional)"
+                        placeholder="Search party…"
                         autocomplete="off"
                         role="combobox"
                         aria-expanded="false"
@@ -89,7 +91,7 @@
         </form>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-outline-theme" onclick="window.print()">Print</button>
-            <a class="btn btn-outline-theme" id="ledger-pdf-link" href="{{ route('daybook.ledger.pdf', $pdfQuery) }}">Download PDF</a>
+            <a class="btn btn-outline-theme" id="ledger-pdf-link" href="{{ $ledger_ready ? route('daybook.ledger.pdf', $pdfQuery) : '#' }}">Download PDF</a>
             <a class="btn btn-outline-theme" href="{{ route('daybook.index') }}">Daybook</a>
         </div>
     </div>
@@ -107,13 +109,25 @@
     <div class="card-body">
         <h1 class="h5 mb-2">Daybook ledger</h1>
         <p class="text-muted small mb-2">{{ $from->format('j M Y') }} — {{ $to->format('j M Y') }}@if($selectedParty) · <strong>{{ $selectedParty->name }}</strong>@endif</p>
-        <p class="small text-muted mb-3">
-            <span class="text-success">Payment in:</span> Rs {{ number_format($grandCashIn, 0) }}
-            <span class="mx-2">·</span>
-            <span class="text-danger">Payment out:</span> Rs {{ number_format($grandCashOut, 0) }}
-            <span class="mx-2">·</span>
-            <span class="text-body">Opening balance:</span> {{ $openingBalanceSummaryDisplay }}
-        </p>
+        @if($ledger_ready && ($grandCashIn > 0 || $grandCashOut > 0 || $openingBalanceSummary != 0.0))
+            <p class="small text-muted mb-3">
+                @php $sep = false; @endphp
+                @if($grandCashIn > 0)
+                    @if($sep)<span class="mx-2">·</span>@endif
+                    <span class="text-success">Payment in:</span> Rs {{ number_format($grandCashIn, 0) }}
+                    @php $sep = true; @endphp
+                @endif
+                @if($grandCashOut > 0)
+                    @if($sep)<span class="mx-2">·</span>@endif
+                    <span class="text-danger">Payment out:</span> Rs {{ number_format($grandCashOut, 0) }}
+                    @php $sep = true; @endphp
+                @endif
+                @if($openingBalanceSummary != 0.0)
+                    @if($sep)<span class="mx-2">·</span>@endif
+                    <span class="text-body">Opening balance:</span> {{ $openingBalanceSummaryDisplay }}
+                @endif
+            </p>
+        @endif
 
         <div class="table-responsive">
             <table class="table table-bordered table-sm mb-0 align-middle daybook-ledger-statement">
@@ -137,10 +151,17 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-muted text-center py-4">{{ $selectedParty ? 'No lines for this party in this range.' : 'No rows for this range.' }}</td>
+                            <td colspan="5" class="text-muted text-center py-4">
+                                @if(!$ledger_ready)
+                                    Please select a party to view the ledger.
+                                @else
+                                    No lines for this party in this range.
+                                @endif
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
+                @if(count($ledgerFooter))
                 <tfoot>
                     <tr class="border-top border-2">
                         <td colspan="3" class="border-end-0 bg-transparent"></td>
@@ -151,6 +172,7 @@
                         </td>
                     </tr>
                 </tfoot>
+                @endif
             </table>
         </div>
     </div>
@@ -188,7 +210,13 @@
     }
 
     if (form && submitBtn) {
-        form.addEventListener('submit', function () {
+        form.addEventListener('submit', function (e) {
+            var pid = document.getElementById('ledger_form_party_id');
+            if (!pid || !String(pid.value || '').trim()) {
+                e.preventDefault();
+                alert('Please select a party first.');
+                return;
+            }
             showOverlay('Loading ledger…');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Loading…';
@@ -204,7 +232,10 @@
         pdfLink.addEventListener('click', function (e) {
             e.preventDefault();
             var href = pdfLink.getAttribute('href');
-            if (!href) return;
+            if (!href || href === '#') {
+                alert('Please select a party first.');
+                return;
+            }
             showOverlay('Preparing PDF…');
             fetch(href, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
                 .then(function (res) {
@@ -235,9 +266,7 @@
                         URL.revokeObjectURL(url);
                     }, 2000);
                 })
-                .catch(function () {
-                    window.location.href = href;
-                })
+                .catch(function () {})
                 .finally(function () {
                     hideOverlay();
                 });

@@ -91,23 +91,32 @@ class DayBookController extends Controller
     }
 
     /**
-     * Normalised from/to and optional party filter for ledger screens and PDF.
+     * Normalised from/to for ledger (party handled separately).
      *
-     * @return array{from: Carbon, to: Carbon, party_id: int|null}
+     * @return array{from: Carbon, to: Carbon}
      */
-    private function ledgerRangeFromRequest(Request $request): array
+    private function ledgerDateRangeFromRequest(Request $request): array
     {
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
-            'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
         ]);
 
-        $to = ! empty($validated['to'] ?? null)
-            ? Carbon::parse($validated['to'])->startOfDay()
+        return $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
+    }
+
+    /**
+     * @param  mixed  $fromRaw
+     * @param  mixed  $toRaw
+     * @return array{from: Carbon, to: Carbon}
+     */
+    private function normalizeLedgerDates($fromRaw, $toRaw): array
+    {
+        $to = ! empty($toRaw)
+            ? Carbon::parse($toRaw)->startOfDay()
             : Carbon::today();
-        $from = ! empty($validated['from'] ?? null)
-            ? Carbon::parse($validated['from'])->startOfDay()
+        $from = ! empty($fromRaw)
+            ? Carbon::parse($fromRaw)->startOfDay()
             : $to->copy()->startOfMonth();
 
         if ($from->gt($to)) {
@@ -120,12 +129,9 @@ class DayBookController extends Controller
             $from = $to->copy()->subDays(365);
         }
 
-        $partyId = isset($validated['party_id']) ? (int) $validated['party_id'] : null;
-
         return [
             'from' => $from,
             'to' => $to,
-            'party_id' => $partyId,
         ];
     }
 
@@ -314,22 +320,20 @@ class DayBookController extends Controller
      *
      * @return list<array{date: string, payment: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
      */
-    private function ledgerStatementRows(Carbon $from, Carbon $to, ?int $partyId): array
+    private function ledgerStatementRows(Carbon $from, Carbon $to, int $partyId): array
     {
         $rows = [];
         $openingBase = $this->ledgerOpeningBalanceForSummary($from);
         $running = $openingBase;
 
         for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
-            if ($partyId !== null) {
-                $hasPartyLines = DayBookEntry::query()
-                    ->whereDate('entry_date', $d)
-                    ->where('link_type', DayBookEntry::LINK_PARTY)
-                    ->where('link_id', $partyId)
-                    ->exists();
-                if (! $hasPartyLines) {
-                    continue;
-                }
+            $hasPartyLines = DayBookEntry::query()
+                ->whereDate('entry_date', $d)
+                ->where('link_type', DayBookEntry::LINK_PARTY)
+                ->where('link_id', $partyId)
+                ->exists();
+            if (! $hasPartyLines) {
+                continue;
             }
 
             $block = $this->buildSingleDayLedger($d, $partyId, 0.0);
@@ -339,41 +343,16 @@ class DayBookController extends Controller
 
             $dateLabel = $d->format('d M Y');
 
-            if ($partyId !== null) {
-                foreach ($block['tableRows'] as $tr) {
-                    $running += (float) $tr['signed_delta'];
-                    $rows[] = [
-                        'date' => $dateLabel,
-                        'payment' => $tr['type_label'],
-                        'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
-                        'description' => $tr['description'],
-                        'balance' => $running,
-                        'balance_display' => $this->formatLedgerBalanceCell($running),
-                    ];
-                }
-            } else {
-                $petty = (float) $block['pettyCashAmount'];
-                $running += $petty;
+            foreach ($block['tableRows'] as $tr) {
+                $running += (float) $tr['signed_delta'];
                 $rows[] = [
                     'date' => $dateLabel,
-                    'payment' => '—',
-                    'amount' => $petty > 0 ? '+'.number_format($petty, 0) : '—',
-                    'description' => 'Petty cash',
+                    'payment' => $tr['type_label'],
+                    'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
+                    'description' => $tr['description'],
                     'balance' => $running,
                     'balance_display' => $this->formatLedgerBalanceCell($running),
-                    'is_meta' => true,
                 ];
-                foreach ($block['tableRows'] as $tr) {
-                    $running += (float) $tr['signed_delta'];
-                    $rows[] = [
-                        'date' => $dateLabel,
-                        'payment' => $tr['type_label'],
-                        'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
-                        'description' => $tr['description'],
-                        'balance' => $running,
-                        'balance_display' => $this->formatLedgerBalanceCell($running),
-                    ];
-                }
             }
         }
 
@@ -383,7 +362,7 @@ class DayBookController extends Controller
     /**
      * @return array{0: float, 1: float} [cash in, cash out]
      */
-    private function ledgerGrandTotalsForRange(Carbon $from, Carbon $to, ?int $partyId): array
+    private function ledgerGrandTotalsForRange(Carbon $from, Carbon $to, int $partyId): array
     {
         $fromStr = $from->toDateString();
         $toStr = $to->toDateString();
@@ -391,19 +370,15 @@ class DayBookController extends Controller
             ->where('entry_date', '>=', $fromStr)
             ->where('entry_date', '<=', $toStr)
             ->where('type', DayBookEntry::TYPE_CASH_IN)
-            ->when($partyId !== null, function ($q) use ($partyId): void {
-                $q->where('link_type', DayBookEntry::LINK_PARTY)
-                    ->where('link_id', $partyId);
-            })
+            ->where('link_type', DayBookEntry::LINK_PARTY)
+            ->where('link_id', $partyId)
             ->sum('amount');
         $grandCashOut = (float) DayBookEntry::query()
             ->where('entry_date', '>=', $fromStr)
             ->where('entry_date', '<=', $toStr)
             ->where('type', DayBookEntry::TYPE_CASH_OUT)
-            ->when($partyId !== null, function ($q) use ($partyId): void {
-                $q->where('link_type', DayBookEntry::LINK_PARTY)
-                    ->where('link_id', $partyId);
-            })
+            ->where('link_type', DayBookEntry::LINK_PARTY)
+            ->where('link_id', $partyId)
             ->sum('amount');
 
         return [$grandCashIn, $grandCashOut];
@@ -416,17 +391,26 @@ class DayBookController extends Controller
      */
     private function ledgerTableFooterRows(float $openingBalanceSummary, float $grandCashIn, float $grandCashOut, array $ledgerRows): array
     {
-        $closing = $openingBalanceSummary;
-        if ($ledgerRows !== []) {
-            $closing = (float) end($ledgerRows)['balance'];
+        if ($ledgerRows === []) {
+            return [
+                ['label' => 'Balance', 'value' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary)],
+            ];
         }
 
-        return [
-            ['label' => 'Opening Balance', 'value' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary)],
-            ['label' => 'Total Received', 'value' => 'Rs '.number_format($grandCashIn, 0)],
-            ['label' => 'Total Given', 'value' => 'Rs '.number_format($grandCashOut, 0)],
-            ['label' => 'Closing Balance', 'value' => $this->formatLedgerOpeningSummaryLine($closing)],
-        ];
+        $closing = (float) end($ledgerRows)['balance'];
+        $lines = [];
+        if ($openingBalanceSummary != 0.0) {
+            $lines[] = ['label' => 'Opening Balance', 'value' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary)];
+        }
+        if ($grandCashIn > 0.0) {
+            $lines[] = ['label' => 'Total Received', 'value' => 'Rs '.number_format($grandCashIn, 0)];
+        }
+        if ($grandCashOut > 0.0) {
+            $lines[] = ['label' => 'Total Given', 'value' => 'Rs '.number_format($grandCashOut, 0)];
+        }
+        $lines[] = ['label' => 'Closing Balance', 'value' => $this->formatLedgerOpeningSummaryLine($closing)];
+
+        return $lines;
     }
 
     /**
@@ -515,18 +499,46 @@ class DayBookController extends Controller
 
     public function ledger(Request $request)
     {
-        $range = $this->ledgerRangeFromRequest($request);
+        $range = $this->ledgerDateRangeFromRequest($request);
         $from = $range['from'];
         $to = $range['to'];
-        $partyId = $range['party_id'];
+        $parties = Party::query()->orderBy('name')->get();
+
+        $emptyPayload = [
+            'from' => $from,
+            'to' => $to,
+            'party_id' => null,
+            'selectedParty' => null,
+            'parties' => $parties,
+            'ledgerRows' => [],
+            'grandCashIn' => 0.0,
+            'grandCashOut' => 0.0,
+            'openingBalanceSummary' => 0.0,
+            'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine(0.0),
+            'ledgerFooter' => [],
+            'ledger_ready' => false,
+        ];
+
+        if ($request->filled('_ledger') && ! $request->filled('party_id')) {
+            return view('daybook.ledger', $emptyPayload)
+                ->withErrors(['party_id' => 'Please select a party first.']);
+        }
+
+        if (! $request->filled('party_id')) {
+            return view('daybook.ledger', $emptyPayload);
+        }
+
+        $validated = $request->validate([
+            'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
+        ]);
+        $partyId = (int) $validated['party_id'];
 
         $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
         [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
         $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
         $ledgerFooter = $this->ledgerTableFooterRows($openingBalanceSummary, $grandCashIn, $grandCashOut, $ledgerRows);
 
-        $selectedParty = $partyId !== null ? Party::query()->find($partyId) : null;
-        $parties = Party::query()->orderBy('name')->get();
+        $selectedParty = Party::query()->findOrFail($partyId);
 
         return view('daybook.ledger', [
             'from' => $from,
@@ -540,15 +552,21 @@ class DayBookController extends Controller
             'openingBalanceSummary' => $openingBalanceSummary,
             'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary),
             'ledgerFooter' => $ledgerFooter,
+            'ledger_ready' => true,
         ]);
     }
 
     public function ledgerPdf(Request $request)
     {
-        $range = $this->ledgerRangeFromRequest($request);
-        $from = $range['from'];
-        $to = $range['to'];
-        $partyId = $range['party_id'];
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
+        ]);
+        $dates = $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
+        $from = $dates['from'];
+        $to = $dates['to'];
+        $partyId = (int) $validated['party_id'];
 
         $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
         [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
@@ -556,7 +574,7 @@ class DayBookController extends Controller
         $ledgerFooter = $this->ledgerTableFooterRows($openingBalanceSummary, $grandCashIn, $grandCashOut, $ledgerRows);
 
         $generatedAt = now();
-        $selectedParty = $partyId !== null ? Party::query()->find($partyId) : null;
+        $selectedParty = Party::query()->findOrFail($partyId);
 
         $pdf = Pdf::loadView('daybook.ledger-pdf', [
             'from' => $from,
@@ -573,11 +591,7 @@ class DayBookController extends Controller
         ]);
         $pdf->setPaper('a4', 'portrait');
 
-        $filename = 'daybook-ledger-'.$from->format('Y-m-d').'_to_'.$to->format('Y-m-d');
-        if ($partyId !== null) {
-            $filename .= '-party-'.$partyId;
-        }
-        $filename .= '.pdf';
+        $filename = 'daybook-ledger-'.$from->format('Y-m-d').'_to_'.$to->format('Y-m-d').'-party-'.$partyId.'.pdf';
 
         return $pdf->download($filename);
     }
