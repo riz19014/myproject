@@ -261,7 +261,23 @@ class DayBookController extends Controller
     }
 
     /**
+     * Strip "Rs" from daybook amount_str for ledger cells; units (Rs.) are shown in column headings.
+     */
+    private function ledgerStatementAmountCell(string $amountStr): string
+    {
+        $s = trim($amountStr);
+        if ($s === '' || $s === '—') {
+            return '—';
+        }
+        $s = str_replace(['+Rs ', '-Rs ', '+Rs', '-Rs', 'Rs '], ['+', '-', '+', '-', ''], $s);
+        $s = ltrim($s);
+
+        return $s === '' ? '—' : $s;
+    }
+
+    /**
      * Flat rows for ledger statement: date, payment, amount, description, balance.
+     * Amount and balance cells are numeric only; (Rs.) is in the view column titles.
      *
      * @return list<array{date: string, payment: string, amount: string, description: string, balance: float, is_meta?: bool}>
      */
@@ -290,21 +306,11 @@ class DayBookController extends Controller
             $dateLabel = $d->format('d M Y');
 
             if ($partyId !== null) {
-                if ((float) $block['party_running_open'] != 0.0) {
-                    $rows[] = [
-                        'date' => $dateLabel,
-                        'payment' => '—',
-                        'amount' => '—',
-                        'description' => 'Brought forward',
-                        'balance' => (float) $block['party_running_open'],
-                        'is_meta' => true,
-                    ];
-                }
                 foreach ($block['tableRows'] as $tr) {
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => $tr['type_label'],
-                        'amount' => $tr['amount_str'],
+                        'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
                         'description' => $tr['description'],
                         'balance' => (float) $tr['balance'],
                     ];
@@ -323,7 +329,7 @@ class DayBookController extends Controller
                 $rows[] = [
                     'date' => $dateLabel,
                     'payment' => '—',
-                    'amount' => $petty > 0 ? '+Rs '.number_format($petty, 0) : '—',
+                    'amount' => $petty > 0 ? '+'.number_format($petty, 0) : '—',
                     'description' => 'Petty cash',
                     'balance' => (float) $block['openingAmount'] + $petty,
                     'is_meta' => true,
@@ -332,7 +338,7 @@ class DayBookController extends Controller
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => $tr['type_label'],
-                        'amount' => $tr['amount_str'],
+                        'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
                         'description' => $tr['description'],
                         'balance' => (float) $tr['balance'],
                     ];

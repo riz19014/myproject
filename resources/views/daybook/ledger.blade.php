@@ -83,9 +83,9 @@
                     <tr class="table-dark">
                         <th scope="col" style="width:10%">Date</th>
                         <th scope="col" style="width:12%">Payment</th>
-                        <th scope="col" class="text-end" style="width:12%">Amount</th>
+                        <th scope="col" class="text-end" style="width:12%">Amount (Rs.)</th>
                         <th scope="col">Description</th>
-                        <th scope="col" class="text-end" style="width:12%">Balance</th>
+                        <th scope="col" class="text-end" style="width:12%">Balance (Rs.)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -95,7 +95,7 @@
                             <td>{{ $r['payment'] }}</td>
                             <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td>{{ $r['description'] }}</td>
-                            <td class="text-end font-monospace">Rs {{ number_format($r['balance'], 0) }}</td>
+                            <td class="text-end font-monospace">{{ number_format($r['balance'], 0) }}</td>
                         </tr>
                     @empty
                         <tr>

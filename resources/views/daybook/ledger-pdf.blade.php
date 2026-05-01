@@ -124,9 +124,9 @@
             <tr>
                 <th style="width:10%">Date</th>
                 <th style="width:13%">Payment</th>
-                <th class="amt" style="width:14%">Amount</th>
+                <th class="amt" style="width:14%">Amount (Rs.)</th>
                 <th>Description</th>
-                <th class="amt" style="width:14%">Balance</th>
+                <th class="amt" style="width:14%">Balance (Rs.)</th>
             </tr>
         </thead>
         <tbody>
@@ -136,7 +136,7 @@
                     <td>{{ $r['payment'] }}</td>
                     <td class="amt">{{ $r['amount'] }}</td>
                     <td>{{ $r['description'] }}</td>
-                    <td class="amt">Rs {{ number_format($r['balance'], 0) }}</td>
+                    <td class="amt">{{ number_format($r['balance'], 0) }}</td>
                 </tr>
             @empty
                 <tr>
