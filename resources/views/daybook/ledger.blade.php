@@ -81,10 +81,11 @@
             <table class="table table-bordered table-sm mb-0 align-middle daybook-ledger-statement">
                 <thead class="text-nowrap">
                     <tr class="table-dark">
-                        <th scope="col" style="width:11%">Date</th>
-                        <th scope="col" style="width:14%">Payment</th>
+                        <th scope="col" style="width:10%">Date</th>
+                        <th scope="col" style="width:12%">Payment</th>
+                        <th scope="col" class="text-end" style="width:12%">Amount</th>
                         <th scope="col">Description</th>
-                        <th scope="col" class="text-end" style="width:14%">Balance</th>
+                        <th scope="col" class="text-end" style="width:12%">Balance</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -92,12 +93,13 @@
                         <tr @class(['table-light' => !empty($r['is_meta'])])>
                             <td>{{ $r['date'] }}</td>
                             <td>{{ $r['payment'] }}</td>
+                            <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td>{{ $r['description'] }}</td>
                             <td class="text-end font-monospace">Rs {{ number_format($r['balance'], 0) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-muted text-center py-4">{{ $selectedParty ? 'No lines for this party in this range.' : 'No rows for this range.' }}</td>
+                            <td colspan="5" class="text-muted text-center py-4">{{ $selectedParty ? 'No lines for this party in this range.' : 'No rows for this range.' }}</td>
                         </tr>
                     @endforelse
                 </tbody>

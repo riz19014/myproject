@@ -122,10 +122,11 @@
     <table class="ledger-table">
         <thead>
             <tr>
-                <th style="width:11%">Date</th>
-                <th style="width:15%">Payment</th>
+                <th style="width:10%">Date</th>
+                <th style="width:13%">Payment</th>
+                <th class="amt" style="width:14%">Amount</th>
                 <th>Description</th>
-                <th class="amt" style="width:16%">Balance</th>
+                <th class="amt" style="width:14%">Balance</th>
             </tr>
         </thead>
         <tbody>
@@ -133,12 +134,13 @@
                 <tr @if(!empty($r['is_meta'])) class="meta" @endif>
                     <td>{{ $r['date'] }}</td>
                     <td>{{ $r['payment'] }}</td>
+                    <td class="amt">{{ $r['amount'] }}</td>
                     <td>{{ $r['description'] }}</td>
                     <td class="amt">Rs {{ number_format($r['balance'], 0) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4" style="text-align:center;color:#64748b;padding:16px;">
+                    <td colspan="5" style="text-align:center;color:#64748b;padding:16px;">
                         {{ !empty($selectedParty) ? 'No lines for this party in this range.' : 'No rows for this range.' }}
                     </td>
                 </tr>

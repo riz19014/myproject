@@ -261,9 +261,9 @@ class DayBookController extends Controller
     }
 
     /**
-     * Flat rows for ledger statement: date, payment, description, balance.
+     * Flat rows for ledger statement: date, payment, amount, description, balance.
      *
-     * @return list<array{date: string, payment: string, description: string, balance: float, is_meta?: bool}>
+     * @return list<array{date: string, payment: string, amount: string, description: string, balance: float, is_meta?: bool}>
      */
     private function ledgerStatementRows(Carbon $from, Carbon $to, ?int $partyId): array
     {
@@ -294,6 +294,7 @@ class DayBookController extends Controller
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => '—',
+                        'amount' => '—',
                         'description' => 'Brought forward',
                         'balance' => (float) $block['party_running_open'],
                         'is_meta' => true,
@@ -303,6 +304,7 @@ class DayBookController extends Controller
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => $tr['type_label'],
+                        'amount' => $tr['amount_str'],
                         'description' => $tr['description'],
                         'balance' => (float) $tr['balance'],
                     ];
@@ -312,21 +314,25 @@ class DayBookController extends Controller
                 $rows[] = [
                     'date' => $dateLabel,
                     'payment' => '—',
+                    'amount' => '—',
                     'description' => 'Opening balance (carried)',
                     'balance' => (float) $block['openingAmount'],
                     'is_meta' => true,
                 ];
+                $petty = (float) $block['pettyCashAmount'];
                 $rows[] = [
                     'date' => $dateLabel,
                     'payment' => '—',
+                    'amount' => $petty > 0 ? '+Rs '.number_format($petty, 0) : '—',
                     'description' => 'Petty cash',
-                    'balance' => (float) $block['openingAmount'] + (float) $block['pettyCashAmount'],
+                    'balance' => (float) $block['openingAmount'] + $petty,
                     'is_meta' => true,
                 ];
                 foreach ($block['tableRows'] as $tr) {
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => $tr['type_label'],
+                        'amount' => $tr['amount_str'],
                         'description' => $tr['description'],
                         'balance' => (float) $tr['balance'],
                     ];
