@@ -69,142 +69,40 @@
 
 <div class="card card-theme daybook-ledger-print mb-4">
     <div class="card-body">
-        <h1 class="h4 mb-1">Daybook ledger</h1>
-        <p class="text-muted small mb-1">Period: {{ $from->format('l, j M Y') }} to {{ $to->format('l, j M Y') }}</p>
-        @if($selectedParty)
-            <p class="small mb-3"><span class="text-muted">Party:</span> <strong>{{ $selectedParty->name }}</strong> — showing daybook lines linked to this party only; balance is cumulative across the selected dates.</p>
-        @else
-            <p class="text-muted small mb-3">Full cash book (all parties and links).</p>
-        @endif
+        <h1 class="h5 mb-2">Daybook ledger</h1>
+        <p class="text-muted small mb-2">{{ $from->format('j M Y') }} — {{ $to->format('j M Y') }}@if($selectedParty) · <strong>{{ $selectedParty->name }}</strong>@endif</p>
+        <p class="small text-muted mb-3">
+            <span class="text-success">Payment in:</span> Rs {{ number_format($grandCashIn, 0) }}
+            <span class="mx-2">·</span>
+            <span class="text-danger">Payment out:</span> Rs {{ number_format($grandCashOut, 0) }}
+        </p>
 
-        <div class="rounded border bg-light-subtle p-3 mb-4" style="border-color: rgba(15, 23, 42, 0.12) !important;">
-            <div class="row g-2 text-center small">
-                <div class="col-6 col-md-3">
-                    <div class="text-muted">Payment in (range){{ $selectedParty ? ' · party' : '' }}</div>
-                    <div class="fw-semibold text-success">Rs {{ number_format($grandCashIn, 0) }}</div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="text-muted">Payment out (range){{ $selectedParty ? ' · party' : '' }}</div>
-                    <div class="fw-semibold text-danger">Rs {{ number_format($grandCashOut, 0) }}</div>
-                </div>
-            </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm mb-0 align-middle daybook-ledger-statement">
+                <thead class="text-nowrap">
+                    <tr class="table-dark">
+                        <th scope="col" style="width:11%">Date</th>
+                        <th scope="col" style="width:14%">Payment</th>
+                        <th scope="col">Description</th>
+                        <th scope="col" class="text-end" style="width:14%">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($ledgerRows as $r)
+                        <tr @class(['table-light' => !empty($r['is_meta'])])>
+                            <td>{{ $r['date'] }}</td>
+                            <td>{{ $r['payment'] }}</td>
+                            <td>{{ $r['description'] }}</td>
+                            <td class="text-end font-monospace">Rs {{ number_format($r['balance'], 0) }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="text-muted text-center py-4">{{ $selectedParty ? 'No lines for this party in this range.' : 'No rows for this range.' }}</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-
-        @forelse($ledgerDays as $L)
-            @php
-                $day = $L['day'];
-                $prevDay = $L['prevDay'];
-                $previousDayClosing = $L['previousDayClosing'];
-                $openingAmount = $L['openingAmount'];
-                $pettyCashAmount = $L['pettyCashAmount'];
-                $cashIn = $L['cashIn'];
-                $cashOut = $L['cashOut'];
-                $closingBalance = $L['closingBalance'];
-                $tableRows = $L['tableRows'];
-                $partyFilter = ! empty($L['party_filter']);
-                $partyRunningOpen = (float) ($L['party_running_open'] ?? 0);
-            @endphp
-            <section class="mb-4 pb-4 border-bottom" style="border-color: rgba(15, 23, 42, 0.1) !important;">
-                <h2 class="h6 text-primary-emphasis mb-2">{{ $day->format('l, j M Y') }}</h2>
-
-                @if($partyFilter)
-                    @if($partyRunningOpen != 0.0)
-                        <p class="small text-muted mb-2">Cumulative balance at start of day: <strong>Rs {{ number_format($partyRunningOpen, 0) }}</strong></p>
-                    @endif
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-bordered mb-0">
-                            <tbody>
-                                <tr class="table-light">
-                                    <th class="text-muted small" style="width:28%">Payment in (day)</th>
-                                    <td class="text-success">Rs {{ number_format($cashIn, 0) }}</td>
-                                    <th class="text-muted small" style="width:28%">Payment out (day)</th>
-                                    <td class="text-danger">Rs {{ number_format($cashOut, 0) }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <th class="text-muted small" colspan="2">Closing (cumulative)</th>
-                                    <td class="fw-bold text-success" colspan="2">Rs {{ number_format($closingBalance, 0) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="small text-muted mb-2">Previous day ({{ $prevDay->format('l, j M Y') }}) closing: <strong>Rs {{ number_format($previousDayClosing, 0) }}</strong></p>
-
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-bordered mb-0">
-                            <tbody>
-                                <tr class="table-light">
-                                    <th class="text-muted small" style="width:20%">Opening</th>
-                                    <td>Rs {{ number_format($openingAmount, 0) }}</td>
-                                    <th class="text-muted small" style="width:20%">Petty cash</th>
-                                    <td>Rs {{ number_format($pettyCashAmount, 0) }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <th class="text-muted small">Payment in</th>
-                                    <td class="text-success">Rs {{ number_format($cashIn, 0) }}</td>
-                                    <th class="text-muted small">Payment out</th>
-                                    <td class="text-danger">Rs {{ number_format($cashOut, 0) }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <th class="text-muted small" colspan="2">Closing balance</th>
-                                    <td class="fw-bold text-success" colspan="2">Rs {{ number_format($closingBalance, 0) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-
-                <div class="table-responsive">
-                    <table class="table table-theme table-sm mb-0">
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th>Payment</th>
-                                <th class="text-end">Amount</th>
-                                <th class="text-end">Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if($partyFilter)
-                                @if($partyRunningOpen != 0.0)
-                                    <tr class="table-secondary">
-                                        <td colspan="2">Brought forward</td>
-                                        <td class="text-end"></td>
-                                        <td class="text-end fw-medium">Rs {{ number_format($partyRunningOpen, 0) }}</td>
-                                    </tr>
-                                @endif
-                            @else
-                                <tr class="table-secondary">
-                                    <td colspan="2">Opening balance (carried)</td>
-                                    <td class="text-end"></td>
-                                    <td class="text-end fw-medium">Rs {{ number_format($openingAmount, 0) }}</td>
-                                </tr>
-                                <tr class="table-secondary">
-                                    <td colspan="2">Petty cash</td>
-                                    <td class="text-end">Rs {{ number_format($pettyCashAmount, 0) }}</td>
-                                    <td class="text-end fw-medium">Rs {{ number_format($openingAmount + $pettyCashAmount, 0) }}</td>
-                                </tr>
-                            @endif
-                            @foreach($tableRows as $row)
-                                <tr>
-                                    <td>{{ $row['description'] }}</td>
-                                    <td>{{ $row['type_label'] }}</td>
-                                    <td class="text-end">{{ $row['amount_str'] }}</td>
-                                    <td class="text-end">Rs {{ number_format($row['balance'], 0) }}</td>
-                                </tr>
-                            @endforeach
-                            <tr class="fw-bold border-top border-2">
-                                <td colspan="2">{{ $partyFilter ? 'Closing (cumulative)' : 'Closing balance' }}</td>
-                                <td class="text-end"></td>
-                                <td class="text-end text-success">Rs {{ number_format($closingBalance, 0) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        @empty
-            <p class="text-muted mb-0">{{ $selectedParty ? 'No daybook lines linked to this party in this date range.' : 'No ledger rows for this range.' }}</p>
-        @endforelse
     </div>
 </div>
 @endsection
