@@ -103,7 +103,7 @@
             <span class="mx-2">·</span>
             <span class="text-danger">Payment out:</span> Rs {{ number_format($grandCashOut, 0) }}
             <span class="mx-2">·</span>
-            <span class="text-body">Opening balance:</span> Rs {{ number_format($openingBalanceSummary, 0) }}
+            <span class="text-body">Opening balance:</span> {{ $openingBalanceSummaryDisplay }}
         </p>
 
         <div class="table-responsive">
@@ -124,7 +124,7 @@
                             <td>{{ $r['payment'] }}</td>
                             <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td>{{ $r['description'] }}</td>
-                            <td class="text-end font-monospace">{{ number_format($r['balance'], 0) }}</td>
+                            <td class="text-end font-monospace">{{ $r['balance_display'] }}</td>
                         </tr>
                     @empty
                         <tr>

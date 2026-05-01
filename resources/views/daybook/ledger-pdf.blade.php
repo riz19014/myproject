@@ -118,7 +118,7 @@
         &nbsp;&nbsp;·&nbsp;&nbsp;
         <span class="out">Payment out (range): Rs {{ number_format($grandCashOut, 0) }}</span>
         &nbsp;&nbsp;·&nbsp;&nbsp;
-        <span style="color:#0f172a;font-weight:bold;">Opening balance: Rs {{ number_format($openingBalanceSummary, 0) }}</span>
+        <span style="color:#0f172a;font-weight:bold;">Opening balance: {{ $openingBalanceSummaryDisplay }}</span>
     </div>
 
     <table class="ledger-table">
@@ -138,7 +138,7 @@
                     <td>{{ $r['payment'] }}</td>
                     <td class="amt">{{ $r['amount'] }}</td>
                     <td>{{ $r['description'] }}</td>
-                    <td class="amt">{{ number_format($r['balance'], 0) }}</td>
+                    <td class="amt">{{ $r['balance_display'] }}</td>
                 </tr>
             @empty
                 <tr>

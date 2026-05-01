@@ -182,6 +182,9 @@ class DayBookController extends Controller
             $running = $partyRunningStart;
             $tableRows = [];
             foreach ($entries as $e) {
+                $signedDelta = $e->type === DayBookEntry::TYPE_CASH_IN
+                    ? (float) $e->amount
+                    : -(float) $e->amount;
                 if ($e->type === DayBookEntry::TYPE_CASH_IN) {
                     $running += (float) $e->amount;
                     $amountStr = '+Rs '.number_format((float) $e->amount, 0);
@@ -196,6 +199,7 @@ class DayBookController extends Controller
                     'type_label' => $typeLabel,
                     'amount_str' => $amountStr,
                     'balance' => $running,
+                    'signed_delta' => $signedDelta,
                 ];
             }
             $closingBalance = $running;
@@ -227,6 +231,9 @@ class DayBookController extends Controller
         $running = $openingAmount + $pettyCashAmount;
         $tableRows = [];
         foreach ($entries as $e) {
+            $signedDelta = $e->type === DayBookEntry::TYPE_CASH_IN
+                ? (float) $e->amount
+                : -(float) $e->amount;
             if ($e->type === DayBookEntry::TYPE_CASH_IN) {
                 $running += (float) $e->amount;
                 $amountStr = '+Rs '.number_format((float) $e->amount, 0);
@@ -241,6 +248,7 @@ class DayBookController extends Controller
                 'type_label' => $typeLabel,
                 'amount_str' => $amountStr,
                 'balance' => $running,
+                'signed_delta' => $signedDelta,
             ];
         }
         $closingBalance = $running;
@@ -261,6 +269,30 @@ class DayBookController extends Controller
     }
 
     /**
+     * Balance column for ledger: negatives as (2,600,000); zero or positive as normal digits.
+     */
+    private function formatLedgerBalanceCell(float $value): string
+    {
+        if ($value < 0) {
+            return '('.number_format(abs($value), 0).')';
+        }
+
+        return number_format($value, 0);
+    }
+
+    /**
+     * Summary line opening balance: negative as (2,600,000); otherwise "Rs …".
+     */
+    private function formatLedgerOpeningSummaryLine(float $value): string
+    {
+        if ($value < 0) {
+            return '('.number_format(abs($value), 0).')';
+        }
+
+        return 'Rs '.number_format($value, 0);
+    }
+
+    /**
      * Strip "Rs" from daybook amount_str for ledger cells; units (Rs.) are shown in column headings.
      */
     private function ledgerStatementAmountCell(string $amountStr): string
@@ -277,14 +309,16 @@ class DayBookController extends Controller
 
     /**
      * Flat rows for ledger statement: date, payment, amount, description, balance.
-     * Amount and balance cells are numeric only; (Rs.) is in the view column titles.
+     * Running balance is continuous across the range: starts at opening (from date), never reset per day.
+     * Amount and balance cells are numeric only; (Rs.) is in the view column titles. Negative balances use parentheses.
      *
-     * @return list<array{date: string, payment: string, amount: string, description: string, balance: float, is_meta?: bool}>
+     * @return list<array{date: string, payment: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
      */
     private function ledgerStatementRows(Carbon $from, Carbon $to, ?int $partyId): array
     {
         $rows = [];
-        $partyRunning = 0.0;
+        $openingBase = $this->ledgerOpeningBalanceForSummary($from);
+        $running = $openingBase;
 
         for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
             if ($partyId !== null) {
@@ -298,7 +332,7 @@ class DayBookController extends Controller
                 }
             }
 
-            $block = $this->buildSingleDayLedger($d, $partyId, $partyRunning);
+            $block = $this->buildSingleDayLedger($d, $partyId, 0.0);
             if ($block === null) {
                 continue;
             }
@@ -307,32 +341,37 @@ class DayBookController extends Controller
 
             if ($partyId !== null) {
                 foreach ($block['tableRows'] as $tr) {
+                    $running += (float) $tr['signed_delta'];
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => $tr['type_label'],
                         'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
                         'description' => $tr['description'],
-                        'balance' => (float) $tr['balance'],
+                        'balance' => $running,
+                        'balance_display' => $this->formatLedgerBalanceCell($running),
                     ];
                 }
-                $partyRunning = (float) $block['closingBalance'];
             } else {
                 $petty = (float) $block['pettyCashAmount'];
+                $running += $petty;
                 $rows[] = [
                     'date' => $dateLabel,
                     'payment' => '—',
                     'amount' => $petty > 0 ? '+'.number_format($petty, 0) : '—',
                     'description' => 'Petty cash',
-                    'balance' => (float) $block['openingAmount'] + $petty,
+                    'balance' => $running,
+                    'balance_display' => $this->formatLedgerBalanceCell($running),
                     'is_meta' => true,
                 ];
                 foreach ($block['tableRows'] as $tr) {
+                    $running += (float) $tr['signed_delta'];
                     $rows[] = [
                         'date' => $dateLabel,
                         'payment' => $tr['type_label'],
                         'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
                         'description' => $tr['description'],
-                        'balance' => (float) $tr['balance'],
+                        'balance' => $running,
+                        'balance_display' => $this->formatLedgerBalanceCell($running),
                     ];
                 }
             }
@@ -478,6 +517,7 @@ class DayBookController extends Controller
             'grandCashIn' => $grandCashIn,
             'grandCashOut' => $grandCashOut,
             'openingBalanceSummary' => $openingBalanceSummary,
+            'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary),
         ]);
     }
 
@@ -504,6 +544,7 @@ class DayBookController extends Controller
             'grandCashIn' => $grandCashIn,
             'grandCashOut' => $grandCashOut,
             'openingBalanceSummary' => $openingBalanceSummary,
+            'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary),
             'generatedAt' => $generatedAt,
         ]);
         $pdf->setPaper('a4', 'portrait');
