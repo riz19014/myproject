@@ -56,6 +56,11 @@
             color: #64748b;
             margin-bottom: 8px;
         }
+        .party-open {
+            font-size: 9px;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
         .mini-sum {
             width: 100%;
             border-collapse: collapse;
@@ -96,17 +101,20 @@
 <body>
     <h1>Daybook ledger</h1>
     <div class="sub">{{ $from->format('l, j M Y') }} — {{ $to->format('l, j M Y') }}</div>
+    @if(!empty($selectedParty))
+        <div class="sub" style="margin-top:-8px;"><strong>Party:</strong> {{ $selectedParty->name }} (linked lines only; cumulative balance)</div>
+    @endif
     <div class="generated">Generated on {{ $generatedAt->format('j M Y, g:i A') }}</div>
 
     <div class="grand">
         <table>
             <tr>
                 <td>
-                    <span class="lbl">Payment in (range)</span>
+                    <span class="lbl">Payment in (range){{ !empty($selectedParty) ? ' · party' : '' }}</span>
                     <span class="c-green">Rs {{ number_format($grandCashIn, 0) }}</span>
                 </td>
                 <td>
-                    <span class="lbl">Payment out (range)</span>
+                    <span class="lbl">Payment out (range){{ !empty($selectedParty) ? ' · party' : '' }}</span>
                     <span class="c-red">Rs {{ number_format($grandCashOut, 0) }}</span>
                 </td>
             </tr>
@@ -124,24 +132,42 @@
             $cashOut = $L['cashOut'];
             $closingBalance = $L['closingBalance'];
             $tableRows = $L['tableRows'];
+            $partyFilter = ! empty($L['party_filter']);
+            $partyRunningOpen = (float) ($L['party_running_open'] ?? 0);
         @endphp
         <div class="day-block">
             <h2>{{ $day->format('l, j M Y') }}</h2>
-            <div class="day-prev">Previous day ({{ $prevDay->format('l, j M Y') }}) closing: <strong>Rs {{ number_format($previousDayClosing, 0) }}</strong></div>
 
-            <table class="mini-sum">
-                <tr>
-                    <th>Opening</th><td>Rs {{ number_format($openingAmount, 0) }}</td>
-                    <th>Petty</th><td>Rs {{ number_format($pettyCashAmount, 0) }}</td>
-                </tr>
-                <tr>
-                    <th>Payment in</th><td class="c-green">Rs {{ number_format($cashIn, 0) }}</td>
-                    <th>Payment out</th><td class="c-red">Rs {{ number_format($cashOut, 0) }}</td>
-                </tr>
-                <tr>
-                    <th>Closing</th><td colspan="3" class="c-green"><strong>Rs {{ number_format($closingBalance, 0) }}</strong></td>
-                </tr>
-            </table>
+            @if($partyFilter)
+                @if($partyRunningOpen != 0.0)
+                    <div class="party-open">Cumulative balance at start of day: <strong>Rs {{ number_format($partyRunningOpen, 0) }}</strong></div>
+                @endif
+                <table class="mini-sum">
+                    <tr>
+                        <th>Payment in (day)</th><td class="c-green">Rs {{ number_format($cashIn, 0) }}</td>
+                        <th>Payment out (day)</th><td class="c-red">Rs {{ number_format($cashOut, 0) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Closing (cumulative)</th><td colspan="3" class="c-green"><strong>Rs {{ number_format($closingBalance, 0) }}</strong></td>
+                    </tr>
+                </table>
+            @else
+                <div class="day-prev">Previous day ({{ $prevDay->format('l, j M Y') }}) closing: <strong>Rs {{ number_format($previousDayClosing, 0) }}</strong></div>
+
+                <table class="mini-sum">
+                    <tr>
+                        <th>Opening</th><td>Rs {{ number_format($openingAmount, 0) }}</td>
+                        <th>Petty</th><td>Rs {{ number_format($pettyCashAmount, 0) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Payment in</th><td class="c-green">Rs {{ number_format($cashIn, 0) }}</td>
+                        <th>Payment out</th><td class="c-red">Rs {{ number_format($cashOut, 0) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Closing</th><td colspan="3" class="c-green"><strong>Rs {{ number_format($closingBalance, 0) }}</strong></td>
+                    </tr>
+                </table>
+            @endif
 
             <table class="data-table">
                 <thead>
@@ -153,16 +179,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr class="row-muted">
-                        <td colspan="2">Opening balance (carried)</td>
-                        <td class="amt"></td>
-                        <td class="amt balance-cell">Rs {{ number_format($openingAmount, 0) }}</td>
-                    </tr>
-                    <tr class="row-muted">
-                        <td colspan="2">Petty cash</td>
-                        <td class="amt">Rs {{ number_format($pettyCashAmount, 0) }}</td>
-                        <td class="amt balance-cell">Rs {{ number_format($openingAmount + $pettyCashAmount, 0) }}</td>
-                    </tr>
+                    @if($partyFilter)
+                        @if($partyRunningOpen != 0.0)
+                            <tr class="row-muted">
+                                <td colspan="2">Brought forward</td>
+                                <td class="amt"></td>
+                                <td class="amt balance-cell">Rs {{ number_format($partyRunningOpen, 0) }}</td>
+                            </tr>
+                        @endif
+                    @else
+                        <tr class="row-muted">
+                            <td colspan="2">Opening balance (carried)</td>
+                            <td class="amt"></td>
+                            <td class="amt balance-cell">Rs {{ number_format($openingAmount, 0) }}</td>
+                        </tr>
+                        <tr class="row-muted">
+                            <td colspan="2">Petty cash</td>
+                            <td class="amt">Rs {{ number_format($pettyCashAmount, 0) }}</td>
+                            <td class="amt balance-cell">Rs {{ number_format($openingAmount + $pettyCashAmount, 0) }}</td>
+                        </tr>
+                    @endif
                     @foreach($tableRows as $row)
                         <tr>
                             <td>{{ $row['description'] }}</td>
@@ -172,7 +208,7 @@
                         </tr>
                     @endforeach
                     <tr class="row-closing">
-                        <td colspan="2">Closing balance</td>
+                        <td colspan="2">{{ $partyFilter ? 'Closing (cumulative)' : 'Closing balance' }}</td>
                         <td class="amt"></td>
                         <td class="amt balance-cell">Rs {{ number_format($closingBalance, 0) }}</td>
                     </tr>
@@ -180,7 +216,7 @@
             </table>
         </div>
     @empty
-        <p style="color:#64748b;">No ledger rows for this range.</p>
+        <p style="color:#64748b;">{{ !empty($selectedParty) ? 'No daybook lines linked to this party in this date range.' : 'No ledger rows for this range.' }}</p>
     @endforelse
 </body>
 </html>
