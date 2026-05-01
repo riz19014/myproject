@@ -130,13 +130,25 @@
         <div class="party-line"><strong>Party:</strong> {{ $selectedParty->name }} (linked entries only)</div>
     @endif
 
-    <div class="totals-line">
-        <span class="in">Payment in (range): Rs {{ number_format($grandCashIn, 0) }}</span>
-        &nbsp;&nbsp;·&nbsp;&nbsp;
-        <span class="out">Payment out (range): Rs {{ number_format($grandCashOut, 0) }}</span>
-        &nbsp;&nbsp;·&nbsp;&nbsp;
-        <span style="color:#0f172a;font-weight:bold;">Opening balance: {{ $openingBalanceSummaryDisplay }}</span>
-    </div>
+    @if($grandCashIn > 0 || $grandCashOut > 0 || $openingBalanceSummary != 0.0)
+        <div class="totals-line">
+            @if($grandCashIn > 0)
+                <span class="in">Payment in (range): Rs {{ number_format($grandCashIn, 0) }}</span>
+            @endif
+            @if($grandCashIn > 0 && ($grandCashOut > 0 || $openingBalanceSummary != 0.0))
+                &nbsp;&nbsp;·&nbsp;&nbsp;
+            @endif
+            @if($grandCashOut > 0)
+                <span class="out">Payment out (range): Rs {{ number_format($grandCashOut, 0) }}</span>
+            @endif
+            @if($grandCashOut > 0 && $openingBalanceSummary != 0.0)
+                &nbsp;&nbsp;·&nbsp;&nbsp;
+            @endif
+            @if($openingBalanceSummary != 0.0)
+                <span style="color:#0f172a;font-weight:bold;">Opening balance: {{ $openingBalanceSummaryDisplay }}</span>
+            @endif
+        </div>
+    @endif
 
     <table class="ledger-table">
         <thead>
@@ -165,16 +177,18 @@
                 </tr>
             @endforelse
         </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="3" class="ledger-footer-spacer"></td>
-                <td colspan="2" class="ledger-footer-totals">
-                    @foreach($ledgerFooter as $line)
-                        <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
-                    @endforeach
-                </td>
-            </tr>
-        </tfoot>
+        @if(count($ledgerFooter))
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="ledger-footer-spacer"></td>
+                    <td colspan="2" class="ledger-footer-totals">
+                        @foreach($ledgerFooter as $line)
+                            <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
+                        @endforeach
+                    </td>
+                </tr>
+            </tfoot>
+        @endif
     </table>
 
     <div class="signatures">
