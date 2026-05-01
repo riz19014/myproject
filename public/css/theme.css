@@ -188,6 +188,16 @@ main {
     transform: translateX(1px);
 }
 
+.app-sidebar-link.app-sidebar-link--sub {
+    padding-left: 2.35rem;
+    font-size: 0.92rem;
+    opacity: 0.96;
+}
+
+.app-sidebar-link.app-sidebar-link--sub .app-sidebar-link__icon {
+    font-size: 1rem;
+}
+
 .app-sidebar-link.active {
     background: linear-gradient(90deg, rgba(249, 115, 22, 0.16) 0%, rgba(249, 115, 22, 0.06) 100%);
     border-color: rgba(249, 115, 22, 0.28);
@@ -322,6 +332,80 @@ main {
 .daybook-project-party-chip:focus-visible {
     outline: 2px solid var(--accent-orange);
     outline-offset: 2px;
+}
+
+/* Daybook — amount label + rupees in words */
+.daybook-page .daybook-amount-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.65rem;
+}
+
+.daybook-page .daybook-amount-words {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 0.01em;
+    line-height: 1.35;
+    max-width: 100%;
+}
+
+.daybook-page .daybook-amount-words:not(:empty)::before {
+    content: "· ";
+    color: #94a3b8;
+    font-weight: 700;
+}
+
+/* Daybook New Entry — searchable project / party */
+.daybook-form-combo {
+    position: relative;
+    z-index: 5;
+}
+
+.daybook-form-combo.is-invalid .form-control {
+    border-color: var(--bs-form-invalid-border-color, #dc3545);
+}
+
+.daybook-form-combo-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 20;
+    max-height: min(260px, 45vh);
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.35rem 0;
+    list-style: none;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.daybook-form-combo-list button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.55rem 1rem;
+    border: 0;
+    background: transparent;
+    font-size: 1rem;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+.daybook-form-combo-list button:hover,
+.daybook-form-combo-list button:focus {
+    background: rgba(249, 115, 22, 0.12);
+    outline: none;
+}
+
+.daybook-form-combo-list .daybook-form-combo-empty {
+    padding: 0.65rem 1rem;
+    color: #64748b;
+    font-size: 0.9375rem;
 }
 
 /* Daybook heading date controls (calendar-like) */
@@ -955,4 +1039,32 @@ h1, h2, h3, h4, h5, h6 {
 .btn-danger-theme:hover {
     background: var(--accent-orange) !important;
     color: #ffffff !important;
+}
+
+/* Print — ledger & similar (hide chrome) */
+@media print {
+    .no-print,
+    .app-sidebar,
+    .app-sidebar-backdrop,
+    .top-bar,
+    .app-sidebar-toggle {
+        display: none !important;
+    }
+
+    .app-shell {
+        display: block;
+    }
+
+    .app-main {
+        overflow: visible !important;
+    }
+
+    body {
+        background: #fff !important;
+    }
+
+    .daybook-ledger-print {
+        box-shadow: none !important;
+        border: none !important;
+    }
 }

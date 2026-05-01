@@ -821,32 +821,60 @@
             <div class="daybook-panel">
                 <div class="row g-4">
                     <div class="col-md-6">
-                        <label class="form-label daybook-label" for="daybook_project_id">Project</label>
-                        <select name="project_id" id="daybook_project_id" class="form-select form-select-theme @error('project_id') is-invalid @enderror">
-                            <option value="" @selected(old('project_id') === null || old('project_id') === '')>Select project</option>
-                            @foreach($projects as $p)
-                                <option value="{{ $p->id }}" @selected(old('project_id') !== null && old('project_id') !== '' && (string) old('project_id') === (string) $p->id)>{{ $p->name }}</option>
-                            @endforeach
-                            <option value="create_project">+ Create new project</option>
-                        </select>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <label class="form-label daybook-label mb-0" for="daybook_form_project_search">Project</label>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_project_create">+ Create new project</button>
+                        </div>
+                        <div class="daybook-form-combo @error('project_id') is-invalid @enderror">
+                            <input type="hidden" name="project_id" id="daybook_form_project_id" value="{{ old('project_id') }}">
+                            <input
+                                type="text"
+                                class="form-control form-control-theme @error('project_id') is-invalid @enderror"
+                                id="daybook_form_project_search"
+                                placeholder="Search project…"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-expanded="false"
+                                aria-controls="daybook_form_project_listbox"
+                                aria-autocomplete="list"
+                            >
+                            <ul class="daybook-form-combo-list d-none" id="daybook_form_project_listbox" role="listbox" hidden></ul>
+                        </div>
                         @error('project_id')
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label daybook-label" for="daybook_party_id">Party</label>
-                        <select name="party_id" id="daybook_party_id" class="form-select form-select-theme @error('party_id') is-invalid @enderror">
-                            <option value="" @selected(old('party_id') === null || old('party_id') === '')>Select party</option>
-                            @foreach($parties as $party)
-                                <option value="{{ $party->id }}" @selected(old('party_id') !== null && old('party_id') !== '' && (string) old('party_id') === (string) $party->id)>{{ $party->name }}</option>
-                            @endforeach
-                            <option value="create_party">+ Create new party</option>
-                        </select>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <label class="form-label daybook-label mb-0" for="daybook_form_party_search">Party</label>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_party_create">+ Create new party</button>
+                        </div>
+                        <div class="daybook-form-combo @error('party_id') is-invalid @enderror">
+                            <input type="hidden" name="party_id" id="daybook_form_party_id" value="{{ old('party_id') }}">
+                            <input
+                                type="text"
+                                class="form-control form-control-theme @error('party_id') is-invalid @enderror"
+                                id="daybook_form_party_search"
+                                placeholder="Search party…"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-expanded="false"
+                                aria-controls="daybook_form_party_listbox"
+                                aria-autocomplete="list"
+                            >
+                            <ul class="daybook-form-combo-list d-none" id="daybook_form_party_listbox" role="listbox" hidden></ul>
+                        </div>
                         @error('party_id')
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
                 </div>
+                <script type="application/json" id="daybook-form-projects-json">@json($projects->map(function ($p) {
+                    return ['id' => $p->id, 'label' => $p->name];
+                })->values())</script>
+                <script type="application/json" id="daybook-form-parties-json">@json($parties->map(function ($p) {
+                    return ['id' => $p->id, 'label' => $p->name];
+                })->values())</script>
             </div>
 
             <div class="daybook-panel mb-0">
@@ -877,8 +905,21 @@
                         <input id="entry_description" type="text" name="description" class="form-control form-control-theme" placeholder="e.g. Office supplies" value="{{ old('description') }}" autocomplete="off">
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <label class="form-label daybook-label" for="entry_amount">Amount (Rs)</label>
-                        <input id="entry_amount" type="number" name="amount" class="form-control form-control-theme" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="{{ old('amount') }}" required>
+                        <label class="form-label daybook-label daybook-amount-label" for="entry_amount">
+                            <span>Amount (Rs)</span>
+                            <span class="daybook-amount-words" id="entry_amount_words" aria-live="polite"></span>
+                        </label>
+                        <input
+                            id="entry_amount"
+                            type="text"
+                            name="amount"
+                            class="form-control form-control-theme"
+                            placeholder="0.00"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            value="{{ old('amount') }}"
+                            required
+                        >
                     </div>
                 </div>
             </div>
@@ -1185,7 +1226,205 @@
 })();
 
 (function () {
-    var select = document.getElementById('daybook_project_id');
+    var projectHidden = document.getElementById('daybook_form_project_id');
+    var projectSearch = document.getElementById('daybook_form_project_search');
+    var projectList = document.getElementById('daybook_form_project_listbox');
+    var projectWrap = projectSearch ? projectSearch.closest('.daybook-form-combo') : null;
+    var projectJsonEl = document.getElementById('daybook-form-projects-json');
+    var projectCreateBtn = document.getElementById('daybook_form_project_create');
+
+    var partyHidden = document.getElementById('daybook_form_party_id');
+    var partySearch = document.getElementById('daybook_form_party_search');
+    var partyList = document.getElementById('daybook_form_party_listbox');
+    var partyWrap = partySearch ? partySearch.closest('.daybook-form-combo') : null;
+    var partyJsonEl = document.getElementById('daybook-form-parties-json');
+    var partyCreateBtn = document.getElementById('daybook_form_party_create');
+
+    if (!projectHidden || !projectSearch || !projectList || !partyHidden || !partySearch || !partyList) return;
+
+    var formProjectRows = [];
+    if (projectJsonEl) {
+        try {
+            formProjectRows = JSON.parse(projectJsonEl.textContent) || [];
+        } catch (e) {
+            formProjectRows = [];
+        }
+    }
+    var formPartyRows = [];
+    if (partyJsonEl) {
+        try {
+            formPartyRows = JSON.parse(partyJsonEl.textContent) || [];
+        } catch (e) {
+            formPartyRows = [];
+        }
+    }
+
+    window.__daybookFormProjectRows = formProjectRows;
+    window.__daybookFormPartyRows = formPartyRows;
+
+    function hideProjectList() {
+        projectList.classList.add('d-none');
+        projectList.setAttribute('hidden', '');
+        projectSearch.setAttribute('aria-expanded', 'false');
+    }
+
+    function showProjectList() {
+        projectList.classList.remove('d-none');
+        projectList.removeAttribute('hidden');
+        projectSearch.setAttribute('aria-expanded', 'true');
+    }
+
+    function filterProjectRows(q) {
+        var nq = (q || '').toLowerCase();
+        if (!nq) return formProjectRows.slice();
+        return formProjectRows.filter(function (row) {
+            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderProjectList(rows) {
+        projectList.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = formProjectRows.length ? 'No projects match.' : 'No projects yet.';
+            projectList.appendChild(li0);
+            showProjectList();
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.dataset.id = String(row.id);
+            btn.textContent = row.label;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                projectHidden.value = String(row.id);
+                projectSearch.value = row.label;
+                hideProjectList();
+            });
+            li.appendChild(btn);
+            projectList.appendChild(li);
+        });
+        showProjectList();
+    }
+
+    function openFilteredProjectList() {
+        renderProjectList(filterProjectRows(projectSearch.value));
+    }
+
+    function hidePartyFormList() {
+        partyList.classList.add('d-none');
+        partyList.setAttribute('hidden', '');
+        partySearch.setAttribute('aria-expanded', 'false');
+    }
+
+    function showPartyFormList() {
+        partyList.classList.remove('d-none');
+        partyList.removeAttribute('hidden');
+        partySearch.setAttribute('aria-expanded', 'true');
+    }
+
+    function filterPartyFormRows(q) {
+        var nq = (q || '').toLowerCase();
+        if (!nq) return formPartyRows.slice();
+        return formPartyRows.filter(function (row) {
+            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderPartyFormList(rows) {
+        partyList.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = formPartyRows.length ? 'No parties match.' : 'No parties yet.';
+            partyList.appendChild(li0);
+            showPartyFormList();
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.dataset.id = String(row.id);
+            btn.textContent = row.label;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                partyHidden.value = String(row.id);
+                partySearch.value = row.label;
+                hidePartyFormList();
+            });
+            li.appendChild(btn);
+            partyList.appendChild(li);
+        });
+        showPartyFormList();
+    }
+
+    function openFilteredPartyFormList() {
+        renderPartyFormList(filterPartyFormRows(partySearch.value));
+    }
+
+    (function syncOldValues() {
+        if (projectHidden.value) {
+            var pr = formProjectRows.find(function (r) { return String(r.id) === String(projectHidden.value); });
+            if (pr) projectSearch.value = pr.label;
+        }
+        if (partyHidden.value) {
+            var py = formPartyRows.find(function (r) { return String(r.id) === String(partyHidden.value); });
+            if (py) partySearch.value = py.label;
+        }
+    })();
+
+    projectSearch.addEventListener('focus', function () {
+        openFilteredProjectList();
+    });
+    projectSearch.addEventListener('input', function () {
+        projectHidden.value = '';
+        openFilteredProjectList();
+    });
+    projectSearch.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            hideProjectList();
+        }
+    });
+
+    partySearch.addEventListener('focus', function () {
+        openFilteredPartyFormList();
+    });
+    partySearch.addEventListener('input', function () {
+        partyHidden.value = '';
+        openFilteredPartyFormList();
+    });
+    partySearch.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            hidePartyFormList();
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        if (projectWrap && !projectWrap.contains(e.target)) hideProjectList();
+        if (partyWrap && !partyWrap.contains(e.target)) hidePartyFormList();
+    });
+})();
+
+(function () {
+    var projectFormHidden = document.getElementById('daybook_form_project_id');
+    var projectFormSearch = document.getElementById('daybook_form_project_search');
+    var projectFormCreateBtn = document.getElementById('daybook_form_project_create');
     var modalEl = document.getElementById('daybookCreateProjectModal');
     var nameInput = document.getElementById('daybook_modal_project_name');
     var fieldTypeSelect = document.getElementById('daybook_modal_project_field_type');
@@ -1208,13 +1447,11 @@
     var backBtn = document.getElementById('daybook_modal_project_back');
     var errEl = document.getElementById('daybook_modal_project_error');
     var token = document.querySelector('meta[name="csrf-token"]');
-    if (!select || !modalEl || !token || typeof bootstrap === 'undefined') return;
+    if (!projectFormHidden || !projectFormSearch || !projectFormCreateBtn || !modalEl || !token || typeof bootstrap === 'undefined') return;
 
     var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
     var maxStep = 5;
     var step = 0;
-
-    var prevProjectId = (select.value && select.value !== 'create_project') ? select.value : '';
 
     var landTypeRows = [];
     if (landTypesJsonEl) {
@@ -1304,6 +1541,13 @@
     }
 
     var selectedPartyIds = [];
+
+    window.__daybookProjectModalPartyRowsPush = function (id, name) {
+        var idStr = String(id);
+        if (!partyRows.some(function (r) { return String(r.id) === idStr; })) {
+            partyRows.push({ id: parseInt(id, 10), label: name });
+        }
+    };
 
     function hidePartyList() {
         if (!partyList) return;
@@ -1624,43 +1868,17 @@
         if (wrap && !wrap.contains(e.target)) hidePartyList();
     });
 
-    function revertSelectFromCreate() {
-        var hasPlaceholder = Array.from(select.options).some(function (o) { return o.value === ''; });
-        if (prevProjectId && Array.from(select.options).some(function (o) { return o.value === prevProjectId; })) {
-            select.value = prevProjectId;
-            return;
-        }
-        if (hasPlaceholder) {
-            select.value = '';
-            return;
-        }
-        var realOpts = Array.from(select.options).filter(function (o) {
-            return o.value && o.value !== 'create_project';
-        });
-        if (realOpts.length) {
-            select.value = realOpts[0].value;
-            prevProjectId = realOpts[0].value;
-        } else {
-            select.value = 'create_project';
-        }
-    }
-
     function showModalErr(msg) {
         if (!errEl) return;
         errEl.textContent = msg || '';
         errEl.classList.toggle('d-none', !msg);
     }
 
-    select.addEventListener('change', function () {
-        if (this.value !== 'create_project') {
-            prevProjectId = this.value;
-            return;
-        }
-        revertSelectFromCreate();
+    projectFormCreateBtn.addEventListener('click', function () {
         showModalErr('');
         resetProjectModalFields();
         goToStep(0);
-        select.blur();
+        projectFormCreateBtn.blur();
         modal.show();
     });
 
@@ -1734,17 +1952,13 @@
                 .then(function (result) {
                     setPrimaryLoading(false);
                     if (result.ok && result.data && result.data.id) {
-                        var createOpt = select.querySelector('option[value="create_project"]');
-                        var opt = document.createElement('option');
-                        opt.value = result.data.id;
-                        opt.textContent = result.data.name;
-                        if (createOpt) {
-                            select.insertBefore(opt, createOpt);
-                        } else {
-                            select.appendChild(opt);
+                        var rows = window.__daybookFormProjectRows || [];
+                        var nid = String(result.data.id);
+                        if (!rows.some(function (r) { return String(r.id) === nid; })) {
+                            rows.push({ id: result.data.id, label: result.data.name });
                         }
-                        select.value = String(result.data.id);
-                        prevProjectId = String(result.data.id);
+                        projectFormHidden.value = nid;
+                        projectFormSearch.value = result.data.name;
                         resetProjectModalFields();
                         showModalErr('');
                         goToStep(0);
@@ -1771,7 +1985,9 @@
 })();
 
 (function () {
-    var select = document.getElementById('daybook_party_id');
+    var partyFormHidden = document.getElementById('daybook_form_party_id');
+    var partyFormSearch = document.getElementById('daybook_form_party_search');
+    var partyFormCreateBtn = document.getElementById('daybook_form_party_create');
     var modalEl = document.getElementById('daybookCreatePartyModal');
     var nameInput = document.getElementById('daybook_modal_party_name');
     var subHidden = document.getElementById('daybook_modal_party_sub_category');
@@ -1781,7 +1997,7 @@
     var saveBtn = document.getElementById('daybook_modal_party_submit');
     var errEl = document.getElementById('daybook_modal_party_error');
     var token = document.querySelector('meta[name="csrf-token"]');
-    if (!select || !modalEl || !token || typeof bootstrap === 'undefined') return;
+    if (!partyFormHidden || !partyFormSearch || !partyFormCreateBtn || !modalEl || !token || typeof bootstrap === 'undefined') return;
 
     var partySubRows = [];
     if (subJsonEl) {
@@ -1793,28 +2009,6 @@
     }
 
     var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
-    var prevPartyId = (select.value && select.value !== 'create_party') ? select.value : '';
-
-    function revertPartySelectFromCreate() {
-        var hasPlaceholder = Array.from(select.options).some(function (o) { return o.value === ''; });
-        if (prevPartyId && Array.from(select.options).some(function (o) { return o.value === prevPartyId; })) {
-            select.value = prevPartyId;
-            return;
-        }
-        if (hasPlaceholder) {
-            select.value = '';
-            return;
-        }
-        var realOpts = Array.from(select.options).filter(function (o) {
-            return o.value && o.value !== 'create_party';
-        });
-        if (realOpts.length) {
-            select.value = realOpts[0].value;
-            prevPartyId = realOpts[0].value;
-        } else {
-            select.value = 'create_party';
-        }
-    }
 
     function showPartyErr(msg) {
         if (!errEl) return;
@@ -1921,16 +2115,11 @@
         if (wrap && !wrap.contains(e.target)) hideSubList();
     });
 
-    select.addEventListener('change', function () {
-        if (this.value !== 'create_party') {
-            prevPartyId = this.value;
-            return;
-        }
-        revertPartySelectFromCreate();
+    partyFormCreateBtn.addEventListener('click', function () {
         showPartyErr('');
         if (nameInput) nameInput.value = '';
         clearSubCategoryPicker();
-        select.blur();
+        partyFormCreateBtn.blur();
         modal.show();
     });
 
@@ -1992,17 +2181,16 @@
                 .then(function (result) {
                     saveBtn.disabled = false;
                     if (result.ok && result.data && result.data.id) {
-                        var createOpt = select.querySelector('option[value="create_party"]');
-                        var opt = document.createElement('option');
-                        opt.value = result.data.id;
-                        opt.textContent = result.data.name;
-                        if (createOpt) {
-                            select.insertBefore(opt, createOpt);
-                        } else {
-                            select.appendChild(opt);
+                        var rows = window.__daybookFormPartyRows || [];
+                        var nid = String(result.data.id);
+                        if (!rows.some(function (r) { return String(r.id) === nid; })) {
+                            rows.push({ id: result.data.id, label: result.data.name });
                         }
-                        select.value = String(result.data.id);
-                        prevPartyId = String(result.data.id);
+                        partyFormHidden.value = nid;
+                        partyFormSearch.value = result.data.name;
+                        if (typeof window.__daybookProjectModalPartyRowsPush === 'function') {
+                            window.__daybookProjectModalPartyRowsPush(result.data.id, result.data.name);
+                        }
                         nameInput.value = '';
                         clearSubCategoryPicker();
                         showPartyErr('');
@@ -2052,6 +2240,178 @@
         disableMobile: true,
         clickOpens: true
     });
+})();
+
+(function () {
+    var input = document.getElementById('entry_amount');
+    var wordsEl = document.getElementById('entry_amount_words');
+    var form = document.getElementById('daybook-add-form');
+    if (!input) return;
+
+    /** Compact scale: cr (crore), lac, k (thousand); two decimals; no "rupees" suffix. */
+    function scale2(x) {
+        return (Math.round(x * 100) / 100).toFixed(2);
+    }
+
+    function compactMainLabel(intPart) {
+        if (intPart < 0) return '';
+        if (intPart >= 10000000) {
+            return scale2(intPart / 10000000) + ' cr';
+        }
+        if (intPart >= 100000) {
+            return scale2(intPart / 100000) + ' lac';
+        }
+        if (intPart >= 1000) {
+            return scale2(intPart / 1000) + ' k';
+        }
+        return String(intPart);
+    }
+
+    function paiseLabel(p) {
+        if (p <= 0) return '';
+        return String(p) + (p === 1 ? ' paisa' : ' paise');
+    }
+
+    function sanitizeAmountString(raw) {
+        var s = String(raw || '').replace(/,/g, '').replace(/[^\d.]/g, '');
+        if (!s) return '';
+        var firstDot = s.indexOf('.');
+        if (firstDot === -1) {
+            s = s.replace(/^0+(\d)/, '$1');
+            return s;
+        }
+        var intp = s.slice(0, firstDot).replace(/\./g, '');
+        intp = intp.replace(/^0+(\d)/, '$1');
+        if (intp === '') intp = '0';
+        var frac = s.slice(firstDot + 1).replace(/\./g, '').replace(/\D/g, '').slice(0, 2);
+        if (frac.length === 0) return intp + '.';
+        return intp + '.' + frac;
+    }
+
+    /** Indian-style grouping: last 3 digits, then groups of 2 (e.g. 12,34,567). */
+    function addIndianCommas(intDigits) {
+        var s = String(intDigits || '').replace(/\D/g, '');
+        if (s === '') s = '0';
+        s = s.replace(/^0+(?=\d)/, '') || '0';
+        if (s === '0') return '0';
+        if (s.length <= 3) return s;
+        var last3 = s.slice(-3);
+        var head = s.slice(0, -3);
+        while (head.length > 2) {
+            last3 = head.slice(-2) + ',' + last3;
+            head = head.slice(0, -2);
+        }
+        if (head.length) {
+            last3 = head + ',' + last3;
+        }
+        return last3;
+    }
+
+    /** Pretty-print amount with commas (integer part only); `sanitized` must be from sanitizeAmountString. */
+    function formatIndianDisplay(sanitized) {
+        if (!sanitized) return '';
+        var dot = sanitized.indexOf('.');
+        var intRaw = dot === -1 ? sanitized : sanitized.slice(0, dot);
+        var fracRaw = dot === -1 ? '' : sanitized.slice(dot + 1);
+        intRaw = intRaw.replace(/\D/g, '');
+        if (intRaw === '') intRaw = '0';
+        var frac = fracRaw.replace(/\D/g, '').slice(0, 2);
+        var out = addIndianCommas(intRaw);
+        if (dot !== -1 && frac.length > 0) return out + '.' + frac;
+        if (dot !== -1 && (fracRaw.length === 0 || sanitized.endsWith('.'))) return out + '.';
+        return out;
+    }
+
+    function parseAmount(s) {
+        var t = sanitizeAmountString(s);
+        if (!t || t === '.') return null;
+        if (t.endsWith('.')) t = t.slice(0, -1);
+        var v = parseFloat(t);
+        if (!isFinite(v) || v < 0) return null;
+        return v;
+    }
+
+    function updateWords() {
+        if (!wordsEl) return;
+        var v = parseAmount(input.value);
+        if (v === null || input.value.trim() === '') {
+            wordsEl.textContent = '';
+            return;
+        }
+        var intPart = Math.floor(v + 1e-9);
+        var dec = Math.round((v - intPart) * 100);
+        if (dec >= 100) {
+            intPart += 1;
+            dec -= 100;
+        }
+        var bits = [];
+        if (intPart > 0 || dec === 0) {
+            bits.push(compactMainLabel(intPart));
+        }
+        if (dec > 0) {
+            bits.push(paiseLabel(dec));
+        }
+        wordsEl.textContent = bits.join(', ');
+    }
+
+    input.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var k = e.key;
+        if (k === 'Backspace' || k === 'Delete' || k === 'Tab' || k === 'Escape' || k === 'Enter' || k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End') return;
+        if (k === '.' || k === ',') {
+            if (k === ',') e.preventDefault();
+            if (input.value.indexOf('.') !== -1) e.preventDefault();
+            return;
+        }
+        if (/\d/.test(k)) return;
+        e.preventDefault();
+    });
+
+    input.addEventListener('input', function () {
+        var cur = input.value;
+        var next = sanitizeAmountString(cur);
+        var display = formatIndianDisplay(next);
+        if (display !== cur) {
+            input.value = display;
+            try {
+                input.setSelectionRange(display.length, display.length);
+            } catch (ignore) {}
+        }
+        updateWords();
+    });
+
+    input.addEventListener('paste', function (e) {
+        e.preventDefault();
+        var paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+        var next = sanitizeAmountString(paste);
+        input.value = formatIndianDisplay(next);
+        try {
+            input.setSelectionRange(input.value.length, input.value.length);
+        } catch (ignore) {}
+        updateWords();
+    });
+
+    input.addEventListener('blur', function () {
+        var t = sanitizeAmountString(input.value);
+        if (t.endsWith('.')) t = t.slice(0, -1);
+        input.value = formatIndianDisplay(t);
+        updateWords();
+    });
+
+    if (form) {
+        form.addEventListener('submit', function () {
+            var t = sanitizeAmountString(input.value);
+            if (t.endsWith('.')) t = t.slice(0, -1);
+            input.value = t;
+        });
+    }
+
+    (function initAmountDisplay() {
+        var t = sanitizeAmountString(input.value);
+        if (t) input.value = formatIndianDisplay(t);
+    })();
+
+    updateWords();
 })();
 </script>
 @endpush

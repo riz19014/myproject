@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
-use App\Models\DaybookOpeningBalance;
 use App\Models\DayBookEntry;
+use App\Models\DaybookOpeningBalance;
 use App\Models\Factory;
 use App\Models\Land;
 use App\Models\LandType;
@@ -90,6 +90,77 @@ class DayBookController extends Controller
         }
     }
 
+    /**
+     * One calendar day of daybook (opening, petty, entries, closing) for reports / ledger.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildSingleDayLedger(Carbon $day): ?array
+    {
+        $dateStr = $day->toDateString();
+        $this->syncOpeningFromPreviousDay($day);
+
+        $openingRecord = DaybookOpeningBalance::query()
+            ->where('balance_date', $dateStr)
+            ->first();
+        if (! $openingRecord) {
+            return null;
+        }
+
+        $entries = DayBookEntry::query()
+            ->whereDate('entry_date', $day)
+            ->orderBy('id')
+            ->get();
+
+        $openingAmount = (float) $openingRecord->amount;
+        $pettyCashAmount = (float) $openingRecord->petty_cash;
+
+        $prevDay = $day->copy()->subDay();
+        $previousDayClosing = $this->computeClosingForDate($prevDay);
+
+        $cashIn = (float) DayBookEntry::query()
+            ->whereDate('entry_date', $day)
+            ->where('type', DayBookEntry::TYPE_CASH_IN)
+            ->sum('amount');
+        $cashOut = (float) DayBookEntry::query()
+            ->whereDate('entry_date', $day)
+            ->where('type', DayBookEntry::TYPE_CASH_OUT)
+            ->sum('amount');
+
+        $running = $openingAmount + $pettyCashAmount;
+        $tableRows = [];
+        foreach ($entries as $e) {
+            if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                $running += (float) $e->amount;
+                $amountStr = '+Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment in';
+            } else {
+                $running -= (float) $e->amount;
+                $amountStr = '-Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment out';
+            }
+            $tableRows[] = [
+                'description' => $e->description ?: '—',
+                'type_label' => $typeLabel,
+                'amount_str' => $amountStr,
+                'balance' => $running,
+            ];
+        }
+        $closingBalance = $running;
+
+        return [
+            'day' => $day->copy(),
+            'prevDay' => $prevDay,
+            'previousDayClosing' => $previousDayClosing,
+            'openingAmount' => $openingAmount,
+            'pettyCashAmount' => $pettyCashAmount,
+            'cashIn' => $cashIn,
+            'cashOut' => $cashOut,
+            'closingBalance' => $closingBalance,
+            'tableRows' => $tableRows,
+        ];
+    }
+
     public function index(Request $request)
     {
         $day = $request->filled('date')
@@ -161,74 +232,138 @@ class DayBookController extends Controller
         ]);
     }
 
+    public function ledger(Request $request)
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
+        $to = ! empty($validated['to'] ?? null)
+            ? Carbon::parse($validated['to'])->startOfDay()
+            : Carbon::today();
+        $from = ! empty($validated['from'] ?? null)
+            ? Carbon::parse($validated['from'])->startOfDay()
+            : $to->copy()->startOfMonth();
+
+        if ($from->gt($to)) {
+            $tmp = $from->copy();
+            $from = $to->copy();
+            $to = $tmp;
+        }
+
+        if ($from->diffInDays($to) >= 366) {
+            $from = $to->copy()->subDays(365);
+        }
+
+        $ledgerDays = [];
+        for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
+            $row = $this->buildSingleDayLedger($d);
+            if ($row !== null) {
+                $ledgerDays[] = $row;
+            }
+        }
+
+        $fromStr = $from->toDateString();
+        $toStr = $to->toDateString();
+        $grandCashIn = (float) DayBookEntry::query()
+            ->where('entry_date', '>=', $fromStr)
+            ->where('entry_date', '<=', $toStr)
+            ->where('type', DayBookEntry::TYPE_CASH_IN)
+            ->sum('amount');
+        $grandCashOut = (float) DayBookEntry::query()
+            ->where('entry_date', '>=', $fromStr)
+            ->where('entry_date', '<=', $toStr)
+            ->where('type', DayBookEntry::TYPE_CASH_OUT)
+            ->sum('amount');
+
+        return view('daybook.ledger', [
+            'from' => $from,
+            'to' => $to,
+            'ledgerDays' => $ledgerDays,
+            'grandCashIn' => $grandCashIn,
+            'grandCashOut' => $grandCashOut,
+        ]);
+    }
+
+    public function ledgerPdf(Request $request)
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
+        $to = ! empty($validated['to'] ?? null)
+            ? Carbon::parse($validated['to'])->startOfDay()
+            : Carbon::today();
+        $from = ! empty($validated['from'] ?? null)
+            ? Carbon::parse($validated['from'])->startOfDay()
+            : $to->copy()->startOfMonth();
+
+        if ($from->gt($to)) {
+            $tmp = $from->copy();
+            $from = $to->copy();
+            $to = $tmp;
+        }
+
+        if ($from->diffInDays($to) >= 366) {
+            $from = $to->copy()->subDays(365);
+        }
+
+        $ledgerDays = [];
+        for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
+            $row = $this->buildSingleDayLedger($d);
+            if ($row !== null) {
+                $ledgerDays[] = $row;
+            }
+        }
+
+        $fromStr = $from->toDateString();
+        $toStr = $to->toDateString();
+        $grandCashIn = (float) DayBookEntry::query()
+            ->where('entry_date', '>=', $fromStr)
+            ->where('entry_date', '<=', $toStr)
+            ->where('type', DayBookEntry::TYPE_CASH_IN)
+            ->sum('amount');
+        $grandCashOut = (float) DayBookEntry::query()
+            ->where('entry_date', '>=', $fromStr)
+            ->where('entry_date', '<=', $toStr)
+            ->where('type', DayBookEntry::TYPE_CASH_OUT)
+            ->sum('amount');
+
+        $generatedAt = now();
+
+        $pdf = Pdf::loadView('daybook.ledger-pdf', [
+            'from' => $from,
+            'to' => $to,
+            'ledgerDays' => $ledgerDays,
+            'grandCashIn' => $grandCashIn,
+            'grandCashOut' => $grandCashOut,
+            'generatedAt' => $generatedAt,
+        ]);
+        $pdf->setPaper('a4', 'portrait');
+
+        $filename = 'daybook-ledger-'.$from->format('Y-m-d').'_to_'.$to->format('Y-m-d').'.pdf';
+
+        return $pdf->download($filename);
+    }
+
     public function reportPdf(Request $request)
     {
         $day = $request->filled('date')
             ? Carbon::parse($request->date)->startOfDay()
             : Carbon::today();
 
-        $dateStr = $day->toDateString();
-
-        $this->syncOpeningFromPreviousDay($day);
-
-        $entries = DayBookEntry::query()
-            ->whereDate('entry_date', $day)
-            ->orderBy('id')
-            ->get();
-
-        $openingRecord = DaybookOpeningBalance::query()
-            ->where('balance_date', $dateStr)
-            ->firstOrFail();
-        $openingAmount = (float) $openingRecord->amount;
-        $pettyCashAmount = (float) $openingRecord->petty_cash;
-
-        $prevDay = $day->copy()->subDay();
-        $previousDayClosing = $this->computeClosingForDate($prevDay);
-
-        $cashIn = (float) DayBookEntry::query()
-            ->whereDate('entry_date', $day)
-            ->where('type', DayBookEntry::TYPE_CASH_IN)
-            ->sum('amount');
-        $cashOut = (float) DayBookEntry::query()
-            ->whereDate('entry_date', $day)
-            ->where('type', DayBookEntry::TYPE_CASH_OUT)
-            ->sum('amount');
-
-        $running = $openingAmount + $pettyCashAmount;
-        $tableRows = [];
-        foreach ($entries as $e) {
-            if ($e->type === DayBookEntry::TYPE_CASH_IN) {
-                $running += (float) $e->amount;
-                $amountStr = '+Rs '.number_format((float) $e->amount, 0);
-                $typeLabel = 'Payment in';
-            } else {
-                $running -= (float) $e->amount;
-                $amountStr = '-Rs '.number_format((float) $e->amount, 0);
-                $typeLabel = 'Payment out';
-            }
-            $tableRows[] = [
-                'description' => $e->description ?: '—',
-                'type_label' => $typeLabel,
-                'amount_str' => $amountStr,
-                'balance' => $running,
-            ];
+        $data = $this->buildSingleDayLedger($day);
+        if ($data === null) {
+            abort(404);
         }
-        $closingBalance = $running;
 
         $generatedAt = now();
 
-        $pdf = Pdf::loadView('daybook.report-pdf', [
-            'day' => $day,
-            'prevDay' => $prevDay,
-            'previousDayClosing' => $previousDayClosing,
-            'openingAmount' => $openingAmount,
-            'pettyCashAmount' => $pettyCashAmount,
-            'cashIn' => $cashIn,
-            'cashOut' => $cashOut,
-            'closingBalance' => $closingBalance,
-            'tableRows' => $tableRows,
+        $pdf = Pdf::loadView('daybook.report-pdf', array_merge($data, [
             'generatedAt' => $generatedAt,
-        ]);
+        ]));
         $pdf->setPaper('a4', 'portrait');
 
         $filename = 'daybook-report-'.$day->format('Y-m-d').'.pdf';
@@ -266,6 +401,7 @@ class DayBookController extends Controller
         $plots = Plot::with('land')->orderBy('id')->get();
         $factories = Factory::orderBy('name')->get();
         $customers = Customer::orderBy('name')->get();
+
         return view('daybook.create', compact('projects', 'lands', 'plots', 'factories', 'customers'));
     }
 
@@ -275,7 +411,7 @@ class DayBookController extends Controller
             [
                 'entry_date' => ['required', 'date'],
                 'type' => ['required', 'in:cash_in,cash_out'],
-                'amount' => ['required', 'numeric', 'min:0.01'],
+                'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
                 'description' => ['nullable', 'string'],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
@@ -339,6 +475,7 @@ class DayBookController extends Controller
         $plots = Plot::with('land')->orderBy('id')->get();
         $factories = Factory::orderBy('name')->get();
         $customers = Customer::orderBy('name')->get();
+
         return view('daybook.edit', compact('entry', 'projects', 'lands', 'plots', 'factories', 'customers'));
     }
 
@@ -347,7 +484,7 @@ class DayBookController extends Controller
         $validated = $request->validate([
             'entry_date' => ['required', 'date'],
             'type' => ['required', 'in:cash_in,cash_out'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
             'description' => ['nullable', 'string'],
             'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
             'link_id' => ['nullable', 'integer', 'min:1'],
@@ -361,12 +498,14 @@ class DayBookController extends Controller
         }
 
         $entry->update($validated);
+
         return redirect()->route('daybook.index')->with('success', 'Entry updated.');
     }
 
     public function destroy(DayBookEntry $entry)
     {
         $entry->delete();
+
         return redirect()->route('daybook.index')->with('success', 'Entry deleted.');
     }
 }
