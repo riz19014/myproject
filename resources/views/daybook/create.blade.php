@@ -16,7 +16,7 @@
             <div class="row">
                 <div class="col-md-4 mb-3">
                     <label for="entry_date" class="form-label">Date <span class="text-danger">*</span></label>
-                    <input type="date" class="form-control form-control-theme @error('entry_date') is-invalid @enderror" id="entry_date" name="entry_date" value="{{ old('entry_date', date('Y-m-d')) }}" required>
+                    <input type="date" class="form-control form-control-theme @error('entry_date') is-invalid @enderror" id="entry_date" name="entry_date" value="{{ old('entry_date', $daybookDefaultEntryDate ?? date('Y-m-d')) }}" required>
                     @error('entry_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-4 mb-3">

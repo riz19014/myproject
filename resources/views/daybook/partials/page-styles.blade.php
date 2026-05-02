@@ -267,13 +267,14 @@
         color: #94a3b8;
         margin-top: 0.25rem;
     }
+    /* overflow: visible so searchable combos (e.g. bank) aren’t clipped at the card edge */
     .daybook-page .daybook-card {
         position: relative;
         border: none;
         border-radius: var(--db-radius);
         box-shadow: var(--db-shadow);
         background: var(--db-surface);
-        overflow: hidden;
+        overflow: visible;
         transition: box-shadow 0.3s ease;
     }
     @media (hover: hover) and (pointer: fine) {
@@ -287,6 +288,11 @@
     }
     .daybook-page .daybook-card .card-body {
         padding: 0;
+        overflow: visible;
+    }
+    .daybook-page .daybook-main-tab-content,
+    .daybook-page .daybook-main-tab-content > .tab-pane {
+        overflow: visible;
     }
     .daybook-page .daybook-page-heading {
         margin-bottom: 1.25rem;

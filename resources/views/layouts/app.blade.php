@@ -86,6 +86,7 @@
                     <a class="app-sidebar-link {{ request()->routeIs('party-categories.*') ? 'active' : '' }}" href="{{ route('party-categories.index') }}"><i class="bi bi-tag app-sidebar-link__icon" aria-hidden="true"></i><span>Party Category</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('party-sub-categories.*') ? 'active' : '' }}" href="{{ route('party-sub-categories.index') }}"><i class="bi bi-tags app-sidebar-link__icon" aria-hidden="true"></i><span>Party Sub Category</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('land-types.*') ? 'active' : '' }}" href="{{ route('land-types.index') }}"><i class="bi bi-grid-3x2-gap app-sidebar-link__icon" aria-hidden="true"></i><span>Land types</span></a>
+                    <a class="app-sidebar-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}"><i class="bi bi-sliders app-sidebar-link__icon" aria-hidden="true"></i><span>Settings</span></a>
                 </nav>
                 @endauth
                 <div class="app-sidebar-footer">

@@ -1565,4 +1565,119 @@
     methodEl.addEventListener('change', sync);
     sync();
 })();
+
+(function () {
+    var hidden = document.getElementById('entry_payment_bank');
+    var search = document.getElementById('entry_payment_bank_search');
+    var list = document.getElementById('entry_payment_bank_listbox');
+    var wrap = search ? search.closest('.daybook-form-combo') : null;
+    var jsonEl = document.getElementById('daybook-form-banks-json');
+    var methodEl = document.getElementById('entry_payment_method');
+    if (!hidden || !search || !list || !jsonEl) return;
+
+    var bankRows = [];
+    try {
+        bankRows = JSON.parse(jsonEl.textContent) || [];
+    } catch (e) {
+        bankRows = [];
+    }
+
+    function hideBankList() {
+        list.classList.add('d-none');
+        list.setAttribute('hidden', '');
+        search.setAttribute('aria-expanded', 'false');
+    }
+
+    function showBankList() {
+        list.classList.remove('d-none');
+        list.removeAttribute('hidden');
+        search.setAttribute('aria-expanded', 'true');
+    }
+
+    function filterBankRows(q) {
+        var nq = (q || '').toLowerCase().trim();
+        if (!nq) return bankRows.slice();
+        return bankRows.filter(function (row) {
+            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderBankList(rows) {
+        list.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = bankRows.length ? 'No banks match.' : 'No banks configured.';
+            list.appendChild(li0);
+            showBankList();
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.textContent = row.label;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                hidden.value = row.id;
+                search.value = row.label;
+                hideBankList();
+            });
+            li.appendChild(btn);
+            list.appendChild(li);
+        });
+        showBankList();
+    }
+
+    function openFilteredBankList() {
+        renderBankList(filterBankRows(search.value));
+    }
+
+    function syncBankSearchFromHidden() {
+        if (!hidden.value) {
+            search.value = '';
+            return;
+        }
+        var match = bankRows.find(function (r) {
+            return String(r.id) === String(hidden.value);
+        });
+        search.value = match ? match.label : hidden.value;
+    }
+
+    syncBankSearchFromHidden();
+
+    search.addEventListener('focus', function () {
+        openFilteredBankList();
+    });
+    search.addEventListener('input', function () {
+        hidden.value = '';
+        openFilteredBankList();
+    });
+    search.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            hideBankList();
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!wrap || wrap.contains(e.target)) return;
+        hideBankList();
+    });
+
+    if (methodEl) {
+        methodEl.addEventListener('change', function () {
+            if (methodEl.value === 'cash') {
+                hidden.value = '';
+                search.value = '';
+                hideBankList();
+            }
+        });
+    }
+})();
 </script>

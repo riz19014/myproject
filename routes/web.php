@@ -11,6 +11,7 @@ use App\Http\Controllers\PartyCategoryController;
 use App\Http\Controllers\PartyController;
 use App\Http\Controllers\PartySubCategoryController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('party-categories', PartyCategoryController::class)->except(['show']);
     Route::resource('party-sub-categories', PartySubCategoryController::class)->except(['show']);
     Route::resource('land-types', LandTypeController::class)->except(['show']);
+    Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 

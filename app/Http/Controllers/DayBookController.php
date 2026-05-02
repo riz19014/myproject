@@ -12,6 +12,7 @@ use App\Models\Party;
 use App\Models\PartySubCategory;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Models\Setting;
 use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -447,7 +448,7 @@ class DayBookController extends Controller
     {
         $day = $request->filled('date')
             ? Carbon::parse($request->date)->startOfDay()
-            : Carbon::today();
+            : (Setting::daybookDefaultCalendarDay() ?? Carbon::today());
 
         $dateStr = $day->toDateString();
 
@@ -719,7 +720,9 @@ class DayBookController extends Controller
         $factories = Factory::orderBy('name')->get();
         $customers = Customer::orderBy('name')->get();
 
-        return view('daybook.create', compact('projects', 'lands', 'plots', 'factories', 'customers'));
+        $daybookDefaultEntryDate = Setting::daybookDefaultCalendarDay()?->toDateString() ?? now()->toDateString();
+
+        return view('daybook.create', compact('projects', 'lands', 'plots', 'factories', 'customers', 'daybookDefaultEntryDate'));
     }
 
     public function store(Request $request)

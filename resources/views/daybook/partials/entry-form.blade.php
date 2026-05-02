@@ -90,6 +90,9 @@
         <script type="application/json" id="daybook-form-party-sub-json">@json($partySubCategories->map(function ($sc) {
             return ['id' => $sc->id, 'label' => ($sc->category?->name ?? '—').' — '.$sc->name];
         })->values())</script>
+        <script type="application/json" id="daybook-form-banks-json">@json(collect(config('pakistan_banks'))->values()->map(function ($name) {
+            return ['id' => $name, 'label' => $name];
+        })->values())</script>
     </div>
 
     <div class="daybook-panel mb-0">
@@ -152,13 +155,22 @@
                 @enderror
             </div>
             <div class="col-md-6 col-xl-5 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
-                <label class="form-label daybook-label" for="entry_payment_bank">Bank</label>
-                <select id="entry_payment_bank" name="payment_bank" class="form-select form-select-theme @error('payment_bank') is-invalid @enderror">
-                    <option value="">Select bank…</option>
-                    @foreach(config('pakistan_banks') as $bankName)
-                        <option value="{{ $bankName }}" @selected(old('payment_bank', $daybookPaymentBankDefault ?? '') === $bankName)>{{ $bankName }}</option>
-                    @endforeach
-                </select>
+                <label class="form-label daybook-label" for="entry_payment_bank_search">Bank</label>
+                <div class="daybook-form-combo @error('payment_bank') is-invalid @enderror">
+                    <input type="hidden" name="payment_bank" id="entry_payment_bank" value="{{ old('payment_bank', $daybookPaymentBankDefault ?? '') }}">
+                    <input
+                        type="text"
+                        class="form-control form-control-theme @error('payment_bank') is-invalid @enderror"
+                        id="entry_payment_bank_search"
+                        placeholder="Search bank…"
+                        autocomplete="off"
+                        role="combobox"
+                        aria-expanded="false"
+                        aria-controls="entry_payment_bank_listbox"
+                        aria-autocomplete="list"
+                    >
+                    <ul class="daybook-form-combo-list d-none" id="entry_payment_bank_listbox" role="listbox" hidden></ul>
+                </div>
                 @error('payment_bank')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror

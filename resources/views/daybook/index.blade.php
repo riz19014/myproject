@@ -131,6 +131,7 @@
                         'daybookFormAction' => route('daybook.store'),
                         'daybookFormUsePut' => false,
                         'daybookReturnDate' => $day->toDateString(),
+                        'daybookEntryDate' => $day->toDateString(),
                         'daybookProjectsJson' => $daybookProjectsJson,
                     ])
                 </div>
