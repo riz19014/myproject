@@ -755,36 +755,100 @@ class DayBookController extends Controller
 
     public function edit(DayBookEntry $entry)
     {
-        $projects = Project::orderBy('name')->get();
-        $lands = Land::orderBy('name')->get();
-        $plots = Plot::with('land')->orderBy('id')->get();
-        $factories = Factory::orderBy('name')->get();
-        $customers = Customer::orderBy('name')->get();
+        $entry->load('partySubCategory.category');
 
-        return view('daybook.edit', compact('entry', 'projects', 'lands', 'plots', 'factories', 'customers'));
+        $projects = Project::orderBy('name')->get();
+        $parties = Party::orderBy('name')->get();
+        $partySubCategories = PartySubCategory::query()
+            ->with('category')
+            ->orderBy('category_id')
+            ->orderBy('name')
+            ->get();
+        $landTypes = LandType::orderBy('name')->get();
+
+        $formPartyId = $entry->link_type === DayBookEntry::LINK_PARTY ? $entry->link_id : null;
+        $formProjectId = null;
+        if ($entry->link_type === DayBookEntry::LINK_PROJECT) {
+            $formProjectId = $entry->link_id;
+        } elseif ($entry->project_id) {
+            $formProjectId = $entry->project_id;
+        }
+
+        return view('daybook.edit', [
+            'entry' => $entry,
+            'projects' => $projects,
+            'parties' => $parties,
+            'partySubCategories' => $partySubCategories,
+            'landTypes' => $landTypes,
+            'daybookProjectIdDefault' => $formProjectId !== null ? (string) $formProjectId : '',
+            'daybookPartyIdDefault' => $formPartyId !== null ? (string) $formPartyId : '',
+            'daybookPartySubCategoryIdDefault' => $entry->party_sub_category_id !== null ? (string) $entry->party_sub_category_id : '',
+            'daybookEntryDate' => $entry->entry_date->format('Y-m-d'),
+            'daybookTypeDefault' => $entry->type,
+            'daybookAmountDefault' => number_format((float) $entry->amount, 2, '.', ''),
+            'daybookDescriptionDefault' => $entry->description ?? '',
+        ]);
     }
 
     public function update(Request $request, DayBookEntry $entry)
     {
-        $validated = $request->validate([
-            'entry_date' => ['required', 'date'],
-            'type' => ['required', 'in:cash_in,cash_out'],
-            'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
-            'description' => ['nullable', 'string'],
-            'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
-            'link_id' => ['nullable', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validate(
+            [
+                'entry_date' => ['required', 'date'],
+                'type' => ['required', 'in:cash_in,cash_out'],
+                'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
+                'description' => ['nullable', 'string'],
+                'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
+                'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
+                'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
+                'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
+                'link_id' => ['nullable', 'integer', 'min:1'],
+            ],
+            [
+                'project_id.exists' => 'The selected project is invalid.',
+                'party_id.exists' => 'The selected party is invalid.',
+                'party_sub_category_id.exists' => 'The selected sub category is invalid.',
+            ]
+        );
 
-        if (empty($validated['link_type']) || $validated['link_type'] === 'office') {
+        if (empty($validated['project_id']) && empty($validated['party_id'])) {
+            return back()
+                ->withErrors(['party_id' => 'Please select a project or a party.'])
+                ->withInput();
+        }
+
+        $formProjectId = $validated['project_id'] ?? null;
+        $formPartyId = $validated['party_id'] ?? null;
+        $contextProjectId = null;
+
+        if (! empty($formPartyId)) {
+            $validated['link_type'] = 'party';
+            $validated['link_id'] = $formPartyId;
+            $contextProjectId = $formProjectId ? (int) $formProjectId : null;
+        } elseif (! empty($formProjectId)) {
+            $validated['link_type'] = 'project';
+            $validated['link_id'] = $formProjectId;
+            $contextProjectId = (int) $formProjectId;
+        } elseif (empty($validated['link_type']) || $validated['link_type'] === 'office') {
             $validated['link_type'] = 'office';
             $validated['link_id'] = null;
-        } elseif (empty($validated['link_id'])) {
-            return back()->withErrors(['link_id' => 'Please select a record to link.'])->withInput();
+        } else {
+            if (empty($validated['link_id'])) {
+                return back()->withErrors(['link_id' => 'Please select a record to link.'])->withInput();
+            }
+        }
+
+        unset($validated['project_id'], $validated['party_id']);
+        $validated['project_id'] = $contextProjectId;
+        if (empty($validated['party_sub_category_id'])) {
+            $validated['party_sub_category_id'] = null;
         }
 
         $entry->update($validated);
 
-        return redirect()->route('daybook.index')->with('success', 'Entry updated.');
+        return redirect()
+            ->route('daybook.index', ['date' => Carbon::parse($validated['entry_date'])->toDateString()])
+            ->with('success', 'DayBook entry updated.');
     }
 
     public function destroy(DayBookEntry $entry)
