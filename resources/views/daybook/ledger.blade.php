@@ -42,11 +42,16 @@
 @section('content')
 @php
     $ledger_ready = $ledger_ready ?? false;
+    $ledger_from_input = $ledger_from_input ?? '';
+    $ledger_to_input = $ledger_to_input ?? '';
     $pdfQuery = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
     if ($ledger_ready && $party_id) {
         $pdfQuery['party_id'] = $party_id;
     }
-    $clearPartyQuery = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
+    $clearPartyQuery = array_filter([
+        'from' => $ledger_from_input !== '' ? $ledger_from_input : null,
+        'to' => $ledger_to_input !== '' ? $ledger_to_input : null,
+    ]);
 @endphp
 <div class="no-print mb-3">
     <div class="d-flex flex-wrap align-items-end gap-3">
@@ -77,12 +82,12 @@
                 @enderror
             </div>
             <div>
-                <label for="ledger-from" class="form-label small text-muted mb-0">From</label>
-                <input type="text" name="from" id="ledger-from" class="form-control form-control-theme" value="{{ $from->format('Y-m-d') }}" autocomplete="off" required>
+                <label for="ledger-from" class="form-label small text-muted mb-0">From <span class="fw-normal">(optional)</span></label>
+                <input type="text" name="from" id="ledger-from" class="form-control form-control-theme" value="{{ old('from', $ledger_from_input) }}" placeholder="Defaults to month start" autocomplete="off">
             </div>
             <div>
-                <label for="ledger-to" class="form-label small text-muted mb-0">To</label>
-                <input type="text" name="to" id="ledger-to" class="form-control form-control-theme" value="{{ $to->format('Y-m-d') }}" autocomplete="off" required>
+                <label for="ledger-to" class="form-label small text-muted mb-0">To <span class="fw-normal">(optional)</span></label>
+                <input type="text" name="to" id="ledger-to" class="form-control form-control-theme" value="{{ old('to', $ledger_to_input) }}" placeholder="Defaults to today" autocomplete="off">
             </div>
             <button type="submit" class="btn btn-theme">Show ledger</button>
             @if($party_id)
@@ -108,7 +113,19 @@
 <div class="card card-theme daybook-ledger-print mb-4">
     <div class="card-body">
         <h1 class="h5 mb-2">Daybook ledger</h1>
-        <p class="text-muted small mb-2">{{ $from->format('j M Y') }} — {{ $to->format('j M Y') }}@if($selectedParty) · <strong>{{ $selectedParty->name }}</strong>@endif</p>
+        @if($ledger_ready || $ledger_from_input !== '' || $ledger_to_input !== '')
+            <p class="text-muted small mb-2">
+                {{ $from->format('j M Y') }} — {{ $to->format('j M Y') }}
+                @if($ledger_ready && $ledger_from_input === '' && $ledger_to_input === '')
+                    <span class="fw-normal">· range defaults when dates left blank</span>
+                @endif
+                @if($selectedParty)
+                    · <strong>{{ $selectedParty->name }}</strong>
+                @elseif($ledger_from_input !== '' || $ledger_to_input !== '')
+                    <span class="fw-normal">· select a party to view</span>
+                @endif
+            </p>
+        @endif
         @if($ledger_ready && ($grandCashIn > 0 || $grandCashOut > 0 || $openingBalanceSummary != 0.0))
             <p class="small text-muted mb-3">
                 @php $sep = false; @endphp
@@ -276,7 +293,7 @@
 
 (function () {
     if (typeof flatpickr === 'undefined') return;
-    var opts = { dateFormat: 'Y-m-d', allowInput: false, disableMobile: true, clickOpens: true };
+    var opts = { dateFormat: 'Y-m-d', allowInput: true, disableMobile: true, clickOpens: true };
     var fromEl = document.getElementById('ledger-from');
     var toEl = document.getElementById('ledger-to');
     if (fromEl) flatpickr(fromEl, opts);
@@ -287,6 +304,7 @@
     var partyHidden = document.getElementById('ledger_form_party_id');
     var partySearch = document.getElementById('ledger_form_party_search');
     var partyList = document.getElementById('ledger_form_party_listbox');
+    var ledgerFormEl = document.getElementById('ledger-filter-form');
     var partyWrap = partySearch ? partySearch.closest('.daybook-form-combo') : null;
     var partyJsonEl = document.getElementById('ledger-form-parties-json');
     if (!partyHidden || !partySearch || !partyList) return;
@@ -346,6 +364,9 @@
                 partyHidden.value = String(row.id);
                 partySearch.value = row.label;
                 hidePartyFormList();
+                if (ledgerFormEl && typeof ledgerFormEl.requestSubmit === 'function') {
+                    ledgerFormEl.requestSubmit();
+                }
             });
             li.appendChild(btn);
             partyList.appendChild(li);

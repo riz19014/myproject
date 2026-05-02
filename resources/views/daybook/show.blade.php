@@ -19,6 +19,7 @@
             <tr><th>Amount</th><td>{{ number_format($entry->amount) }}</td></tr>
             <tr><th>Description</th><td>{{ $entry->description ?? '—' }}</td></tr>
             <tr><th>Linked To</th><td>{{ $entry->getLinkLabel() }}</td></tr>
+            <tr><th>Party sub category</th><td>{{ $entry->getPartySubCategoryLabel() }}</td></tr>
         </table>
     </div>
 </div>

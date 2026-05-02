@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DayBookEntry extends Model
 {
-    protected $fillable = ['entry_date', 'type', 'amount', 'description', 'link_type', 'link_id', 'project_id'];
+    protected $fillable = ['entry_date', 'type', 'amount', 'description', 'link_type', 'link_id', 'project_id', 'party_sub_category_id'];
 
     protected function casts(): array
     {
@@ -22,22 +22,35 @@ class DayBookEntry extends Model
         return $this->belongsTo(Project::class);
     }
 
+    public function partySubCategory(): BelongsTo
+    {
+        return $this->belongsTo(PartySubCategory::class);
+    }
+
     public const TYPE_CASH_IN = 'cash_in';
+
     public const TYPE_CASH_OUT = 'cash_out';
 
     public const LINK_OFFICE = 'office';
+
     public const LINK_PROJECT = 'project';
+
     public const LINK_LAND = 'land';
+
     public const LINK_PLOT = 'plot';
+
     public const LINK_FACTORY = 'factory';
+
     public const LINK_CUSTOMER = 'customer';
+
     public const LINK_PARTY = 'party';
 
     public function getLinkModel(): ?Model
     {
-        if (!$this->link_type || !$this->link_id) {
+        if (! $this->link_type || ! $this->link_id) {
             return null;
         }
+
         return match ($this->link_type) {
             'project' => Project::find($this->link_id),
             'land' => Land::find($this->link_id),
@@ -51,19 +64,31 @@ class DayBookEntry extends Model
 
     public function getLinkLabel(): string
     {
-        if ($this->link_type === 'office' || !$this->link_type) {
+        if ($this->link_type === 'office' || ! $this->link_type) {
             return 'Office';
         }
         $m = $this->getLinkModel();
-        if (!$m) {
+        if (! $m) {
             return '—';
         }
         if ($m instanceof Plot) {
-            return 'Plot: ' . $m->plot_number . ' (' . $m->land->name . ')';
+            return 'Plot: '.$m->plot_number.' ('.$m->land->name.')';
         }
         if ($m instanceof Party) {
-            return 'Party: ' . ($m->name ?? ('#' . $this->link_id));
+            return 'Party: '.($m->name ?? ('#'.$this->link_id));
         }
-        return $m->name ?? ('#' . $this->link_id);
+
+        return $m->name ?? ('#'.$this->link_id);
+    }
+
+    public function getPartySubCategoryLabel(): string
+    {
+        $sc = $this->partySubCategory;
+        if (! $sc) {
+            return '—';
+        }
+        $cat = $sc->category?->name ?? '—';
+
+        return $cat.' — '.$sc->name;
     }
 }

@@ -820,7 +820,7 @@
 
             <div class="daybook-panel">
                 <div class="row g-4">
-                    <div class="col-md-6">
+                    <div class="col-12 col-lg-4">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                             <label class="form-label daybook-label mb-0" for="daybook_form_project_search">Project</label>
                             <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_project_create">+ Create new project</button>
@@ -844,7 +844,7 @@
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-12 col-lg-4">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                             <label class="form-label daybook-label mb-0" for="daybook_form_party_search">Party</label>
                             <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_party_create">+ Create new party</button>
@@ -868,12 +868,36 @@
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label daybook-label mb-2 d-block" for="daybook_form_party_sub_search">Sub category <span class="text-muted fw-normal">(optional)</span></label>
+                        <div class="daybook-form-combo @error('party_sub_category_id') is-invalid @enderror">
+                            <input type="hidden" name="party_sub_category_id" id="daybook_form_party_sub_category_id" value="{{ old('party_sub_category_id') }}">
+                            <input
+                                type="text"
+                                class="form-control form-control-theme @error('party_sub_category_id') is-invalid @enderror"
+                                id="daybook_form_party_sub_search"
+                                placeholder="Category — sub category…"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-expanded="false"
+                                aria-controls="daybook_form_party_sub_listbox"
+                                aria-autocomplete="list"
+                            >
+                            <ul class="daybook-form-combo-list d-none" id="daybook_form_party_sub_listbox" role="listbox" hidden></ul>
+                        </div>
+                        @error('party_sub_category_id')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
                 </div>
                 <script type="application/json" id="daybook-form-projects-json">@json($projects->map(function ($p) {
                     return ['id' => $p->id, 'label' => $p->name];
                 })->values())</script>
                 <script type="application/json" id="daybook-form-parties-json">@json($parties->map(function ($p) {
-                    return ['id' => $p->id, 'label' => $p->name];
+                    return ['id' => $p->id, 'label' => $p->name, 'sub_category_id' => $p->sub_category_id];
+                })->values())</script>
+                <script type="application/json" id="daybook-form-party-sub-json">@json($partySubCategories->map(function ($sc) {
+                    return ['id' => $sc->id, 'label' => ($sc->category?->name ?? '—').' — '.$sc->name];
                 })->values())</script>
             </div>
 
@@ -943,6 +967,7 @@
                         <th>Payment</th>
                         <th class="text-end">Amount (Rs)</th>
                         <th>Linked to</th>
+                        <th>Sub category</th>
                         <th width="220">Actions</th>
                     </tr>
                 </thead>
@@ -966,6 +991,7 @@
                                 @endif
                             </td>
                             <td class="small">{{ $e->getLinkLabel() }}</td>
+                            <td class="small">{{ $e->getPartySubCategoryLabel() }}</td>
                             <td>
                                 <div class="daybook-table-actions">
                                     <a href="{{ route('daybook.show', $e) }}" class="daybook-table-action-btn">View</a>
@@ -980,7 +1006,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="daybook-empty">
+                            <td colspan="7" class="daybook-empty">
                                 <div class="daybook-empty__icon" aria-hidden="true">◇</div>
                                 <p><strong>No lines yet</strong> for this date. Add a payment in <strong>New Entry</strong> — project, party, and amount — to build your ledger.</p>
                             </td>
@@ -1240,6 +1266,12 @@
     var partyJsonEl = document.getElementById('daybook-form-parties-json');
     var partyCreateBtn = document.getElementById('daybook_form_party_create');
 
+    var subHidden = document.getElementById('daybook_form_party_sub_category_id');
+    var subSearch = document.getElementById('daybook_form_party_sub_search');
+    var subList = document.getElementById('daybook_form_party_sub_listbox');
+    var subWrap = subSearch ? subSearch.closest('.daybook-form-combo') : null;
+    var subJsonEl = document.getElementById('daybook-form-party-sub-json');
+
     if (!projectHidden || !projectSearch || !projectList || !partyHidden || !partySearch || !partyList) return;
 
     var formProjectRows = [];
@@ -1256,6 +1288,15 @@
             formPartyRows = JSON.parse(partyJsonEl.textContent) || [];
         } catch (e) {
             formPartyRows = [];
+        }
+    }
+
+    var formSubRows = [];
+    if (subJsonEl && subHidden && subSearch && subList) {
+        try {
+            formSubRows = JSON.parse(subJsonEl.textContent) || [];
+        } catch (e) {
+            formSubRows = [];
         }
     }
 
@@ -1365,6 +1406,13 @@
                 partyHidden.value = String(row.id);
                 partySearch.value = row.label;
                 hidePartyFormList();
+                if (subHidden && subSearch && row.sub_category_id) {
+                    var sc = formSubRows.find(function (r) { return String(r.id) === String(row.sub_category_id); });
+                    if (sc) {
+                        subHidden.value = String(sc.id);
+                        subSearch.value = sc.label;
+                    }
+                }
             });
             li.appendChild(btn);
             partyList.appendChild(li);
@@ -1376,6 +1424,66 @@
         renderPartyFormList(filterPartyFormRows(partySearch.value));
     }
 
+    function hideSubFormList() {
+        if (!subList || !subSearch) return;
+        subList.classList.add('d-none');
+        subList.setAttribute('hidden', '');
+        subSearch.setAttribute('aria-expanded', 'false');
+    }
+
+    function showSubFormList() {
+        if (!subList || !subSearch) return;
+        subList.classList.remove('d-none');
+        subList.removeAttribute('hidden');
+        subSearch.setAttribute('aria-expanded', 'true');
+    }
+
+    function filterSubFormRows(q) {
+        var nq = (q || '').toLowerCase();
+        if (!nq) return formSubRows.slice();
+        return formSubRows.filter(function (row) {
+            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderSubFormList(rows) {
+        if (!subList || !subSearch || !subHidden) return;
+        subList.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = formSubRows.length ? 'No sub categories match.' : 'No sub categories yet.';
+            subList.appendChild(li0);
+            showSubFormList();
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.dataset.id = String(row.id);
+            btn.textContent = row.label;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                subHidden.value = String(row.id);
+                subSearch.value = row.label;
+                hideSubFormList();
+            });
+            li.appendChild(btn);
+            subList.appendChild(li);
+        });
+        showSubFormList();
+    }
+
+    function openFilteredSubFormList() {
+        renderSubFormList(filterSubFormRows(subSearch.value));
+    }
+
     (function syncOldValues() {
         if (projectHidden.value) {
             var pr = formProjectRows.find(function (r) { return String(r.id) === String(projectHidden.value); });
@@ -1384,6 +1492,10 @@
         if (partyHidden.value) {
             var py = formPartyRows.find(function (r) { return String(r.id) === String(partyHidden.value); });
             if (py) partySearch.value = py.label;
+        }
+        if (subHidden && subHidden.value && subSearch) {
+            var sb = formSubRows.find(function (r) { return String(r.id) === String(subHidden.value); });
+            if (sb) subSearch.value = sb.label;
         }
     })();
 
@@ -1406,6 +1518,10 @@
     });
     partySearch.addEventListener('input', function () {
         partyHidden.value = '';
+        if (subHidden && subSearch) {
+            subHidden.value = '';
+            subSearch.value = '';
+        }
         openFilteredPartyFormList();
     });
     partySearch.addEventListener('keydown', function (e) {
@@ -1415,9 +1531,26 @@
         }
     });
 
+    if (subHidden && subSearch && subList) {
+        subSearch.addEventListener('focus', function () {
+            openFilteredSubFormList();
+        });
+        subSearch.addEventListener('input', function () {
+            subHidden.value = '';
+            openFilteredSubFormList();
+        });
+        subSearch.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hideSubFormList();
+            }
+        });
+    }
+
     document.addEventListener('click', function (e) {
         if (projectWrap && !projectWrap.contains(e.target)) hideProjectList();
         if (partyWrap && !partyWrap.contains(e.target)) hidePartyFormList();
+        if (subWrap && !subWrap.contains(e.target)) hideSubFormList();
     });
 })();
 

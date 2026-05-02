@@ -92,17 +92,33 @@ class DayBookController extends Controller
 
     /**
      * Normalised from/to for ledger (party handled separately).
+     * Empty date fields use defaults (month start → today). Request preserves blank inputs for the form.
      *
-     * @return array{from: Carbon, to: Carbon}
+     * @return array{from: Carbon, to: Carbon, from_input: string, to_input: string}
      */
     private function ledgerDateRangeFromRequest(Request $request): array
     {
+        $fromRaw = $request->input('from');
+        $toRaw = $request->input('to');
+
+        $request->merge([
+            'from' => ($fromRaw !== null && $fromRaw !== '') ? $fromRaw : null,
+            'to' => ($toRaw !== null && $toRaw !== '') ? $toRaw : null,
+        ]);
+
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
         ]);
 
-        return $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
+        $dates = $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
+
+        return [
+            'from' => $dates['from'],
+            'to' => $dates['to'],
+            'from_input' => ($fromRaw !== null && $fromRaw !== '') ? (string) $fromRaw : '',
+            'to_input' => ($toRaw !== null && $toRaw !== '') ? (string) $toRaw : '',
+        ];
     }
 
     /**
@@ -438,6 +454,7 @@ class DayBookController extends Controller
 
         $entries = DayBookEntry::query()
             ->whereDate('entry_date', $day)
+            ->with(['partySubCategory.category'])
             ->orderBy('id')
             ->get();
 
@@ -502,11 +519,15 @@ class DayBookController extends Controller
         $range = $this->ledgerDateRangeFromRequest($request);
         $from = $range['from'];
         $to = $range['to'];
+        $ledger_from_input = $range['from_input'];
+        $ledger_to_input = $range['to_input'];
         $parties = Party::query()->orderBy('name')->get();
 
         $emptyPayload = [
             'from' => $from,
             'to' => $to,
+            'ledger_from_input' => $ledger_from_input,
+            'ledger_to_input' => $ledger_to_input,
             'party_id' => null,
             'selectedParty' => null,
             'parties' => $parties,
@@ -543,6 +564,8 @@ class DayBookController extends Controller
         return view('daybook.ledger', [
             'from' => $from,
             'to' => $to,
+            'ledger_from_input' => $ledger_from_input,
+            'ledger_to_input' => $ledger_to_input,
             'party_id' => $partyId,
             'selectedParty' => $selectedParty,
             'parties' => $parties,
@@ -558,6 +581,13 @@ class DayBookController extends Controller
 
     public function ledgerPdf(Request $request)
     {
+        $fromRaw = $request->input('from');
+        $toRaw = $request->input('to');
+        $request->merge([
+            'from' => ($fromRaw !== null && $fromRaw !== '') ? $fromRaw : null,
+            'to' => ($toRaw !== null && $toRaw !== '') ? $toRaw : null,
+        ]);
+
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
@@ -663,12 +693,14 @@ class DayBookController extends Controller
                 'description' => ['nullable', 'string'],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
+                'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
                 'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
                 'link_id' => ['nullable', 'integer', 'min:1'],
             ],
             [
                 'project_id.exists' => 'The selected project is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
+                'party_sub_category_id.exists' => 'The selected sub category is invalid.',
             ]
         );
 
@@ -701,6 +733,9 @@ class DayBookController extends Controller
 
         unset($validated['project_id'], $validated['party_id']);
         $validated['project_id'] = $contextProjectId;
+        if (empty($validated['party_sub_category_id'])) {
+            $validated['party_sub_category_id'] = null;
+        }
 
         DayBookEntry::create($validated);
 
@@ -713,6 +748,8 @@ class DayBookController extends Controller
 
     public function show(DayBookEntry $entry)
     {
+        $entry->load('partySubCategory.category');
+
         return view('daybook.show', compact('entry'));
     }
 
