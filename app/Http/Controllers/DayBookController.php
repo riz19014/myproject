@@ -12,6 +12,7 @@ use App\Models\Party;
 use App\Models\PartySubCategory;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -508,10 +509,29 @@ class DayBookController extends Controller
             'cashOut' => $cashOut,
             'closingBalance' => $closingBalance,
             'projects' => $projects,
+            'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
             'landTypes' => $landTypes,
         ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function daybookProjectsJsonPayload()
+    {
+        return Project::query()
+            ->orderBy('name')
+            ->with('parties')
+            ->get()
+            ->map(function (Project $p) {
+                return array_merge(
+                    ['id' => $p->id, 'label' => $p->name],
+                    LandMeasure::projectPartyAreaPayload($p)
+                );
+            })
+            ->values();
     }
 
     public function ledger(Request $request)
@@ -672,6 +692,25 @@ class DayBookController extends Controller
             ->with('success', 'Petty cash saved.');
     }
 
+    /**
+     * Clear bank / reference when settlement method does not use them (after validation).
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function normalizePaymentSettlement(array $validated): array
+    {
+        $method = $validated['payment_method'] ?? null;
+        if ($method === DayBookEntry::PAYMENT_CASH) {
+            $validated['payment_bank'] = null;
+            $validated['payment_reference'] = null;
+        } elseif ($method === DayBookEntry::PAYMENT_ONLINE) {
+            $validated['payment_reference'] = null;
+        }
+
+        return $validated;
+    }
+
     public function create()
     {
         $projects = Project::orderBy('name')->get();
@@ -685,12 +724,39 @@ class DayBookController extends Controller
 
     public function store(Request $request)
     {
+        if (! $request->has('payment_method')) {
+            $request->merge(['payment_method' => DayBookEntry::PAYMENT_CASH]);
+        }
+
         $validated = $request->validate(
             [
                 'entry_date' => ['required', 'date'],
                 'type' => ['required', 'in:cash_in,cash_out'],
                 'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
                 'description' => ['nullable', 'string'],
+                'payment_method' => ['required', Rule::in([
+                    DayBookEntry::PAYMENT_CASH,
+                    DayBookEntry::PAYMENT_ONLINE,
+                    DayBookEntry::PAYMENT_CHEQUE,
+                    DayBookEntry::PAYMENT_PAYORDER,
+                ])],
+                'payment_bank' => Rule::when(
+                    in_array($request->input('payment_method'), [
+                        DayBookEntry::PAYMENT_ONLINE,
+                        DayBookEntry::PAYMENT_CHEQUE,
+                        DayBookEntry::PAYMENT_PAYORDER,
+                    ], true),
+                    ['required', 'string', 'max:120', Rule::in(array_values(config('pakistan_banks')))],
+                    ['nullable']
+                ),
+                'payment_reference' => Rule::when(
+                    in_array($request->input('payment_method'), [
+                        DayBookEntry::PAYMENT_CHEQUE,
+                        DayBookEntry::PAYMENT_PAYORDER,
+                    ], true),
+                    ['required', 'string', 'max:100'],
+                    ['nullable']
+                ),
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
@@ -701,6 +767,7 @@ class DayBookController extends Controller
                 'project_id.exists' => 'The selected project is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
+                'payment_bank.in' => 'Please choose a bank from the list.',
             ]
         );
 
@@ -736,6 +803,8 @@ class DayBookController extends Controller
         if (empty($validated['party_sub_category_id'])) {
             $validated['party_sub_category_id'] = null;
         }
+
+        $validated = $this->normalizePaymentSettlement($validated);
 
         DayBookEntry::create($validated);
 
@@ -777,6 +846,7 @@ class DayBookController extends Controller
         return view('daybook.edit', [
             'entry' => $entry,
             'projects' => $projects,
+            'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
             'landTypes' => $landTypes,
@@ -787,6 +857,9 @@ class DayBookController extends Controller
             'daybookTypeDefault' => $entry->type,
             'daybookAmountDefault' => number_format((float) $entry->amount, 2, '.', ''),
             'daybookDescriptionDefault' => $entry->description ?? '',
+            'daybookPaymentMethodDefault' => $entry->payment_method ?? DayBookEntry::PAYMENT_CASH,
+            'daybookPaymentBankDefault' => $entry->payment_bank ?? '',
+            'daybookPaymentReferenceDefault' => $entry->payment_reference ?? '',
         ]);
     }
 
@@ -798,6 +871,29 @@ class DayBookController extends Controller
                 'type' => ['required', 'in:cash_in,cash_out'],
                 'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
                 'description' => ['nullable', 'string'],
+                'payment_method' => ['required', Rule::in([
+                    DayBookEntry::PAYMENT_CASH,
+                    DayBookEntry::PAYMENT_ONLINE,
+                    DayBookEntry::PAYMENT_CHEQUE,
+                    DayBookEntry::PAYMENT_PAYORDER,
+                ])],
+                'payment_bank' => Rule::when(
+                    in_array($request->input('payment_method'), [
+                        DayBookEntry::PAYMENT_ONLINE,
+                        DayBookEntry::PAYMENT_CHEQUE,
+                        DayBookEntry::PAYMENT_PAYORDER,
+                    ], true),
+                    ['required', 'string', 'max:120', Rule::in(array_values(config('pakistan_banks')))],
+                    ['nullable']
+                ),
+                'payment_reference' => Rule::when(
+                    in_array($request->input('payment_method'), [
+                        DayBookEntry::PAYMENT_CHEQUE,
+                        DayBookEntry::PAYMENT_PAYORDER,
+                    ], true),
+                    ['required', 'string', 'max:100'],
+                    ['nullable']
+                ),
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
@@ -808,6 +904,7 @@ class DayBookController extends Controller
                 'project_id.exists' => 'The selected project is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
+                'payment_bank.in' => 'Please choose a bank from the list.',
             ]
         );
 
@@ -844,10 +941,12 @@ class DayBookController extends Controller
             $validated['party_sub_category_id'] = null;
         }
 
+        $validated = $this->normalizePaymentSettlement($validated);
+
         $entry->update($validated);
 
         return redirect()
-            ->route('daybook.index', ['date' => Carbon::parse($validated['entry_date'])->toDateString()])
+            ->route('daybook.show', $entry)
             ->with('success', 'DayBook entry updated.');
     }
 

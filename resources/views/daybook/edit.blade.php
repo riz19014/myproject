@@ -32,6 +32,7 @@
                     'daybookFormAction' => route('daybook.update', $entry),
                     'daybookFormUsePut' => true,
                     'daybookReturnDate' => null,
+                    'daybookProjectsJson' => $daybookProjectsJson,
                     'daybookProjectIdDefault' => $daybookProjectIdDefault ?? '',
                     'daybookPartyIdDefault' => $daybookPartyIdDefault ?? '',
                     'daybookPartySubCategoryIdDefault' => $daybookPartySubCategoryIdDefault ?? '',
@@ -39,6 +40,9 @@
                     'daybookTypeDefault' => $daybookTypeDefault ?? 'cash_out',
                     'daybookAmountDefault' => $daybookAmountDefault ?? '',
                     'daybookDescriptionDefault' => $daybookDescriptionDefault ?? '',
+                    'daybookPaymentMethodDefault' => $daybookPaymentMethodDefault ?? 'cash',
+                    'daybookPaymentBankDefault' => $daybookPaymentBankDefault ?? '',
+                    'daybookPaymentReferenceDefault' => $daybookPaymentReferenceDefault ?? '',
                 ])
             </div>
             <div class="daybook-form-inner pt-0 pb-4">

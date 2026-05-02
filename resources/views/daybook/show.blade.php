@@ -16,6 +16,7 @@
         <table class="table table-theme">
             <tr><th width="180">Date</th><td>{{ $entry->entry_date->format('d M Y') }}</td></tr>
             <tr><th>Payment</th><td>{{ $entry->type === 'cash_in' ? 'Payment in' : 'Payment out' }}</td></tr>
+            <tr><th>Settlement</th><td>{{ $entry->getSettlementLabel() }}</td></tr>
             <tr><th>Amount</th><td>{{ number_format($entry->amount) }}</td></tr>
             <tr><th>Description</th><td>{{ $entry->description ?? '—' }}</td></tr>
             <tr><th>Linked To</th><td>{{ $entry->getLinkLabel() }}</td></tr>

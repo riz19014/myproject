@@ -36,6 +36,8 @@ class Party extends Model
 
     public function projects(): BelongsToMany
     {
-        return $this->belongsToMany(Project::class)->withTimestamps();
+        return $this->belongsToMany(Project::class)
+            ->withPivot(['land_area', 'land_area_unit'])
+            ->withTimestamps();
     }
 }

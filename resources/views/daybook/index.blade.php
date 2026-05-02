@@ -131,6 +131,7 @@
                         'daybookFormAction' => route('daybook.store'),
                         'daybookFormUsePut' => false,
                         'daybookReturnDate' => $day->toDateString(),
+                        'daybookProjectsJson' => $daybookProjectsJson,
                     ])
                 </div>
             </div>
@@ -166,6 +167,7 @@
                                 @else
                                     <span class="daybook-pill daybook-pill--out">Payment out</span>
                                 @endif
+                                <div class="small text-muted mt-1">{{ $e->getSettlementLabel() }}</div>
                             </td>
                             <td class="text-end font-monospace">
                                 @if($e->type === 'cash_in')

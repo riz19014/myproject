@@ -8,15 +8,18 @@ use App\Models\LandType;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProjectController extends Controller
 {
     public function index()
     {
         $projects = Project::withCount('projectFiles')->orderBy('id', 'desc')->paginate(10);
+
         return view('projects.index', compact('projects'));
     }
 
@@ -72,6 +75,7 @@ class ProjectController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
         Project::create($validated);
+
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
 
@@ -80,20 +84,124 @@ class ProjectController extends Controller
      */
     public function quickStore(Request $request)
     {
+        $partyIds = collect($request->input('party_ids', []))
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (count($partyIds) === 0) {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'area_acre' => ['required', 'integer', 'min:0'],
+                'area_kanal' => ['required', 'integer', 'min:0'],
+                'area_marla' => ['required', 'integer', 'min:0'],
+                'area_sqft' => ['required', 'integer', 'min:0'],
+                'field_type' => ['required', 'string', Rule::in(['sale', 'purchase'])],
+                'land_type_id' => ['required', 'integer', 'exists:land_types,id'],
+                'total_amount' => ['required', 'numeric', 'min:0'],
+            ]);
+
+            $marlaTotal = LandMeasure::marlaFromAkms(
+                (int) $validated['area_acre'],
+                (int) $validated['area_kanal'],
+                (int) $validated['area_marla'],
+                (int) $validated['area_sqft']
+            );
+            if ($marlaTotal <= 0) {
+                throw ValidationException::withMessages([
+                    'area_acre' => ['Enter at least one positive whole number in A, K, M, or SQFT.'],
+                ]);
+            }
+
+            $project = Project::create([
+                'name' => $validated['name'],
+                'land_area' => round($marlaTotal, 4),
+                'land_area_unit' => 'marla',
+                'field_type' => $validated['field_type'],
+                'total_amount' => $validated['total_amount'],
+                'land_type_id' => $validated['land_type_id'],
+                'description' => null,
+                'notes' => null,
+            ]);
+            $project->load('parties');
+
+            return response()->json(array_merge([
+                'id' => $project->id,
+                'name' => $project->name,
+            ], LandMeasure::projectPartyAreaPayload($project)));
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'land_area' => ['required', 'integer', 'min:0'],
-            'land_area_unit' => ['required', 'string', Rule::in(['acre', 'kanal', 'marla', 'sqft'])],
             'field_type' => ['required', 'string', Rule::in(['sale', 'purchase'])],
             'land_type_id' => ['required', 'integer', 'exists:land_types,id'],
             'total_amount' => ['required', 'numeric', 'min:0'],
-            'party_ids' => ['nullable', 'array'],
-            'party_ids.*' => ['integer', 'exists:parties,id'],
+            'party_ids' => ['required', 'array', 'min:1'],
+            'party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
+            'party_areas' => ['required', 'array', 'min:1'],
+            'party_areas.*.party_id' => ['required', 'integer', 'exists:parties,id'],
+            'party_areas.*.area_acre' => ['required', 'integer', 'min:0'],
+            'party_areas.*.area_kanal' => ['required', 'integer', 'min:0'],
+            'party_areas.*.area_marla' => ['required', 'integer', 'min:0'],
+            'party_areas.*.area_sqft' => ['required', 'integer', 'min:0'],
         ]);
+
+        $partyIds = collect($validated['party_ids'])->map(fn ($id) => (int) $id)->unique()->values()->all();
+
+        $byParty = [];
+        $seen = [];
+        foreach ($validated['party_areas'] as $row) {
+            $pid = (int) $row['party_id'];
+            if (isset($seen[$pid])) {
+                throw ValidationException::withMessages([
+                    'party_areas' => ['Each party may only appear once in the area list.'],
+                ]);
+            }
+            $seen[$pid] = true;
+            $marlaParty = LandMeasure::marlaFromAkms(
+                (int) $row['area_acre'],
+                (int) $row['area_kanal'],
+                (int) $row['area_marla'],
+                (int) $row['area_sqft']
+            );
+            if ($marlaParty <= 0) {
+                throw ValidationException::withMessages([
+                    'party_areas' => ['Each party needs at least one positive whole number in A, K, M, or SQFT.'],
+                ]);
+            }
+            $byParty[$pid] = [
+                'land_area' => round($marlaParty, 4),
+                'land_area_unit' => 'marla',
+            ];
+        }
+
+        foreach ($partyIds as $pid) {
+            if (! isset($byParty[$pid])) {
+                throw ValidationException::withMessages([
+                    'party_areas' => ['Each selected party must have an area (A, K, M, SQFT).'],
+                ]);
+            }
+        }
+
+        foreach (array_keys($byParty) as $pid) {
+            if (! in_array($pid, $partyIds, true)) {
+                throw ValidationException::withMessages([
+                    'party_areas' => ['Party areas must match selected parties only.'],
+                ]);
+            }
+        }
+
+        $totalMarla = 0.0;
+        foreach ($partyIds as $pid) {
+            $totalMarla += (float) $byParty[$pid]['land_area'];
+        }
+
         $project = Project::create([
             'name' => $validated['name'],
-            'land_area' => $validated['land_area'],
-            'land_area_unit' => $validated['land_area_unit'],
+            'land_area' => round($totalMarla, 4),
+            'land_area_unit' => 'marla',
             'field_type' => $validated['field_type'],
             'total_amount' => $validated['total_amount'],
             'land_type_id' => $validated['land_type_id'],
@@ -101,20 +209,21 @@ class ProjectController extends Controller
             'notes' => null,
         ]);
 
-        $partyIds = collect($validated['party_ids'] ?? [])
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-        if (!empty($partyIds)) {
-            $project->parties()->sync($partyIds);
+        $sync = [];
+        foreach ($partyIds as $pid) {
+            $sync[$pid] = [
+                'land_area' => $byParty[$pid]['land_area'],
+                'land_area_unit' => $byParty[$pid]['land_area_unit'],
+            ];
         }
+        $project->parties()->sync($sync);
 
-        return response()->json([
+        $project->load('parties');
+
+        return response()->json(array_merge([
             'id' => $project->id,
             'name' => $project->name,
-        ]);
+        ], LandMeasure::projectPartyAreaPayload($project)));
     }
 
     public function show(Project $project)
@@ -268,12 +377,14 @@ class ProjectController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
         $project->update($validated);
+
         return redirect()->route('projects.index')->with('success', 'Project updated successfully.');
     }
 
     public function destroy(Project $project)
     {
         $project->delete();
+
         return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
     }
 
@@ -285,6 +396,7 @@ class ProjectController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
         $project->projectFiles()->create(array_merge($validated, ['status' => 'available']));
+
         return redirect()->route('projects.show', $project)->with('success', 'File added to project.');
     }
 
@@ -302,6 +414,7 @@ class ProjectController extends Controller
             'sale_amount' => $validated['sale_amount'] ?? null,
             'sale_date' => $validated['sale_date'] ?? now(),
         ]);
+
         return redirect()->route('projects.show', $project)->with('success', 'File marked as sold.');
     }
 
@@ -312,6 +425,7 @@ class ProjectController extends Controller
         foreach ($request->file('documents') as $file) {
             $projectFile->addDocument($file);
         }
+
         return redirect()->route('projects.show', $project)->with('success', 'Document(s) uploaded.');
     }
 
@@ -319,6 +433,7 @@ class ProjectController extends Controller
     {
         $doc = $projectFile->documents()->findOrFail($document);
         $doc->delete();
+
         return redirect()->route('projects.show', $project)->with('success', 'Document removed.');
     }
 }

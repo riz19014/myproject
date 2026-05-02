@@ -7,7 +7,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DayBookEntry extends Model
 {
-    protected $fillable = ['entry_date', 'type', 'amount', 'description', 'link_type', 'link_id', 'project_id', 'party_sub_category_id'];
+    protected $fillable = [
+        'entry_date',
+        'type',
+        'amount',
+        'description',
+        'payment_method',
+        'payment_bank',
+        'payment_reference',
+        'link_type',
+        'link_id',
+        'project_id',
+        'party_sub_category_id',
+    ];
 
     protected function casts(): array
     {
@@ -30,6 +42,14 @@ class DayBookEntry extends Model
     public const TYPE_CASH_IN = 'cash_in';
 
     public const TYPE_CASH_OUT = 'cash_out';
+
+    public const PAYMENT_CASH = 'cash';
+
+    public const PAYMENT_ONLINE = 'online';
+
+    public const PAYMENT_CHEQUE = 'cheque';
+
+    public const PAYMENT_PAYORDER = 'payorder';
 
     public const LINK_OFFICE = 'office';
 
@@ -90,5 +110,23 @@ class DayBookEntry extends Model
         $cat = $sc->category?->name ?? '—';
 
         return $cat.' — '.$sc->name;
+    }
+
+    public function getSettlementLabel(): string
+    {
+        $method = $this->payment_method;
+        if ($method === null || $method === '') {
+            return '—';
+        }
+
+        return match ($method) {
+            self::PAYMENT_CASH => 'Cash',
+            self::PAYMENT_ONLINE => 'Online'.($this->payment_bank ? ' · '.$this->payment_bank : ''),
+            self::PAYMENT_CHEQUE => 'Cheque'.($this->payment_bank ? ' · '.$this->payment_bank : '')
+                .($this->payment_reference ? ' · #'.$this->payment_reference : ''),
+            self::PAYMENT_PAYORDER => 'Pay order'.($this->payment_bank ? ' · '.$this->payment_bank : '')
+                .($this->payment_reference ? ' · Ref '.$this->payment_reference : ''),
+            default => (string) $method,
+        };
     }
 }

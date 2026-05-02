@@ -401,10 +401,62 @@
     var partyList = document.getElementById('daybook_modal_project_party_listbox');
     var partiesJsonEl = document.getElementById('daybook-parties-json');
     var partySelectedWrap = document.getElementById('daybook_modal_project_party_selected');
+    var partyAreaRowsEl = document.getElementById('daybook_modal_party_area_rows');
+    var projectAreaPanel = document.getElementById('daybook_modal_area_project_panel');
+    var partiesAreaPanel = document.getElementById('daybook_modal_area_parties_panel');
+    var partyAreaByPartyId = {};
     var areaAcreInput = document.getElementById('daybook_modal_project_area_acre');
     var areaKanalInput = document.getElementById('daybook_modal_project_area_kanal');
     var areaMarlaInput = document.getElementById('daybook_modal_project_area_marla');
     var areaSqftInput = document.getElementById('daybook_modal_project_area_sqft');
+
+    function bindDaybookWholeAreaInput(el) {
+        if (!el) return;
+        el.addEventListener('input', function () {
+            var t = (el.value || '').replace(/\D/g, '');
+            if (el.value !== t) el.value = t;
+        });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === '.' || e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === ',') {
+                e.preventDefault();
+            }
+        });
+        el.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+            var t = paste.replace(/\D/g, '');
+            el.value = t;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+
+    function parseIntAkms(v) {
+        var s = String(v == null ? '' : v).replace(/\D/g, '');
+        if (s === '') return 0;
+        var n = parseInt(s, 10);
+        return isFinite(n) && n >= 0 ? n : 0;
+    }
+
+    function marlaFromAkmsParts(a, k, m, sqft) {
+        return a * 160 + k * 20 + m + sqft / 272.25;
+    }
+
+    function readProjectAkms() {
+        return {
+            a: parseIntAkms(areaAcreInput && areaAcreInput.value),
+            k: parseIntAkms(areaKanalInput && areaKanalInput.value),
+            m: parseIntAkms(areaMarlaInput && areaMarlaInput.value),
+            sqft: parseIntAkms(areaSqftInput && areaSqftInput.value)
+        };
+    }
+
+    function validatePartyAkmsFromState(pid) {
+        var st = partyAreaByPartyId[pid] || {};
+        return marlaFromAkmsParts(parseIntAkms(st.a), parseIntAkms(st.k), parseIntAkms(st.m), parseIntAkms(st.sqft)) > 0;
+    }
+
+    [areaAcreInput, areaKanalInput, areaMarlaInput, areaSqftInput].forEach(bindDaybookWholeAreaInput);
+
     var totalAmountInput = document.getElementById('daybook_modal_project_total_amount');
     var primaryBtn = document.getElementById('daybook_modal_project_primary');
     var primaryLabel = document.getElementById('daybook_modal_project_primary_label');
@@ -506,6 +558,90 @@
 
     var selectedPartyIds = [];
 
+    function toggleAreaStepPanels() {
+        var has = selectedPartyIds.length > 0;
+        if (projectAreaPanel) projectAreaPanel.classList.toggle('d-none', has);
+        if (partiesAreaPanel) partiesAreaPanel.classList.toggle('d-none', !has);
+        if (has && partyAreaRowsEl) renderPartyAreaRowsContainer();
+    }
+
+    function renderPartyAreaRowsContainer() {
+        if (!partyAreaRowsEl) return;
+        partyAreaRowsEl.innerHTML = '';
+        selectedPartyIds.forEach(function (id) {
+            var rowMeta = partyRows.find(function (r) { return String(r.id) === String(id); });
+            var label = rowMeta ? rowMeta.label : 'Party #' + id;
+            var prev = partyAreaByPartyId[id];
+            var st = prev && typeof prev === 'object' ? prev : {};
+            st = {
+                a: st.a != null ? String(st.a) : '',
+                k: st.k != null ? String(st.k) : '',
+                m: st.m != null ? String(st.m) : '',
+                sqft: st.sqft != null ? String(st.sqft) : ''
+            };
+            partyAreaByPartyId[id] = st;
+
+            var wrap = document.createElement('div');
+            wrap.className = 'daybook-modal-party-area-row mb-3 pb-3 border-bottom border-secondary border-opacity-25';
+            wrap.dataset.partyId = String(id);
+
+            var head = document.createElement('div');
+            head.className = 'fw-medium small mb-2';
+            head.textContent = label;
+            wrap.appendChild(head);
+
+            var row = document.createElement('div');
+            row.className = 'row g-2 align-items-end';
+
+            function addField(shortLabel, key, fid) {
+                var col = document.createElement('div');
+                col.className = 'col-6 col-md-3';
+                var labEl = document.createElement('label');
+                labEl.className = 'daybook-modal-label';
+                labEl.setAttribute('for', fid);
+                labEl.textContent = shortLabel;
+                var inpEl = document.createElement('input');
+                inpEl.type = 'text';
+                inpEl.className = 'form-control form-control-theme daybook-area-whole';
+                inpEl.id = fid;
+                inpEl.placeholder = '0';
+                inpEl.inputMode = 'numeric';
+                inpEl.autocomplete = 'off';
+                inpEl.maxLength = 12;
+                inpEl.value = st[key] || '';
+                bindDaybookWholeAreaInput(inpEl);
+                function persistParty() {
+                    partyAreaByPartyId[id] = {
+                        a: document.getElementById('daybook_party_area_a_' + id).value,
+                        k: document.getElementById('daybook_party_area_k_' + id).value,
+                        m: document.getElementById('daybook_party_area_m_' + id).value,
+                        sqft: document.getElementById('daybook_party_area_sqft_' + id).value
+                    };
+                }
+                inpEl.addEventListener('input', persistParty);
+                inpEl.addEventListener('blur', persistParty);
+                col.appendChild(labEl);
+                col.appendChild(inpEl);
+                row.appendChild(col);
+            }
+
+            addField('A', 'a', 'daybook_party_area_a_' + id);
+            addField('K', 'k', 'daybook_party_area_k_' + id);
+            addField('M', 'm', 'daybook_party_area_m_' + id);
+            addField('SQFT', 'sqft', 'daybook_party_area_sqft_' + id);
+
+            wrap.appendChild(row);
+            partyAreaRowsEl.appendChild(wrap);
+
+            partyAreaByPartyId[id] = {
+                a: document.getElementById('daybook_party_area_a_' + id).value,
+                k: document.getElementById('daybook_party_area_k_' + id).value,
+                m: document.getElementById('daybook_party_area_m_' + id).value,
+                sqft: document.getElementById('daybook_party_area_sqft_' + id).value
+            };
+        });
+    }
+
     window.__daybookProjectModalPartyRowsPush = function (id, name) {
         var idStr = String(id);
         if (!partyRows.some(function (r) { return String(r.id) === idStr; })) {
@@ -554,6 +690,7 @@
             chip.textContent = label + ' ×';
             chip.addEventListener('click', function () {
                 selectedPartyIds = selectedPartyIds.filter(function (x) { return String(x) !== String(id); });
+                delete partyAreaByPartyId[id];
                 renderSelectedParties();
             });
             partySelectedWrap.appendChild(chip);
@@ -626,6 +763,8 @@
         if (areaMarlaInput) areaMarlaInput.value = '';
         if (areaSqftInput) areaSqftInput.value = '';
         if (totalAmountInput) totalAmountInput.value = '';
+        partyAreaByPartyId = {};
+        if (partyAreaRowsEl) partyAreaRowsEl.innerHTML = '';
     }
 
     function clearPrimaryLoading() {
@@ -686,37 +825,17 @@
             }
             renderSelectedParties();
             openFilteredPartyList();
-        } else if (step === 4 && areaSqftInput && window.daybookModalFocusText) {
-            window.daybookModalFocusText(areaSqftInput, { scheduleEnsure: true });
+        } else if (step === 4) {
+            toggleAreaStepPanels();
+            if (selectedPartyIds.length && partyAreaRowsEl) {
+                var fi = partyAreaRowsEl.querySelector('.daybook-area-whole');
+                if (fi && window.daybookModalFocusText) window.daybookModalFocusText(fi, { scheduleEnsure: true });
+            } else if (areaAcreInput && window.daybookModalFocusText) {
+                window.daybookModalFocusText(areaAcreInput, { scheduleEnsure: true });
+            }
         } else if (step === 5 && totalAmountInput && window.daybookModalFocusText) {
             window.daybookModalFocusText(totalAmountInput, { scheduleEnsure: true });
         }
-    }
-
-    function parseUnsignedInt(raw) {
-        var s = (raw || '').trim();
-        if (!s) return null;
-        if (!/^\d+$/.test(s)) return NaN;
-        var n = parseInt(s, 10);
-        if (!isFinite(n) || n < 0) return NaN;
-        return n;
-    }
-
-    function getSelectedArea() {
-        var pairs = [
-            ['acre', areaAcreInput ? areaAcreInput.value : ''],
-            ['kanal', areaKanalInput ? areaKanalInput.value : ''],
-            ['marla', areaMarlaInput ? areaMarlaInput.value : ''],
-            ['sqft', areaSqftInput ? areaSqftInput.value : '']
-        ];
-        var filled = pairs
-            .map(function (p) { return [p[0], parseUnsignedInt(p[1])]; })
-            .filter(function (p) { return p[1] !== null; });
-
-        if (filled.length === 0) return { ok: false, msg: 'Please enter area in one unit (Acre, Kanal, Marla, or Sq ft).', unit: null, area: null };
-        if (filled.length > 1) return { ok: false, msg: 'Please enter area in only one unit. Clear the other fields.', unit: null, area: null };
-        if (isNaN(filled[0][1])) return { ok: false, msg: 'Area must be an unsigned integer (0 or greater).', unit: null, area: null };
-        return { ok: true, unit: filled[0][0], area: filled[0][1], msg: '' };
     }
 
     function validateStep(s) {
@@ -758,10 +877,37 @@
             return true; // parties optional
         }
         if (s === 4) {
-            var sel = getSelectedArea();
-            if (!sel.ok) {
-                showModalErr(sel.msg);
-                if (areaSqftInput && window.daybookModalFocusText) window.daybookModalFocusText(areaSqftInput);
+            if (selectedPartyIds.length > 0) {
+                selectedPartyIds.forEach(function (id) {
+                    var aEl = document.getElementById('daybook_party_area_a_' + id);
+                    var kEl = document.getElementById('daybook_party_area_k_' + id);
+                    var mEl = document.getElementById('daybook_party_area_m_' + id);
+                    var sqEl = document.getElementById('daybook_party_area_sqft_' + id);
+                    if (aEl && kEl && mEl && sqEl) {
+                        partyAreaByPartyId[id] = {
+                            a: aEl.value,
+                            k: kEl.value,
+                            m: mEl.value,
+                            sqft: sqEl.value
+                        };
+                    }
+                });
+                var i;
+                for (i = 0; i < selectedPartyIds.length; i++) {
+                    var pid = selectedPartyIds[i];
+                    if (!validatePartyAkmsFromState(pid)) {
+                        showModalErr('Each party needs at least one positive whole number in A, K, M, or SQFT.');
+                        var bad = document.getElementById('daybook_party_area_a_' + pid);
+                        if (bad && window.daybookModalFocusText) window.daybookModalFocusText(bad);
+                        return false;
+                    }
+                }
+                return true;
+            }
+            var pk = readProjectAkms();
+            if (marlaFromAkmsParts(pk.a, pk.k, pk.m, pk.sqft) <= 0) {
+                showModalErr('Enter at least one positive whole number in A, K, M, or SQFT.');
+                if (areaAcreInput && window.daybookModalFocusText) window.daybookModalFocusText(areaAcreInput);
                 return false;
             }
             return true;
@@ -883,10 +1029,34 @@
                 goToStep(step + 1);
                 return;
             }
-            if (!validateStep(5)) return;
+            if (!validateStep(4) || !validateStep(5)) return;
             var name = (nameInput.value || '').trim();
-            var sel = getSelectedArea();
             var totalAmount = parseFloat((totalAmountInput.value || '').trim());
+            var payload = {
+                name: name,
+                field_type: fieldTypeSelect.value,
+                land_type_id: parseInt(landTypeHidden.value, 10),
+                total_amount: totalAmount,
+                party_ids: selectedPartyIds
+            };
+            if (selectedPartyIds.length > 0) {
+                payload.party_areas = selectedPartyIds.map(function (id) {
+                    var st = partyAreaByPartyId[id] || {};
+                    return {
+                        party_id: parseInt(id, 10),
+                        area_acre: parseIntAkms(st.a),
+                        area_kanal: parseIntAkms(st.k),
+                        area_marla: parseIntAkms(st.m),
+                        area_sqft: parseIntAkms(st.sqft)
+                    };
+                });
+            } else {
+                var pk = readProjectAkms();
+                payload.area_acre = pk.a;
+                payload.area_kanal = pk.k;
+                payload.area_marla = pk.m;
+                payload.area_sqft = pk.sqft;
+            }
             setPrimaryLoading(true);
             fetch('{{ route('projects.quick-store') }}', {
                 method: 'POST',
@@ -896,15 +1066,7 @@
                     'X-CSRF-TOKEN': token.getAttribute('content'),
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({
-                    name: name,
-                    field_type: fieldTypeSelect.value,
-                    land_area: sel.area,
-                    land_area_unit: sel.unit,
-                    land_type_id: parseInt(landTypeHidden.value, 10),
-                    total_amount: totalAmount,
-                    party_ids: selectedPartyIds
-                })
+                body: JSON.stringify(payload)
             })
                 .then(function (res) {
                     return res.json().then(function (data) {
@@ -918,8 +1080,24 @@
                     if (result.ok && result.data && result.data.id) {
                         var rows = window.__daybookFormProjectRows || [];
                         var nid = String(result.data.id);
+                        var row = {
+                            id: result.data.id,
+                            label: result.data.name,
+                            party_areas: result.data.party_areas || {},
+                            parties_total_marla: result.data.parties_total_marla || 0,
+                            parties_total_label: result.data.parties_total_label || ''
+                        };
                         if (!rows.some(function (r) { return String(r.id) === nid; })) {
-                            rows.push({ id: result.data.id, label: result.data.name });
+                            rows.push(row);
+                        } else {
+                            rows.forEach(function (r) {
+                                if (String(r.id) === nid) {
+                                    r.label = result.data.name;
+                                    r.party_areas = row.party_areas;
+                                    r.parties_total_marla = row.parties_total_marla;
+                                    r.parties_total_label = row.parties_total_label;
+                                }
+                            });
                         }
                         projectFormHidden.value = nid;
                         projectFormSearch.value = result.data.name;
@@ -1360,5 +1538,31 @@
     })();
 
     updateWords();
+})();
+
+(function () {
+    var methodEl = document.getElementById('entry_payment_method');
+    var bankRow = document.getElementById('entry_payment_bank_row');
+    var refRow = document.getElementById('entry_payment_reference_row');
+    var refLabel = document.getElementById('entry_payment_reference_label');
+    var refInput = document.getElementById('entry_payment_reference');
+    if (!methodEl || !bankRow || !refRow) return;
+
+    function sync() {
+        var m = methodEl.value;
+        var showBank = m === 'online' || m === 'cheque' || m === 'payorder';
+        var showRef = m === 'cheque' || m === 'payorder';
+        bankRow.classList.toggle('d-none', !showBank);
+        refRow.classList.toggle('d-none', !showRef);
+        if (refLabel) {
+            refLabel.textContent = m === 'payorder' ? 'Pay order reference #' : 'Cheque #';
+        }
+        if (refInput) {
+            refInput.placeholder = m === 'payorder' ? 'Reference number' : 'Cheque number';
+        }
+    }
+
+    methodEl.addEventListener('change', sync);
+    sync();
 })();
 </script>

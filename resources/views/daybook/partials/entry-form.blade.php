@@ -1,4 +1,4 @@
-{{-- Shared new/edit entry fields; expects $projects, $parties, $partySubCategories --}}
+{{-- Shared new/edit entry fields; expects $daybookProjectsJson, $projects, $parties, $partySubCategories --}}
 <form method="post" action="{{ $daybookFormAction }}" id="daybook-entry-form">
     @csrf
     @if(!empty($daybookFormUsePut))
@@ -83,9 +83,7 @@
                 @enderror
             </div>
         </div>
-        <script type="application/json" id="daybook-form-projects-json">@json($projects->map(function ($p) {
-            return ['id' => $p->id, 'label' => $p->name];
-        })->values())</script>
+        <script type="application/json" id="daybook-form-projects-json">@json($daybookProjectsJson)</script>
         <script type="application/json" id="daybook-form-parties-json">@json($parties->map(function ($p) {
             return ['id' => $p->id, 'label' => $p->name, 'sub_category_id' => $p->sub_category_id];
         })->values())</script>
@@ -137,6 +135,40 @@
                     value="{{ old('amount', $daybookAmountDefault ?? '') }}"
                     required
                 >
+            </div>
+        </div>
+        @php($daybookPaymentMethodOld = old('payment_method', $daybookPaymentMethodDefault ?? 'cash'))
+        <div class="row g-4 mt-1 pt-3 border-top border-secondary border-opacity-25">
+            <div class="col-md-6 col-xl-3">
+                <label class="form-label daybook-label" for="entry_payment_method">Settlement</label>
+                <select id="entry_payment_method" name="payment_method" class="form-select form-select-theme @error('payment_method') is-invalid @enderror" required>
+                    <option value="cash" @selected($daybookPaymentMethodOld === 'cash')>Cash payment</option>
+                    <option value="online" @selected($daybookPaymentMethodOld === 'online')>Online payment</option>
+                    <option value="cheque" @selected($daybookPaymentMethodOld === 'cheque')>Cheque</option>
+                    <option value="payorder" @selected($daybookPaymentMethodOld === 'payorder')>Pay order</option>
+                </select>
+                @error('payment_method')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-6 col-xl-5 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
+                <label class="form-label daybook-label" for="entry_payment_bank">Bank</label>
+                <select id="entry_payment_bank" name="payment_bank" class="form-select form-select-theme @error('payment_bank') is-invalid @enderror">
+                    <option value="">Select bank…</option>
+                    @foreach(config('pakistan_banks') as $bankName)
+                        <option value="{{ $bankName }}" @selected(old('payment_bank', $daybookPaymentBankDefault ?? '') === $bankName)>{{ $bankName }}</option>
+                    @endforeach
+                </select>
+                @error('payment_bank')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-12 col-xl-4 {{ in_array($daybookPaymentMethodOld, ['cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_reference_row">
+                <label class="form-label daybook-label" for="entry_payment_reference" id="entry_payment_reference_label">{{ $daybookPaymentMethodOld === 'payorder' ? 'Pay order reference #' : 'Cheque #' }}</label>
+                <input type="text" id="entry_payment_reference" name="payment_reference" class="form-control form-control-theme @error('payment_reference') is-invalid @enderror" placeholder="{{ $daybookPaymentMethodOld === 'payorder' ? 'Reference number' : 'Cheque number' }}" value="{{ old('payment_reference', $daybookPaymentReferenceDefault ?? '') }}" maxlength="100" autocomplete="off">
+                @error('payment_reference')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
             </div>
         </div>
     </div>

@@ -83,26 +83,32 @@
                     </div>
                 </div>
                 <div class="daybook-project-modal-step mb-0 d-none" data-project-modal-step="4">
-                    <div class="daybook-project-modal-panel">
-                        <label class="daybook-modal-label mb-2">Area (enter only one)</label>
-                        <div class="row g-3">
-                            <div class="col-sm-6">
-                                <label class="daybook-modal-label" for="daybook_modal_project_area_acre">Acre</label>
-                                <input type="number" class="form-control form-control-theme" id="daybook_modal_project_area_acre" placeholder="0" step="1" min="0" inputmode="numeric" autocomplete="off">
+                    <div class="daybook-project-modal-panel" id="daybook_modal_area_project_panel">
+                        <label class="daybook-modal-label mb-2">Project area</label>
+                        <p class="text-muted small mb-3">Used when no parties are linked. Non-negative whole numbers only (no decimals).</p>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_modal_project_area_acre">A</label>
+                                <input type="text" class="form-control form-control-theme daybook-area-whole" id="daybook_modal_project_area_acre" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12">
                             </div>
-                            <div class="col-sm-6">
-                                <label class="daybook-modal-label" for="daybook_modal_project_area_kanal">Kanal</label>
-                                <input type="number" class="form-control form-control-theme" id="daybook_modal_project_area_kanal" placeholder="0" step="1" min="0" inputmode="numeric" autocomplete="off">
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_modal_project_area_kanal">K</label>
+                                <input type="text" class="form-control form-control-theme daybook-area-whole" id="daybook_modal_project_area_kanal" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12">
                             </div>
-                            <div class="col-sm-6">
-                                <label class="daybook-modal-label" for="daybook_modal_project_area_marla">Marla</label>
-                                <input type="number" class="form-control form-control-theme" id="daybook_modal_project_area_marla" placeholder="0" step="1" min="0" inputmode="numeric" autocomplete="off">
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_modal_project_area_marla">M</label>
+                                <input type="text" class="form-control form-control-theme daybook-area-whole" id="daybook_modal_project_area_marla" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12">
                             </div>
-                            <div class="col-sm-6">
-                                <label class="daybook-modal-label" for="daybook_modal_project_area_sqft">Sq ft</label>
-                                <input type="number" class="form-control form-control-theme" id="daybook_modal_project_area_sqft" placeholder="0" step="1" min="0" inputmode="numeric" autocomplete="off">
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_modal_project_area_sqft">SQFT</label>
+                                <input type="text" class="form-control form-control-theme daybook-area-whole" id="daybook_modal_project_area_sqft" placeholder="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12">
                             </div>
                         </div>
+                    </div>
+                    <div class="daybook-project-modal-panel d-none" id="daybook_modal_area_parties_panel">
+                        <label class="daybook-modal-label mb-2">Area per party</label>
+                        <p class="text-muted small mb-3">Each party: <strong>A — K — M — SQFT</strong>. Whole numbers ≥ 0 only. Project total is the sum (converted to marla).</p>
+                        <div id="daybook_modal_party_area_rows"></div>
                     </div>
                 </div>
                 <div class="daybook-project-modal-step mb-0 d-none" data-project-modal-step="5">
