@@ -13,7 +13,7 @@
             <div class="col-12 col-lg-4">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="daybook_form_project_search">Project</label>
-                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_project_create">+ Create new project</button>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_project_create">+ Create project</button>
                 </div>
                 <div class="daybook-form-combo @error('project_id') is-invalid @enderror">
                     <input type="hidden" name="project_id" id="daybook_form_project_id" value="{{ old('project_id', $daybookProjectIdDefault ?? '') }}">

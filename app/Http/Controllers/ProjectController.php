@@ -8,6 +8,7 @@ use App\Models\LandType;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\Sale;
 use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -47,23 +48,66 @@ class ProjectController extends Controller
         $totalAmount = (float) $projects->sum('total_amount');
         $byLandType = $projects->groupBy(fn (Project $p) => $p->land_type_id ?: 0);
 
+        $sales = collect();
+        if ($type === 'sale') {
+            $sales = Sale::query()
+                ->with(['project', 'participants.party', 'participants.customer', 'landCuttings'])
+                ->orderByDesc('id')
+                ->limit(300)
+                ->get();
+        }
+
         return view('projects.typed-index', [
             'type' => $type,
             'projects' => $projects,
             'totalAmount' => $totalAmount,
             'byLandType' => $byLandType,
+            'sales' => $sales,
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $landTypes = LandType::orderBy('name')->get();
 
-        return view('projects.create', compact('landTypes'));
+        $context = $request->query('context');
+        if ($context !== null && $context !== '' && ! in_array($context, ['sale', 'purchase'], true)) {
+            abort(404);
+        }
+        $context = in_array($context, ['sale', 'purchase'], true) ? $context : null;
+
+        $assignableProjects = collect();
+        if ($context !== null) {
+            $assignableProjects = Project::query()
+                ->with('landType')
+                ->orderBy('name')
+                ->get();
+        }
+
+        return view('projects.create', compact('landTypes', 'context', 'assignableProjects'));
     }
 
     public function store(Request $request)
     {
+        if ($request->input('submit_action') === 'assign') {
+            $validated = $request->validate([
+                'assign_project_id' => ['required', 'integer', 'exists:projects,id'],
+                'context' => ['required', 'string', Rule::in(['sale', 'purchase'])],
+            ]);
+            $project = Project::query()->findOrFail($validated['assign_project_id']);
+            if ($project->field_type === $validated['context']) {
+                $label = $validated['context'] === 'sale' ? 'Sale' : 'Purchase';
+                throw ValidationException::withMessages([
+                    'assign_project_id' => ['This project is already marked as '.$label.'.'],
+                ]);
+            }
+            $project->update(['field_type' => $validated['context']]);
+            $label = $validated['context'] === 'sale' ? 'Sale' : 'Purchase';
+
+            return redirect()->route($validated['context'].'.index')
+                ->with('success', 'Project added to '.$label.'.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'land_area' => ['nullable', 'numeric', 'min:0'],
@@ -73,7 +117,20 @@ class ProjectController extends Controller
             'total_amount' => ['nullable', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'context' => ['nullable', 'string', Rule::in(['sale', 'purchase'])],
         ]);
+        $fieldType = $validated['field_type'] ?? null;
+        if ($fieldType === '') {
+            $fieldType = null;
+        }
+        if ($fieldType === null
+            && isset($validated['context'])
+            && in_array($validated['context'], ['sale', 'purchase'], true)) {
+            $validated['field_type'] = $validated['context'];
+        } else {
+            $validated['field_type'] = $fieldType;
+        }
+        unset($validated['context']);
         Project::create($validated);
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
@@ -84,6 +141,31 @@ class ProjectController extends Controller
      */
     public function quickStore(Request $request)
     {
+        if ($request->boolean('simple')) {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'land_type_id' => ['required', 'integer', 'exists:land_types,id'],
+                'field_type' => ['nullable', 'string', Rule::in(['sale', 'purchase'])],
+            ]);
+
+            $project = Project::create([
+                'name' => $validated['name'],
+                'land_area' => null,
+                'land_area_unit' => null,
+                'field_type' => $validated['field_type'] ?? null,
+                'land_type_id' => $validated['land_type_id'],
+                'total_amount' => 0,
+                'description' => null,
+                'notes' => null,
+            ]);
+            $project->load('parties');
+
+            return response()->json(array_merge([
+                'id' => $project->id,
+                'name' => $project->name,
+            ], LandMeasure::projectPartyAreaPayload($project)));
+        }
+
         $partyIds = collect($request->input('party_ids', []))
             ->filter(fn ($id) => $id !== null && $id !== '')
             ->map(fn ($id) => (int) $id)

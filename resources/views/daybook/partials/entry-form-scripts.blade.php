@@ -57,7 +57,6 @@
     var projectList = document.getElementById('daybook_form_project_listbox');
     var projectWrap = projectSearch ? projectSearch.closest('.daybook-form-combo') : null;
     var projectJsonEl = document.getElementById('daybook-form-projects-json');
-    var projectCreateBtn = document.getElementById('daybook_form_project_create');
 
     var partyHidden = document.getElementById('daybook_form_party_id');
     var partySearch = document.getElementById('daybook_form_party_search');
@@ -391,83 +390,17 @@
     var projectFormCreateBtn = document.getElementById('daybook_form_project_create');
     var modalEl = document.getElementById('daybookCreateProjectModal');
     var nameInput = document.getElementById('daybook_modal_project_name');
-    var fieldTypeSelect = document.getElementById('daybook_modal_project_field_type');
     var landTypeHidden = document.getElementById('daybook_modal_project_land_type_id');
     var landTypeSearch = document.getElementById('daybook_modal_project_land_type_search');
     var landTypeList = document.getElementById('daybook_modal_project_land_type_listbox');
     var landTypesJsonEl = document.getElementById('daybook-land-types-json');
-    var partyHidden = document.getElementById('daybook_modal_project_party_id');
-    var partySearch = document.getElementById('daybook_modal_project_party_search');
-    var partyList = document.getElementById('daybook_modal_project_party_listbox');
-    var partiesJsonEl = document.getElementById('daybook-parties-json');
-    var partySelectedWrap = document.getElementById('daybook_modal_project_party_selected');
-    var partyAreaRowsEl = document.getElementById('daybook_modal_party_area_rows');
-    var projectAreaPanel = document.getElementById('daybook_modal_area_project_panel');
-    var partiesAreaPanel = document.getElementById('daybook_modal_area_parties_panel');
-    var partyAreaByPartyId = {};
-    var areaAcreInput = document.getElementById('daybook_modal_project_area_acre');
-    var areaKanalInput = document.getElementById('daybook_modal_project_area_kanal');
-    var areaMarlaInput = document.getElementById('daybook_modal_project_area_marla');
-    var areaSqftInput = document.getElementById('daybook_modal_project_area_sqft');
-
-    function bindDaybookWholeAreaInput(el) {
-        if (!el) return;
-        el.addEventListener('input', function () {
-            var t = (el.value || '').replace(/\D/g, '');
-            if (el.value !== t) el.value = t;
-        });
-        el.addEventListener('keydown', function (e) {
-            if (e.key === '.' || e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === ',') {
-                e.preventDefault();
-            }
-        });
-        el.addEventListener('paste', function (e) {
-            e.preventDefault();
-            var paste = (e.clipboardData || window.clipboardData).getData('text') || '';
-            var t = paste.replace(/\D/g, '');
-            el.value = t;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-    }
-
-    function parseIntAkms(v) {
-        var s = String(v == null ? '' : v).replace(/\D/g, '');
-        if (s === '') return 0;
-        var n = parseInt(s, 10);
-        return isFinite(n) && n >= 0 ? n : 0;
-    }
-
-    function marlaFromAkmsParts(a, k, m, sqft) {
-        return a * 160 + k * 20 + m + sqft / 272.25;
-    }
-
-    function readProjectAkms() {
-        return {
-            a: parseIntAkms(areaAcreInput && areaAcreInput.value),
-            k: parseIntAkms(areaKanalInput && areaKanalInput.value),
-            m: parseIntAkms(areaMarlaInput && areaMarlaInput.value),
-            sqft: parseIntAkms(areaSqftInput && areaSqftInput.value)
-        };
-    }
-
-    function validatePartyAkmsFromState(pid) {
-        var st = partyAreaByPartyId[pid] || {};
-        return marlaFromAkmsParts(parseIntAkms(st.a), parseIntAkms(st.k), parseIntAkms(st.m), parseIntAkms(st.sqft)) > 0;
-    }
-
-    [areaAcreInput, areaKanalInput, areaMarlaInput, areaSqftInput].forEach(bindDaybookWholeAreaInput);
-
-    var totalAmountInput = document.getElementById('daybook_modal_project_total_amount');
     var primaryBtn = document.getElementById('daybook_modal_project_primary');
     var primaryLabel = document.getElementById('daybook_modal_project_primary_label');
-    var backBtn = document.getElementById('daybook_modal_project_back');
     var errEl = document.getElementById('daybook_modal_project_error');
     var token = document.querySelector('meta[name="csrf-token"]');
     if (!projectFormHidden || !projectFormSearch || !projectFormCreateBtn || !modalEl || !token || typeof bootstrap === 'undefined') return;
 
     var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
-    var maxStep = 5;
-    var step = 0;
 
     var landTypeRows = [];
     if (landTypesJsonEl) {
@@ -547,224 +480,9 @@
         hideLandTypeList();
     }
 
-    var partyRows = [];
-    if (partiesJsonEl) {
-        try {
-            partyRows = JSON.parse(partiesJsonEl.textContent) || [];
-        } catch (e) {
-            partyRows = [];
-        }
-    }
-
-    var selectedPartyIds = [];
-
-    function toggleAreaStepPanels() {
-        var has = selectedPartyIds.length > 0;
-        if (projectAreaPanel) projectAreaPanel.classList.toggle('d-none', has);
-        if (partiesAreaPanel) partiesAreaPanel.classList.toggle('d-none', !has);
-        if (has && partyAreaRowsEl) renderPartyAreaRowsContainer();
-    }
-
-    function renderPartyAreaRowsContainer() {
-        if (!partyAreaRowsEl) return;
-        partyAreaRowsEl.innerHTML = '';
-        selectedPartyIds.forEach(function (id) {
-            var rowMeta = partyRows.find(function (r) { return String(r.id) === String(id); });
-            var label = rowMeta ? rowMeta.label : 'Party #' + id;
-            var prev = partyAreaByPartyId[id];
-            var st = prev && typeof prev === 'object' ? prev : {};
-            st = {
-                a: st.a != null ? String(st.a) : '',
-                k: st.k != null ? String(st.k) : '',
-                m: st.m != null ? String(st.m) : '',
-                sqft: st.sqft != null ? String(st.sqft) : ''
-            };
-            partyAreaByPartyId[id] = st;
-
-            var wrap = document.createElement('div');
-            wrap.className = 'daybook-modal-party-area-row mb-3 pb-3 border-bottom border-secondary border-opacity-25';
-            wrap.dataset.partyId = String(id);
-
-            var head = document.createElement('div');
-            head.className = 'fw-medium small mb-2';
-            head.textContent = label;
-            wrap.appendChild(head);
-
-            var row = document.createElement('div');
-            row.className = 'row g-2 align-items-end';
-
-            function addField(shortLabel, key, fid) {
-                var col = document.createElement('div');
-                col.className = 'col-6 col-md-3';
-                var labEl = document.createElement('label');
-                labEl.className = 'daybook-modal-label';
-                labEl.setAttribute('for', fid);
-                labEl.textContent = shortLabel;
-                var inpEl = document.createElement('input');
-                inpEl.type = 'text';
-                inpEl.className = 'form-control form-control-theme daybook-area-whole';
-                inpEl.id = fid;
-                inpEl.placeholder = '0';
-                inpEl.inputMode = 'numeric';
-                inpEl.autocomplete = 'off';
-                inpEl.maxLength = 12;
-                inpEl.value = st[key] || '';
-                bindDaybookWholeAreaInput(inpEl);
-                function persistParty() {
-                    partyAreaByPartyId[id] = {
-                        a: document.getElementById('daybook_party_area_a_' + id).value,
-                        k: document.getElementById('daybook_party_area_k_' + id).value,
-                        m: document.getElementById('daybook_party_area_m_' + id).value,
-                        sqft: document.getElementById('daybook_party_area_sqft_' + id).value
-                    };
-                }
-                inpEl.addEventListener('input', persistParty);
-                inpEl.addEventListener('blur', persistParty);
-                col.appendChild(labEl);
-                col.appendChild(inpEl);
-                row.appendChild(col);
-            }
-
-            addField('A', 'a', 'daybook_party_area_a_' + id);
-            addField('K', 'k', 'daybook_party_area_k_' + id);
-            addField('M', 'm', 'daybook_party_area_m_' + id);
-            addField('SQFT', 'sqft', 'daybook_party_area_sqft_' + id);
-
-            wrap.appendChild(row);
-            partyAreaRowsEl.appendChild(wrap);
-
-            partyAreaByPartyId[id] = {
-                a: document.getElementById('daybook_party_area_a_' + id).value,
-                k: document.getElementById('daybook_party_area_k_' + id).value,
-                m: document.getElementById('daybook_party_area_m_' + id).value,
-                sqft: document.getElementById('daybook_party_area_sqft_' + id).value
-            };
-        });
-    }
-
-    window.__daybookProjectModalPartyRowsPush = function (id, name) {
-        var idStr = String(id);
-        if (!partyRows.some(function (r) { return String(r.id) === idStr; })) {
-            partyRows.push({ id: parseInt(id, 10), label: name });
-        }
-    };
-
-    function hidePartyList() {
-        if (!partyList) return;
-        partyList.classList.add('d-none');
-        partyList.setAttribute('hidden', '');
-        if (partySearch) partySearch.setAttribute('aria-expanded', 'false');
-    }
-
-    function showPartyList() {
-        if (!partyList) return;
-        partyList.classList.remove('d-none');
-        partyList.removeAttribute('hidden');
-        if (partySearch) partySearch.setAttribute('aria-expanded', 'true');
-    }
-
-    function filterPartyRows(q) {
-        var nq = (q || '').toLowerCase();
-        if (!nq) return partyRows.slice();
-        return partyRows.filter(function (row) {
-            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
-        });
-    }
-
-    function renderSelectedParties() {
-        if (!partySelectedWrap) return;
-        partySelectedWrap.innerHTML = '';
-        if (!selectedPartyIds.length) {
-            var empty = document.createElement('div');
-            empty.className = 'text-muted small';
-            empty.textContent = 'No parties selected.';
-            partySelectedWrap.appendChild(empty);
-            return;
-        }
-        selectedPartyIds.forEach(function (id) {
-            var row = partyRows.find(function (r) { return String(r.id) === String(id); });
-            var label = row ? row.label : ('Party #' + id);
-            var chip = document.createElement('button');
-            chip.type = 'button';
-            chip.className = 'daybook-project-party-chip';
-            chip.textContent = label + ' ×';
-            chip.addEventListener('click', function () {
-                selectedPartyIds = selectedPartyIds.filter(function (x) { return String(x) !== String(id); });
-                delete partyAreaByPartyId[id];
-                renderSelectedParties();
-            });
-            partySelectedWrap.appendChild(chip);
-        });
-    }
-
-    function renderPartyList(rows) {
-        if (!partyList) return;
-        partyList.innerHTML = '';
-        if (!rows.length) {
-            var li0 = document.createElement('li');
-            li0.className = 'daybook-project-party-empty';
-            li0.setAttribute('role', 'presentation');
-            li0.textContent = partyRows.length ? 'No parties match.' : 'No parties yet. Create one first.';
-            partyList.appendChild(li0);
-            showPartyList();
-            return;
-        }
-        rows.forEach(function (row) {
-            var li = document.createElement('li');
-            li.setAttribute('role', 'none');
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.setAttribute('role', 'option');
-            btn.dataset.id = String(row.id);
-            btn.textContent = row.label;
-            btn.addEventListener('mousedown', function (e) {
-                e.preventDefault();
-            });
-            btn.addEventListener('click', function () {
-                if (partyHidden) partyHidden.value = String(row.id);
-                if (partySearch) partySearch.value = row.label;
-                hidePartyList();
-                var id = String(row.id);
-                if (!selectedPartyIds.some(function (x) { return String(x) === id; })) {
-                    selectedPartyIds.push(row.id);
-                    renderSelectedParties();
-                }
-                if (partyHidden) partyHidden.value = '';
-                if (partySearch) partySearch.value = '';
-            });
-            li.appendChild(btn);
-            partyList.appendChild(li);
-        });
-        showPartyList();
-    }
-
-    function openFilteredPartyList() {
-        renderPartyList(filterPartyRows(partySearch ? partySearch.value : ''));
-    }
-
-    function clearPartyPicker() {
-        if (partyHidden) partyHidden.value = '';
-        if (partySearch) {
-            partySearch.value = '';
-            partySearch.setAttribute('aria-expanded', 'false');
-        }
-        hidePartyList();
-        selectedPartyIds = [];
-        renderSelectedParties();
-    }
-
     function resetProjectModalFields() {
         if (nameInput) nameInput.value = '';
-        if (fieldTypeSelect) fieldTypeSelect.value = '';
         clearLandTypePicker();
-        clearPartyPicker();
-        if (areaAcreInput) areaAcreInput.value = '';
-        if (areaKanalInput) areaKanalInput.value = '';
-        if (areaMarlaInput) areaMarlaInput.value = '';
-        if (areaSqftInput) areaSqftInput.value = '';
-        if (totalAmountInput) totalAmountInput.value = '';
-        partyAreaByPartyId = {};
-        if (partyAreaRowsEl) partyAreaRowsEl.innerHTML = '';
     }
 
     function clearPrimaryLoading() {
@@ -783,152 +501,61 @@
             primaryBtn.setAttribute('aria-label', 'Saving…');
         } else {
             clearPrimaryLoading();
-            updatePrimaryChrome();
         }
     }
 
-    function updatePrimaryChrome() {
-        if (!primaryBtn || !primaryLabel) return;
-        var isLast = step >= maxStep;
-        primaryLabel.textContent = isLast ? 'Create project' : 'Next';
-        primaryBtn.setAttribute('aria-label', isLast ? 'Create project' : 'Next step');
+    function showModalErr(msg) {
+        if (!errEl) return;
+        errEl.textContent = msg || '';
+        errEl.classList.toggle('d-none', !msg);
     }
 
-    function goToStep(n) {
-        var was = step;
-        step = Math.max(0, Math.min(maxStep, n));
-        if (was === 2 && step !== 2) hideLandTypeList();
-        if (was === 3 && step !== 3) hidePartyList();
-        modalEl.querySelectorAll('.daybook-project-modal-step').forEach(function (el) {
-            var sn = parseInt(el.getAttribute('data-project-modal-step'), 10);
-            el.classList.toggle('d-none', sn !== step);
-        });
-        if (backBtn) backBtn.classList.toggle('d-none', step === 0);
-        updatePrimaryChrome();
-        if (!modalEl.classList.contains('show')) return;
-        if (step === 0 && nameInput && window.daybookModalFocusText) {
-            window.daybookModalFocusText(nameInput, { scheduleEnsure: true });
-        } else if (step === 1 && fieldTypeSelect) {
-            fieldTypeSelect.focus();
-        } else if (step === 2 && landTypeSearch) {
-            if (window.daybookModalFocusText) {
-                window.daybookModalFocusText(landTypeSearch, { scheduleEnsure: true });
-            } else {
-                landTypeSearch.focus();
-            }
+    function validateModal() {
+        var name = (nameInput && (nameInput.value || '').trim()) || '';
+        if (!name) {
+            showModalErr('Please enter a project name.');
+            if (nameInput && window.daybookModalFocusText) window.daybookModalFocusText(nameInput);
+            return false;
+        }
+        if (!landTypeHidden || !landTypeHidden.value) {
+            showModalErr('Please select a land type from the list.');
+            if (landTypeSearch && window.daybookModalFocusText) window.daybookModalFocusText(landTypeSearch);
             openFilteredLandTypeList();
-        } else if (step === 3 && partySearch) {
-            if (window.daybookModalFocusText) {
-                window.daybookModalFocusText(partySearch, { scheduleEnsure: true });
-            } else {
-                partySearch.focus();
-            }
-            renderSelectedParties();
-            openFilteredPartyList();
-        } else if (step === 4) {
-            toggleAreaStepPanels();
-            if (selectedPartyIds.length && partyAreaRowsEl) {
-                var fi = partyAreaRowsEl.querySelector('.daybook-area-whole');
-                if (fi && window.daybookModalFocusText) window.daybookModalFocusText(fi, { scheduleEnsure: true });
-            } else if (areaAcreInput && window.daybookModalFocusText) {
-                window.daybookModalFocusText(areaAcreInput, { scheduleEnsure: true });
-            }
-        } else if (step === 5 && totalAmountInput && window.daybookModalFocusText) {
-            window.daybookModalFocusText(totalAmountInput, { scheduleEnsure: true });
+            return false;
         }
-    }
-
-    function validateStep(s) {
-        if (s === 0) {
-            var name = (nameInput && (nameInput.value || '').trim()) || '';
-            if (!name) {
-                showModalErr('Please enter a project name.');
-                if (nameInput && window.daybookModalFocusText) window.daybookModalFocusText(nameInput);
-                return false;
-            }
-            return true;
-        }
-        if (s === 1) {
-            if (!fieldTypeSelect || !fieldTypeSelect.value) {
-                showModalErr('Please select type (sale or purchase).');
-                return false;
-            }
-            return true;
-        }
-        if (s === 2) {
-            if (!landTypeHidden || !landTypeHidden.value) {
-                showModalErr('Please select a land type from the list.');
-                if (landTypeSearch && window.daybookModalFocusText) window.daybookModalFocusText(landTypeSearch);
-                openFilteredLandTypeList();
-                return false;
-            }
-            var still = landTypeRows.some(function (r) {
-                return String(r.id) === landTypeHidden.value && landTypeSearch && r.label === landTypeSearch.value;
-            });
-            if (!still) {
-                showModalErr('Choose a valid land type from the search results.');
-                if (landTypeSearch && window.daybookModalFocusText) window.daybookModalFocusText(landTypeSearch);
-                openFilteredLandTypeList();
-                return false;
-            }
-            return true;
-        }
-        if (s === 3) {
-            return true; // parties optional
-        }
-        if (s === 4) {
-            if (selectedPartyIds.length > 0) {
-                selectedPartyIds.forEach(function (id) {
-                    var aEl = document.getElementById('daybook_party_area_a_' + id);
-                    var kEl = document.getElementById('daybook_party_area_k_' + id);
-                    var mEl = document.getElementById('daybook_party_area_m_' + id);
-                    var sqEl = document.getElementById('daybook_party_area_sqft_' + id);
-                    if (aEl && kEl && mEl && sqEl) {
-                        partyAreaByPartyId[id] = {
-                            a: aEl.value,
-                            k: kEl.value,
-                            m: mEl.value,
-                            sqft: sqEl.value
-                        };
-                    }
-                });
-                var i;
-                for (i = 0; i < selectedPartyIds.length; i++) {
-                    var pid = selectedPartyIds[i];
-                    if (!validatePartyAkmsFromState(pid)) {
-                        showModalErr('Each party needs at least one positive whole number in A, K, M, or SQFT.');
-                        var bad = document.getElementById('daybook_party_area_a_' + pid);
-                        if (bad && window.daybookModalFocusText) window.daybookModalFocusText(bad);
-                        return false;
-                    }
-                }
-                return true;
-            }
-            var pk = readProjectAkms();
-            if (marlaFromAkmsParts(pk.a, pk.k, pk.m, pk.sqft) <= 0) {
-                showModalErr('Enter at least one positive whole number in A, K, M, or SQFT.');
-                if (areaAcreInput && window.daybookModalFocusText) window.daybookModalFocusText(areaAcreInput);
-                return false;
-            }
-            return true;
-        }
-        if (s === 5) {
-            var raw = totalAmountInput ? (totalAmountInput.value || '').trim() : '';
-            if (!raw) {
-                showModalErr('Please enter total amount.');
-                if (totalAmountInput && window.daybookModalFocusText) window.daybookModalFocusText(totalAmountInput);
-                return false;
-            }
-            var val = parseFloat(raw);
-            if (isNaN(val) || val < 0) {
-                showModalErr('Total amount must be 0 or greater.');
-                if (totalAmountInput && window.daybookModalFocusText) window.daybookModalFocusText(totalAmountInput);
-                return false;
-            }
-            return true;
+        var still = landTypeRows.some(function (r) {
+            return String(r.id) === landTypeHidden.value && landTypeSearch && r.label === landTypeSearch.value;
+        });
+        if (!still) {
+            showModalErr('Choose a valid land type from the search results.');
+            if (landTypeSearch && window.daybookModalFocusText) window.daybookModalFocusText(landTypeSearch);
+            openFilteredLandTypeList();
+            return false;
         }
         return true;
     }
+
+    projectFormCreateBtn.addEventListener('click', function () {
+        showModalErr('');
+        resetProjectModalFields();
+        if (primaryLabel) primaryLabel.textContent = 'Create project';
+        projectFormCreateBtn.blur();
+        modal.show();
+    });
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+        if (nameInput && window.daybookModalFocusText) {
+            window.daybookModalFocusText(nameInput, { scheduleEnsure: true });
+        } else if (nameInput) {
+            nameInput.focus();
+        }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        showModalErr('');
+        resetProjectModalFields();
+        clearPrimaryLoading();
+    });
 
     if (landTypeSearch && landTypeList) {
         landTypeSearch.addEventListener('focus', function () {
@@ -957,66 +584,9 @@
         if (ltWrap && !ltWrap.contains(e.target)) hideLandTypeList();
     });
 
-    if (partySearch && partyList) {
-        partySearch.addEventListener('focus', function () {
-            openFilteredPartyList();
-        });
-        partySearch.addEventListener('input', function () {
-            openFilteredPartyList();
-        });
-        partySearch.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-                hidePartyList();
-            }
-        });
-    }
-
-    document.addEventListener('click', function (e) {
-        if (!modalEl.classList.contains('show') || !partyList || partyList.classList.contains('d-none')) return;
-        var wrap = modalEl.querySelector('.daybook-project-party-combo');
-        if (wrap && !wrap.contains(e.target)) hidePartyList();
-    });
-
-    function showModalErr(msg) {
-        if (!errEl) return;
-        errEl.textContent = msg || '';
-        errEl.classList.toggle('d-none', !msg);
-    }
-
-    projectFormCreateBtn.addEventListener('click', function () {
-        showModalErr('');
-        resetProjectModalFields();
-        goToStep(0);
-        projectFormCreateBtn.blur();
-        modal.show();
-    });
-
-    modalEl.addEventListener('shown.bs.modal', function () {
-        goToStep(step);
-    });
-
-    modalEl.addEventListener('hidden.bs.modal', function () {
-        showModalErr('');
-        resetProjectModalFields();
-        clearPrimaryLoading();
-        goToStep(0);
-    });
-
-    if (backBtn) {
-        backBtn.addEventListener('click', function () {
-            if (step <= 0) return;
-            showModalErr('');
-            goToStep(step - 1);
-        });
-    }
-
     modalEl.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
         if (e.target && e.target.closest && e.target.closest('a')) return;
-        var inStep = e.target && e.target.closest && e.target.closest('.daybook-project-modal-step');
-        if (!inStep) return;
-        e.preventDefault();
         if (primaryBtn && !primaryBtn.disabled) primaryBtn.click();
     });
 
@@ -1024,39 +594,14 @@
         primaryBtn.addEventListener('click', function () {
             if (primaryBtn.classList.contains('is-loading')) return;
             showModalErr('');
-            if (step < maxStep) {
-                if (!validateStep(step)) return;
-                goToStep(step + 1);
-                return;
-            }
-            if (!validateStep(4) || !validateStep(5)) return;
-            var name = (nameInput.value || '').trim();
-            var totalAmount = parseFloat((totalAmountInput.value || '').trim());
+            if (!validateModal()) return;
+
             var payload = {
-                name: name,
-                field_type: fieldTypeSelect.value,
-                land_type_id: parseInt(landTypeHidden.value, 10),
-                total_amount: totalAmount,
-                party_ids: selectedPartyIds
+                simple: true,
+                name: (nameInput.value || '').trim(),
+                land_type_id: parseInt(landTypeHidden.value, 10)
             };
-            if (selectedPartyIds.length > 0) {
-                payload.party_areas = selectedPartyIds.map(function (id) {
-                    var st = partyAreaByPartyId[id] || {};
-                    return {
-                        party_id: parseInt(id, 10),
-                        area_acre: parseIntAkms(st.a),
-                        area_kanal: parseIntAkms(st.k),
-                        area_marla: parseIntAkms(st.m),
-                        area_sqft: parseIntAkms(st.sqft)
-                    };
-                });
-            } else {
-                var pk = readProjectAkms();
-                payload.area_acre = pk.a;
-                payload.area_kanal = pk.k;
-                payload.area_marla = pk.m;
-                payload.area_sqft = pk.sqft;
-            }
+
             setPrimaryLoading(true);
             fetch('{{ route('projects.quick-store') }}', {
                 method: 'POST',
@@ -1103,7 +648,6 @@
                         projectFormSearch.value = result.data.name;
                         resetProjectModalFields();
                         showModalErr('');
-                        goToStep(0);
                         modal.hide();
                     } else {
                         var msg = 'Could not create project.';

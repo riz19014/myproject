@@ -49,4 +49,9 @@ class Project extends Model
             ->withPivot(['land_area', 'land_area_unit'])
             ->withTimestamps();
     }
+
+    public function sales(): HasMany
+    {
+        return $this->hasMany(Sale::class);
+    }
 }

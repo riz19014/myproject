@@ -14,13 +14,83 @@
             <i class="bi {{ $icon }}" aria-hidden="true"></i>
             <span>{{ $label }}</span>
         </h1>
-        <div class="text-muted small">Projects where type is <strong class="text-capitalize">{{ $type }}</strong>.</div>
+        @if($type === 'sale')
+            <div class="text-muted small">Sale lines, land cuttings, and net saleable area by project.</div>
+        @else
+            <div class="text-muted small">Projects where type is <strong class="text-capitalize">{{ $type }}</strong>.</div>
+        @endif
     </div>
     <div class="d-flex flex-wrap gap-2">
-        <a href="{{ route('projects.create') }}" class="btn btn-pink">Add Project</a>
+        @if($type === 'sale')
+            <a href="{{ route('sale.records.create') }}" class="btn btn-pink">Add sale</a>
+            <a href="{{ route('projects.create', ['context' => 'sale']) }}" class="btn btn-outline-theme">Add sale project</a>
+        @else
+            <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-pink">Add Project</a>
+        @endif
         <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">All projects</a>
     </div>
 </div>
+
+@if($type === 'sale')
+    <div class="card card-theme mb-4">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Sales</h2>
+            @if($sales->isEmpty())
+                <p class="text-muted small mb-0">No sale lines yet. Use <strong>Add sale</strong> to record land area, parties or buyers, and amount against a sale project.</p>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-striped table-theme mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 72px;">ID</th>
+                                <th>Project</th>
+                                <th style="min-width: 200px;">Sale land</th>
+                                <th class="text-end" style="width: 120px;">Cuttings</th>
+                                <th class="text-end" style="width: 120px;">Net saleable</th>
+                                <th>Parties / buyers</th>
+                                <th class="text-end" style="width: 120px;">Total (Rs)</th>
+                                <th style="width: 100px;">Date</th>
+                                <th class="text-center" style="width: 56px;" title="Land cutting"><span class="visually-hidden">Cuttings</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($sales as $sale)
+                                @php
+                                    $names = $sale->participants->map(function ($sp) {
+                                        return $sp->party?->name ?? $sp->customer?->name ?? '—';
+                                    })->filter()->values();
+                                    $cutMarla = (float) $sale->landCuttings->sum('land_area_marla');
+                                    $netMarla = (float) $sale->land_area_marla - $cutMarla;
+                                @endphp
+                                <tr>
+                                    <td>{{ $sale->id }}</td>
+                                    <td class="fw-semibold">{{ $sale->project?->name ?? '—' }}</td>
+                                    <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $sale->land_area_marla) }}</td>
+                                    <td class="text-end small">{{ $cutMarla > 0 ? \App\Support\LandMeasure::formatAkmsLabelFromMarla($cutMarla) : '—' }}</td>
+                                    <td class="text-end small fw-semibold {{ $netMarla < 0 ? 'text-danger' : '' }}">
+                                        @if($netMarla < 0)
+                                            −{{ number_format(abs($netMarla), 2) }} marla
+                                        @else
+                                            {{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($netMarla) }}
+                                        @endif
+                                    </td>
+                                    <td class="small">{{ $names->isEmpty() ? '—' : $names->implode(', ') }}</td>
+                                    <td class="text-end fw-semibold">{{ number_format((float) $sale->total_amount, 0) }}</td>
+                                    <td class="text-muted small">{{ $sale->created_at?->format('Y-m-d') }}</td>
+                                    <td class="text-center">
+                                        <a href="{{ route('sale.records.land-cuttings.index', $sale) }}" class="btn btn-sm btn-outline-theme p-2" title="Land cutting" aria-label="Land cutting for sale {{ $sale->id }}">
+                                            <i class="bi bi-scissors" aria-hidden="true"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
+@endif
 
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-lg-3">
@@ -123,7 +193,11 @@
         <div class="card-body text-center py-5">
             <div class="text-muted">No {{ strtolower($label) }} projects yet.</div>
             <div class="mt-3">
-                <a href="{{ route('projects.create') }}" class="btn btn-pink">Create a project</a>
+                @if($type === 'sale')
+                    <a href="{{ route('projects.create', ['context' => 'sale']) }}" class="btn btn-pink">Add sale project</a>
+                @else
+                    <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-pink">Create a project</a>
+                @endif
             </div>
         </div>
     </div>

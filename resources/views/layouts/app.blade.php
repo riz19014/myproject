@@ -72,10 +72,18 @@
             <div class="app-sidebar-inner">
                 <a class="app-sidebar-brand" href="{{ route('users.index') }}">{{ config('app.name') }}</a>
                 @auth
+                @php
+                    $sidebarNavProject = request()->route('project');
+                    $sidebarIsSaleProject = $sidebarNavProject instanceof \App\Models\Project && $sidebarNavProject->field_type === 'sale';
+                    $sidebarIsPurchaseProject = $sidebarNavProject instanceof \App\Models\Project && $sidebarNavProject->field_type === 'purchase';
+                @endphp
                 <nav class="app-sidebar-nav">
                     <a class="app-sidebar-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i class="bi bi-people app-sidebar-link__icon" aria-hidden="true"></i><span>Users</span></a>
-                    <a class="app-sidebar-link {{ request()->routeIs('sale.*') ? 'active' : '' }}" href="{{ route('sale.index') }}"><i class="bi bi-graph-up-arrow app-sidebar-link__icon" aria-hidden="true"></i><span>Sale</span></a>
-                    <a class="app-sidebar-link {{ request()->routeIs('purchase.*') ? 'active' : '' }}" href="{{ route('purchase.index') }}"><i class="bi bi-bag-check app-sidebar-link__icon" aria-hidden="true"></i><span>Purchase</span></a>
+                    <a class="app-sidebar-link {{ request()->routeIs('sale.index') || request()->routeIs('sale.records.*') || $sidebarIsSaleProject ? 'active' : '' }}" href="{{ route('sale.index') }}"><i class="bi bi-graph-up-arrow app-sidebar-link__icon" aria-hidden="true"></i><span>Sale</span></a>
+                    <a class="app-sidebar-link {{ request()->routeIs('purchase.index') || $sidebarIsPurchaseProject ? 'active' : '' }}" href="{{ route('purchase.index') }}"><i class="bi bi-bag-check app-sidebar-link__icon" aria-hidden="true"></i><span>Purchase</span></a>
+                    @foreach($sidebarPurchaseProjects ?? [] as $pp)
+                        <a class="app-sidebar-link app-sidebar-link--sub {{ $sidebarNavProject && (int) $sidebarNavProject->id === (int) $pp->id && (request()->routeIs('projects.show', 'projects.edit', 'projects.ledger.pdf') || request()->routeIs('projects.files.*')) ? 'active' : '' }}" href="{{ route('projects.show', $pp) }}" title="{{ $pp->name }}"><i class="bi bi-folder2-open app-sidebar-link__icon" aria-hidden="true"></i><span>{{ \Illuminate\Support\Str::limit($pp->name, 32) }}</span></a>
+                    @endforeach
                     <a class="app-sidebar-link {{ request()->routeIs('projects.*') ? 'active' : '' }}" href="{{ route('projects.index') }}"><i class="bi bi-folder2 app-sidebar-link__icon" aria-hidden="true"></i><span>Projects</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('lands.*') ? 'active' : '' }}" href="{{ route('lands.index') }}"><i class="bi bi-geo-alt app-sidebar-link__icon" aria-hidden="true"></i><span>Land</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('factories.*') ? 'active' : '' }}" href="{{ route('factories.index') }}"><i class="bi bi-building app-sidebar-link__icon" aria-hidden="true"></i><span>Factory</span></a>
@@ -85,8 +93,9 @@
                     {{--<a class="app-sidebar-link {{ request()->routeIs('jobs.*') ? 'active' : '' }}" href="{{ route('jobs.index') }}"><i class="bi bi-briefcase app-sidebar-link__icon" aria-hidden="true"></i><span>Jobs</span></a>--}}
                     <a class="app-sidebar-link {{ request()->routeIs('party-categories.*') ? 'active' : '' }}" href="{{ route('party-categories.index') }}"><i class="bi bi-tag app-sidebar-link__icon" aria-hidden="true"></i><span>Party Category</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('party-sub-categories.*') ? 'active' : '' }}" href="{{ route('party-sub-categories.index') }}"><i class="bi bi-tags app-sidebar-link__icon" aria-hidden="true"></i><span>Party Sub Category</span></a>
+                    <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('parties.*') ? 'active' : '' }}" href="{{ route('parties.index') }}"><i class="bi bi-person-lines-fill app-sidebar-link__icon" aria-hidden="true"></i><span>Parties</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('land-types.*') ? 'active' : '' }}" href="{{ route('land-types.index') }}"><i class="bi bi-grid-3x2-gap app-sidebar-link__icon" aria-hidden="true"></i><span>Land types</span></a>
-                    <a class="app-sidebar-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}"><i class="bi bi-sliders app-sidebar-link__icon" aria-hidden="true"></i><span>Settings</span></a>
+                    <a class="app-sidebar-link {{ request()->routeIs('settings.index', 'settings.update') ? 'active' : '' }}" href="{{ route('settings.index') }}"><i class="bi bi-sliders app-sidebar-link__icon" aria-hidden="true"></i><span>Settings</span></a>
                 </nav>
                 @endauth
                 <div class="app-sidebar-footer">
