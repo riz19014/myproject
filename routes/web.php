@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('sale/records/{sale}/land-cuttings/{land_cutting}', [SaleLandCuttingController::class, 'destroy'])->name('sale.records.land-cuttings.destroy');
     Route::get('purchase', [ProjectController::class, 'purchaseIndex'])->name('purchase.index');
     Route::get('purchase/lines/pdf', [PurchaseItemController::class, 'pdf'])->name('purchase.lines.pdf');
+    Route::get('purchase/lines/ledger-pdf', [PurchaseItemController::class, 'ledgerPdf'])->name('purchase.lines.ledger-pdf');
     Route::get('purchase/records/create', [PurchaseItemController::class, 'create'])->name('purchase.records.create');
     Route::post('purchase/records', [PurchaseItemController::class, 'store'])->name('purchase.records.store');
     Route::get('purchase/records/{purchase_item}/edit', [PurchaseItemController::class, 'edit'])->name('purchase.records.edit');

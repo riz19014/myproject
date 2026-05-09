@@ -100,10 +100,16 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <h2 class="h5 mb-0">Purchase lines</h2>
-                <a href="{{ route('purchase.lines.pdf') }}" class="btn btn-sm btn-outline-theme d-inline-flex align-items-center gap-1">
-                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
-                    <span>Print PDF</span>
-                </a>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="{{ route('purchase.lines.pdf') }}" class="btn btn-sm btn-outline-theme d-inline-flex align-items-center gap-1">
+                        <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                        <span>Print PDF</span>
+                    </a>
+                    <a href="{{ route('purchase.lines.ledger-pdf') }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Chronological ledger with running balance (formal layout)">
+                        <i class="bi bi-journal-text" aria-hidden="true"></i>
+                        <span>Ledger PDF</span>
+                    </a>
+                </div>
             </div>
             @if($projects->isNotEmpty())
                 <div class="mb-3 pb-3 border-bottom">

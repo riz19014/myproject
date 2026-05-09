@@ -428,18 +428,85 @@ class ProjectController extends Controller
         ];
     }
 
+    /**
+     * Project land as A — K — M — SQFT for PDF header, or em dash when not set.
+     */
+    private function projectLedgerLandAkmsLine(Project $project): string
+    {
+        if ($project->land_area === null || $project->land_area === '' || ! $project->land_area_unit) {
+            return '—';
+        }
+        $unit = (string) $project->land_area_unit;
+        if (! in_array($unit, ['acre', 'kanal', 'marla', 'sqft'], true)) {
+            return '—';
+        }
+        $marla = LandMeasure::toMarla((float) $project->land_area, $unit);
+
+        return LandMeasure::formatAkmsLabelFromMarla($marla);
+    }
+
+    /**
+     * All project-linked daybook lines in one chronological list with global running balance.
+     *
+     * @return list<array{date: string, party: string, payment: string, amount: float, amount_in: bool, running: float}>
+     */
+    private function buildProjectLedgerFlatRows(Project $project): array
+    {
+        $entries = $this->projectDayBookEntries($project)
+            ->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])
+            ->values();
+
+        $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
+        $parties = Party::query()->whereIn('id', $partyIds)->get()->keyBy('id');
+
+        $running = 0.0;
+        $rows = [];
+        foreach ($entries as $e) {
+            if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                $running += (float) $e->amount;
+            } else {
+                $running -= (float) $e->amount;
+            }
+
+            $partyName = 'General';
+            if ($e->link_type === DayBookEntry::LINK_PARTY && $e->link_id) {
+                $partyName = $parties->get((int) $e->link_id)?->name ?? ('Party #'.$e->link_id);
+            }
+
+            $kind = $e->type === DayBookEntry::TYPE_CASH_IN ? 'Payment in' : 'Payment out';
+            $settlement = $e->getSettlementLabel();
+            $paymentText = $kind;
+            if ($settlement !== '' && $settlement !== '—') {
+                $paymentText .= ' · '.$settlement;
+            }
+
+            $rows[] = [
+                'date' => $e->entry_date->format('d M Y'),
+                'party' => $partyName,
+                'payment' => $paymentText,
+                'amount' => (float) $e->amount,
+                'amount_in' => $e->type === DayBookEntry::TYPE_CASH_IN,
+                'running' => $running,
+            ];
+        }
+
+        return $rows;
+    }
+
     public function ledgerPdf(Project $project)
     {
+        $project->loadMissing('landType');
         $ledger = $this->buildProjectLedger($project);
         $generatedAt = now();
+        $ledgerFlatRows = $this->buildProjectLedgerFlatRows($project);
+        $projectLandAkms = $this->projectLedgerLandAkmsLine($project);
+        $projectTotalBookAmount = $project->total_amount !== null && $project->total_amount !== ''
+            ? (float) $project->total_amount
+            : null;
 
         $pdf = Pdf::loadView('projects.ledger-pdf', array_merge(
-            compact('project', 'generatedAt'),
+            compact('project', 'generatedAt', 'ledgerFlatRows', 'projectLandAkms', 'projectTotalBookAmount'),
             [
-                'ledgerSections' => $ledger['ledgerSections'],
-                'ledgerTotalIn' => $ledger['ledgerTotalIn'],
-                'ledgerTotalOut' => $ledger['ledgerTotalOut'],
-                'ledgerNetFlow' => $ledger['ledgerNetFlow'],
                 'entryCount' => $ledger['entries']->count(),
             ]
         ));

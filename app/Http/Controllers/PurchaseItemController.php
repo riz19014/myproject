@@ -166,6 +166,37 @@ class PurchaseItemController extends Controller
     }
 
     /**
+     * Formal ledger PDF: chronological lines with running balance (separate from {@see pdf()}).
+     */
+    public function ledgerPdf()
+    {
+        $purchaseItems = PurchaseItem::query()
+            ->with(['project', 'party'])
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->limit(400)
+            ->get();
+
+        $purchaseTotalMarla = (float) $purchaseItems->sum(fn ($i) => (float) $i->land_area_marla);
+        $purchaseTotalRs = (float) $purchaseItems->sum(fn ($i) => (float) $i->line_total_rs);
+        $purchaseLineCount = $purchaseItems->count();
+        $generatedAt = now();
+
+        $pdf = Pdf::loadView('purchases.ledger-pdf', [
+            'purchaseItems' => $purchaseItems,
+            'purchaseTotalMarla' => $purchaseTotalMarla,
+            'purchaseTotalRs' => $purchaseTotalRs,
+            'purchaseLineCount' => $purchaseLineCount,
+            'generatedAt' => $generatedAt,
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $filename = 'purchase-land-ledger-'.$generatedAt->format('Y-m-d-His').'.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
      * @param  array<string, mixed>  $line
      * @return array<string, mixed>
      */
