@@ -825,9 +825,17 @@ body.app-sidebar-open {
     color: var(--text-dark) !important;
 }
 
-.btn-outline-theme:hover {
-    background: var(--text-dark) !important;
-    color: var(--bg-lighter) !important;
+.btn-outline-theme:hover,
+.btn-outline-theme:focus-visible {
+    background: rgba(249, 115, 22, 0.12) !important;
+    border-color: var(--accent-orange) !important;
+    color: var(--text-dark) !important;
+}
+
+.btn-outline-theme:active {
+    background: rgba(249, 115, 22, 0.2) !important;
+    border-color: var(--accent-orange-hover) !important;
+    color: var(--text-dark) !important;
 }
 
 /* Card */
