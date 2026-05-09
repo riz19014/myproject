@@ -224,6 +224,7 @@ class DayBookController extends Controller
                     'amount_str' => $amountStr,
                     'balance' => $running,
                     'signed_delta' => $signedDelta,
+                    'settlement' => $e->getSettlementLabel(),
                 ];
             }
             $closingBalance = $running;
@@ -273,6 +274,7 @@ class DayBookController extends Controller
                 'amount_str' => $amountStr,
                 'balance' => $running,
                 'signed_delta' => $signedDelta,
+                'settlement' => $e->getSettlementLabel(),
             ];
         }
         $closingBalance = $running;
@@ -332,49 +334,141 @@ class DayBookController extends Controller
     }
 
     /**
-     * Flat rows for ledger statement: date, payment, amount, description, balance.
-     * Running balance is continuous across the range: starts at opening (from date), never reset per day.
-     * Amount and balance cells are numeric only; (Rs.) is in the view column titles. Negative balances use parentheses.
+     * Flat rows for party ledger: date, payment, settlement, amount, description, balance.
+     * Running balance starts at opening (from date) and follows party-linked entries in date order.
      *
-     * @return list<array{date: string, payment: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
+     * @return list<array{date: string, payment: string, settlement: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
      */
     private function ledgerStatementRows(Carbon $from, Carbon $to, int $partyId): array
     {
-        $rows = [];
         $openingBase = $this->ledgerOpeningBalanceForSummary($from);
         $running = $openingBase;
+        $rows = [];
 
-        for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
-            $hasPartyLines = DayBookEntry::query()
-                ->whereDate('entry_date', $d)
-                ->where('link_type', DayBookEntry::LINK_PARTY)
-                ->where('link_id', $partyId)
-                ->exists();
-            if (! $hasPartyLines) {
-                continue;
+        $entries = DayBookEntry::query()
+            ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
+            ->where('link_type', DayBookEntry::LINK_PARTY)
+            ->where('link_id', $partyId)
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($entries as $e) {
+            if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                $running += (float) $e->amount;
+                $amountStr = '+Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment in';
+            } else {
+                $running -= (float) $e->amount;
+                $amountStr = '-Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment out';
             }
 
-            $block = $this->buildSingleDayLedger($d, $partyId, 0.0);
-            if ($block === null) {
-                continue;
-            }
-
-            $dateLabel = $d->format('d M Y');
-
-            foreach ($block['tableRows'] as $tr) {
-                $running += (float) $tr['signed_delta'];
-                $rows[] = [
-                    'date' => $dateLabel,
-                    'payment' => $tr['type_label'],
-                    'amount' => $this->ledgerStatementAmountCell($tr['amount_str']),
-                    'description' => $tr['description'],
-                    'balance' => $running,
-                    'balance_display' => $this->formatLedgerBalanceCell($running),
-                ];
-            }
+            $rows[] = [
+                'date' => $e->entry_date->format('d M Y'),
+                'payment' => $typeLabel,
+                'settlement' => $e->getSettlementLabel(),
+                'amount' => $this->ledgerStatementAmountCell($amountStr),
+                'description' => $e->description ?: '—',
+                'balance' => $running,
+                'balance_display' => $this->formatLedgerBalanceCell($running),
+            ];
         }
 
         return $rows;
+    }
+
+    /**
+     * All daybook entries in range (every link type), chronological, with running balance from opening + petty on from-date.
+     *
+     * @return list<array{date: string, payment: string, settlement: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
+     */
+    private function ledgerStatementRowsDateWise(Carbon $from, Carbon $to): array
+    {
+        $this->syncOpeningFromPreviousDay($from);
+        $opening = $this->ledgerOpeningBalanceForSummary($from);
+        $petty = $this->ledgerPettyCashForSummary($from);
+        $running = $opening + $petty;
+
+        $entries = DayBookEntry::query()
+            ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        $rows = [];
+        foreach ($entries as $e) {
+            if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                $running += (float) $e->amount;
+                $amountStr = '+Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment in';
+            } else {
+                $running -= (float) $e->amount;
+                $amountStr = '-Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment out';
+            }
+            $linkLabel = $e->getLinkLabel();
+            $desc = ($e->description ?: '—');
+            if ($linkLabel !== '' && $linkLabel !== 'Office') {
+                $desc .= ' · '.$linkLabel;
+            }
+
+            $rows[] = [
+                'date' => $e->entry_date->format('d M Y'),
+                'payment' => $typeLabel,
+                'settlement' => $e->getSettlementLabel(),
+                'amount' => $this->ledgerStatementAmountCell($amountStr),
+                'description' => $desc,
+                'balance' => $running,
+                'balance_display' => $this->formatLedgerBalanceCell($running),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function ledgerPettyCashForSummary(Carbon $from): float
+    {
+        $this->syncOpeningFromPreviousDay($from);
+        $rec = DaybookOpeningBalance::query()
+            ->where('balance_date', $from->toDateString())
+            ->first();
+
+        return $rec ? (float) $rec->petty_cash : 0.0;
+    }
+
+    private function earliestPartyEntryDate(int $partyId): ?Carbon
+    {
+        $min = DayBookEntry::query()
+            ->where('link_type', DayBookEntry::LINK_PARTY)
+            ->where('link_id', $partyId)
+            ->min('entry_date');
+        if ($min === null) {
+            return null;
+        }
+
+        return Carbon::parse($min)->startOfDay();
+    }
+
+    /**
+     * @return array{0: float, 1: float} [cash in, cash out] for all links in range
+     */
+    private function ledgerGrandTotalsAllForRange(Carbon $from, Carbon $to): array
+    {
+        $fromStr = $from->toDateString();
+        $toStr = $to->toDateString();
+        $grandCashIn = (float) DayBookEntry::query()
+            ->where('entry_date', '>=', $fromStr)
+            ->where('entry_date', '<=', $toStr)
+            ->where('type', DayBookEntry::TYPE_CASH_IN)
+            ->sum('amount');
+        $grandCashOut = (float) DayBookEntry::query()
+            ->where('entry_date', '>=', $fromStr)
+            ->where('entry_date', '<=', $toStr)
+            ->where('type', DayBookEntry::TYPE_CASH_OUT)
+            ->sum('amount');
+
+        return [$grandCashIn, $grandCashOut];
     }
 
     /**
@@ -537,18 +631,19 @@ class DayBookController extends Controller
 
     public function ledger(Request $request)
     {
-        $range = $this->ledgerDateRangeFromRequest($request);
-        $from = $range['from'];
-        $to = $range['to'];
-        $ledger_from_input = $range['from_input'];
-        $ledger_to_input = $range['to_input'];
         $parties = Party::query()->orderBy('name')->get();
 
+        $fromRaw = $request->input('from');
+        $toRaw = $request->input('to');
+        $hasFromInput = $fromRaw !== null && $fromRaw !== '';
+        $hasToInput = $toRaw !== null && $toRaw !== '';
+
+        $defaultRange = $this->normalizeLedgerDates(null, null);
         $emptyPayload = [
-            'from' => $from,
-            'to' => $to,
-            'ledger_from_input' => $ledger_from_input,
-            'ledger_to_input' => $ledger_to_input,
+            'from' => $defaultRange['from'],
+            'to' => $defaultRange['to'],
+            'ledger_from_input' => '',
+            'ledger_to_input' => '',
             'party_id' => null,
             'selectedParty' => null,
             'parties' => $parties,
@@ -559,28 +654,62 @@ class DayBookController extends Controller
             'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine(0.0),
             'ledgerFooter' => [],
             'ledger_ready' => false,
+            'ledger_scope' => null,
         ];
 
-        if ($request->filled('_ledger') && ! $request->filled('party_id')) {
-            return view('daybook.ledger', $emptyPayload)
-                ->withErrors(['party_id' => 'Please select a party first.']);
-        }
-
-        if (! $request->filled('party_id')) {
+        if (! $request->filled('_ledger')) {
             return view('daybook.ledger', $emptyPayload);
         }
 
-        $validated = $request->validate([
-            'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
-        ]);
-        $partyId = (int) $validated['party_id'];
+        $partyId = null;
+        if ($request->filled('party_id')) {
+            $validatedParty = $request->validate([
+                'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
+            ], [], ['party_id' => 'party']);
+            $partyId = (int) $validatedParty['party_id'];
+        }
 
-        $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
-        [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
+        $ledger_scope = 'date_range';
+        $from = null;
+        $to = null;
+        $ledger_from_input = '';
+        $ledger_to_input = '';
+
+        if ($partyId !== null && ! $hasFromInput && ! $hasToInput) {
+            $ledger_scope = 'party_all_time';
+            $earliest = $this->earliestPartyEntryDate($partyId);
+            $from = $earliest ?? Carbon::today();
+            $to = Carbon::today();
+            if ($from->gt($to)) {
+                $from = $to->copy();
+            }
+            $maxDays = 366 * 40;
+            if ($from->diffInDays($to) > $maxDays) {
+                $from = $to->copy()->subDays($maxDays);
+            }
+        } else {
+            $range = $this->ledgerDateRangeFromRequest($request);
+            $from = $range['from'];
+            $to = $range['to'];
+            $ledger_from_input = $range['from_input'];
+            $ledger_to_input = $range['to_input'];
+            if ($partyId !== null) {
+                $ledger_scope = 'party_date_range';
+            }
+        }
+
+        if ($partyId === null) {
+            $ledgerRows = $this->ledgerStatementRowsDateWise($from, $to);
+            [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsAllForRange($from, $to);
+        } else {
+            $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
+            [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
+        }
+
         $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
         $ledgerFooter = $this->ledgerTableFooterRows($openingBalanceSummary, $grandCashIn, $grandCashOut, $ledgerRows);
 
-        $selectedParty = Party::query()->findOrFail($partyId);
+        $selectedParty = $partyId !== null ? Party::query()->findOrFail($partyId) : null;
 
         return view('daybook.ledger', [
             'from' => $from,
@@ -597,6 +726,7 @@ class DayBookController extends Controller
             'openingBalanceSummaryDisplay' => $this->formatLedgerOpeningSummaryLine($openingBalanceSummary),
             'ledgerFooter' => $ledgerFooter,
             'ledger_ready' => true,
+            'ledger_scope' => $ledger_scope,
         ]);
     }
 
@@ -612,20 +742,45 @@ class DayBookController extends Controller
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
-            'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
+            'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
         ]);
-        $dates = $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
-        $from = $dates['from'];
-        $to = $dates['to'];
-        $partyId = (int) $validated['party_id'];
 
-        $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
-        [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
+        $hasFromInput = $fromRaw !== null && $fromRaw !== '';
+        $hasToInput = $toRaw !== null && $toRaw !== '';
+        $partyId = isset($validated['party_id']) && $validated['party_id'] !== null && $validated['party_id'] !== ''
+            ? (int) $validated['party_id']
+            : null;
+
+        if ($partyId !== null && ! $hasFromInput && ! $hasToInput) {
+            $earliest = $this->earliestPartyEntryDate($partyId);
+            $from = $earliest ?? Carbon::today();
+            $to = Carbon::today();
+            if ($from->gt($to)) {
+                $from = $to->copy();
+            }
+            $maxDays = 366 * 40;
+            if ($from->diffInDays($to) > $maxDays) {
+                $from = $to->copy()->subDays($maxDays);
+            }
+        } else {
+            $dates = $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
+            $from = $dates['from'];
+            $to = $dates['to'];
+        }
+
+        if ($partyId === null) {
+            $ledgerRows = $this->ledgerStatementRowsDateWise($from, $to);
+            [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsAllForRange($from, $to);
+        } else {
+            $ledgerRows = $this->ledgerStatementRows($from, $to, $partyId);
+            [$grandCashIn, $grandCashOut] = $this->ledgerGrandTotalsForRange($from, $to, $partyId);
+        }
+
         $openingBalanceSummary = $this->ledgerOpeningBalanceForSummary($from);
         $ledgerFooter = $this->ledgerTableFooterRows($openingBalanceSummary, $grandCashIn, $grandCashOut, $ledgerRows);
 
         $generatedAt = now();
-        $selectedParty = Party::query()->findOrFail($partyId);
+        $selectedParty = $partyId !== null ? Party::query()->findOrFail($partyId) : null;
 
         $pdf = Pdf::loadView('daybook.ledger-pdf', [
             'from' => $from,
@@ -642,7 +797,10 @@ class DayBookController extends Controller
         ]);
         $pdf->setPaper('a4', 'portrait');
 
-        $filename = 'daybook-ledger-'.$from->format('Y-m-d').'_to_'.$to->format('Y-m-d').'-party-'.$partyId.'.pdf';
+        $slug = $from->format('Y-m-d').'_to_'.$to->format('Y-m-d');
+        $filename = $partyId !== null
+            ? 'daybook-ledger-'.$slug.'-party-'.$partyId.'.pdf'
+            : 'daybook-ledger-'.$slug.'-all-parties.pdf';
 
         return $pdf->download($filename);
     }

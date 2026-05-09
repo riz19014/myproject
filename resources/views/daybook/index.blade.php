@@ -144,7 +144,7 @@
             </div>
             <span class="text-muted small fw-medium">{{ $day->format('l, j M Y') }}</span>
         </div>
-        <div class="table-responsive daybook-table-shell">
+        <div class="table-responsive daybook-table-shell" role="region" aria-label="Daybook entries for this date">
             <table class="table table-theme mb-0 align-middle">
                 <thead>
                     <tr>
@@ -154,7 +154,7 @@
                         <th class="text-end">Amount (Rs)</th>
                         <th>Linked to</th>
                         <th>Sub category</th>
-                        <th width="220">Actions</th>
+                        <th class="daybook-records-actions-col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -121,11 +121,14 @@ class DayBookEntry extends Model
 
         return match ($method) {
             self::PAYMENT_CASH => 'Cash',
-            self::PAYMENT_ONLINE => 'Online'.($this->payment_bank ? ' · '.$this->payment_bank : ''),
-            self::PAYMENT_CHEQUE => 'Cheque'.($this->payment_bank ? ' · '.$this->payment_bank : '')
-                .($this->payment_reference ? ' · #'.$this->payment_reference : ''),
-            self::PAYMENT_PAYORDER => 'Pay order'.($this->payment_bank ? ' · '.$this->payment_bank : '')
-                .($this->payment_reference ? ' · Ref '.$this->payment_reference : ''),
+            self::PAYMENT_ONLINE => 'Online'
+                .($this->payment_bank ? ' · Bank: '.$this->payment_bank : ''),
+            self::PAYMENT_CHEQUE => 'Cheque'
+                .($this->payment_bank ? ' · Bank: '.$this->payment_bank : '')
+                .($this->payment_reference ? ' · No. '.$this->payment_reference : ''),
+            self::PAYMENT_PAYORDER => 'Pay order'
+                .($this->payment_bank ? ' · Bank: '.$this->payment_bank : '')
+                .($this->payment_reference ? ' · No. '.$this->payment_reference : ''),
             default => (string) $method,
         };
     }

@@ -367,10 +367,11 @@
         min-width: 3rem;
         border-radius: 10px;
     }
-    .daybook-page .daybook-card-heading .btn-outline-theme:hover {
-        background: #0f172a !important;
-        color: #fff !important;
-        border-color: #0f172a !important;
+    .daybook-page .daybook-card-heading .btn-outline-theme:hover,
+    .daybook-page .daybook-card-heading .btn-outline-theme:focus-visible {
+        background: rgba(249, 115, 22, 0.12) !important;
+        border-color: #f97316 !important;
+        color: #0f172a !important;
     }
     .daybook-page .daybook-date-chip {
         display: inline-flex;
@@ -551,13 +552,28 @@
     }
     .daybook-page .daybook-table-shell {
         border-radius: 10px;
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
         border: 1px solid var(--db-border);
         background: #fff;
     }
     .daybook-page .daybook-records-panel .table-theme {
         margin: 0;
+        min-width: 42rem;
         --bs-table-border-color: #e2e8f0;
+    }
+    @media (max-width: 575.98px) {
+        .daybook-page .daybook-records-panel .table-theme thead th,
+        .daybook-page .daybook-records-panel .table-theme tbody td {
+            padding: 0.6rem 0.65rem !important;
+            font-size: 0.8125rem !important;
+        }
+        .daybook-page .daybook-records-panel .table-theme thead th {
+            font-size: 0.625rem !important;
+            letter-spacing: 0.05em;
+        }
     }
     .daybook-page .daybook-records-panel .table-theme thead th {
         font-size: 0.6875rem;
@@ -589,6 +605,42 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 0.4rem;
+    }
+    @media (max-width: 575.98px) {
+        .daybook-page .daybook-table-actions {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.35rem;
+            min-width: 6.5rem;
+        }
+        .daybook-page .daybook-table-actions .daybook-table-action-btn {
+            width: 100%;
+            justify-content: center;
+        }
+        .daybook-page .daybook-table-actions form {
+            display: block;
+            width: 100%;
+        }
+        .daybook-page .daybook-table-actions form .daybook-table-action-btn {
+            width: 100%;
+        }
+    }
+    .daybook-page .daybook-records-actions-col {
+        min-width: 7.5rem;
+        width: 1%;
+    }
+    .daybook-page .daybook-records-panel thead .daybook-records-actions-col {
+        white-space: nowrap;
+    }
+    @media (min-width: 576px) {
+        .daybook-page .daybook-records-actions-col {
+            min-width: 11rem;
+        }
+    }
+    @media (min-width: 768px) {
+        .daybook-page .daybook-records-actions-col {
+            min-width: 13.75rem;
+        }
     }
     .daybook-page .daybook-pill {
         display: inline-block;

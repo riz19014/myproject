@@ -45,7 +45,7 @@
     $ledger_from_input = $ledger_from_input ?? '';
     $ledger_to_input = $ledger_to_input ?? '';
     $pdfQuery = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
-    if ($ledger_ready && $party_id) {
+    if ($ledger_ready && ! empty($party_id)) {
         $pdfQuery['party_id'] = $party_id;
     }
     $clearPartyQuery = array_filter([
@@ -59,7 +59,7 @@
             <input type="hidden" name="_ledger" value="1">
             <div style="min-width: min(100%, 220px); max-width: 320px;">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                    <label class="form-label small text-muted mb-0" for="ledger_form_party_search">Party <span class="text-danger">*</span></label>
+                    <label class="form-label small text-muted mb-0" for="ledger_form_party_search">Party <span class="fw-normal text-muted">(optional if dates set)</span></label>
                     <a href="{{ route('daybook.index') }}" class="small fw-semibold text-decoration-none">+ Create on Daybook</a>
                 </div>
                 <div class="daybook-form-combo @error('party_id') is-invalid @enderror">
@@ -83,11 +83,11 @@
             </div>
             <div>
                 <label for="ledger-from" class="form-label small text-muted mb-0">From <span class="fw-normal">(optional)</span></label>
-                <input type="text" name="from" id="ledger-from" class="form-control form-control-theme" value="{{ old('from', $ledger_from_input) }}" placeholder="Defaults to month start" autocomplete="off">
+                <input type="text" name="from" id="ledger-from" class="form-control form-control-theme" value="{{ old('from', $ledger_from_input) }}" placeholder="Party only: all history · No party: month start" autocomplete="off">
             </div>
             <div>
                 <label for="ledger-to" class="form-label small text-muted mb-0">To <span class="fw-normal">(optional)</span></label>
-                <input type="text" name="to" id="ledger-to" class="form-control form-control-theme" value="{{ old('to', $ledger_to_input) }}" placeholder="Defaults to today" autocomplete="off">
+                <input type="text" name="to" id="ledger-to" class="form-control form-control-theme" value="{{ old('to', $ledger_to_input) }}" placeholder="Party only: today · No party: today" autocomplete="off">
             </div>
             <button type="submit" class="btn btn-theme">Show ledger</button>
             @if($party_id)
@@ -116,13 +116,17 @@
         @if($ledger_ready || $ledger_from_input !== '' || $ledger_to_input !== '')
             <p class="text-muted small mb-2">
                 {{ $from->format('j M Y') }} — {{ $to->format('j M Y') }}
-                @if($ledger_ready && $ledger_from_input === '' && $ledger_to_input === '')
-                    <span class="fw-normal">· range defaults when dates left blank</span>
+                @if($ledger_ready && ($ledger_scope ?? null) === 'party_all_time')
+                    <span class="fw-normal">· all dates for this party (first entry through today)</span>
+                @elseif($ledger_ready && ($ledger_scope ?? null) === 'date_range' && ! $selectedParty)
+                    <span class="fw-normal">· all parties, date order</span>
+                @elseif($ledger_ready && ($ledger_scope ?? null) === 'party_date_range' && $selectedParty)
+                    <span class="fw-normal">· filtered by party and dates</span>
+                @elseif($ledger_from_input !== '' || $ledger_to_input !== '')
+                    <span class="fw-normal">· choose <strong>Party</strong> and/or dates, then Show ledger</span>
                 @endif
                 @if($selectedParty)
                     · <strong>{{ $selectedParty->name }}</strong>
-                @elseif($ledger_from_input !== '' || $ledger_to_input !== '')
-                    <span class="fw-normal">· select a party to view</span>
                 @endif
             </p>
         @endif
@@ -150,11 +154,12 @@
             <table class="table table-bordered table-sm mb-0 align-middle daybook-ledger-statement">
                 <thead class="text-nowrap">
                     <tr class="table-dark">
-                        <th scope="col" style="width:10%">Date</th>
-                        <th scope="col" style="width:12%">Payment</th>
+                        <th scope="col" style="width:9%">Date</th>
+                        <th scope="col" style="width:10%">Payment</th>
+                        <th scope="col" style="width:18%">Settlement</th>
                         <th scope="col">Description</th>
-                        <th scope="col" class="text-end" style="width:12%">Amount (Rs.)</th>
-                        <th scope="col" class="text-end" style="width:12%">Balance (Rs.)</th>
+                        <th scope="col" class="text-end" style="width:11%">Amount (Rs.)</th>
+                        <th scope="col" class="text-end" style="width:11%">Balance (Rs.)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -162,17 +167,18 @@
                         <tr @class(['table-light' => !empty($r['is_meta'])])>
                             <td>{{ $r['date'] }}</td>
                             <td>{{ $r['payment'] }}</td>
+                            <td class="small">{{ $r['settlement'] ?? '—' }}</td>
                             <td>{{ $r['description'] }}</td>
                             <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td class="text-end font-monospace">{{ $r['balance_display'] }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-muted text-center py-4">
+                            <td colspan="6" class="text-muted text-center py-4">
                                 @if(!$ledger_ready)
-                                    Please select a party to view the ledger.
+                                    Choose a party and/or from–to dates, then <strong>Show ledger</strong>.
                                 @else
-                                    No lines for this party in this range.
+                                    No entries in this range{{ $selectedParty ? ' for this party' : '' }}.
                                 @endif
                             </td>
                         </tr>
@@ -181,7 +187,7 @@
                 @if(count($ledgerFooter))
                 <tfoot>
                     <tr class="border-top border-2">
-                        <td colspan="3" class="border-end-0 bg-transparent"></td>
+                        <td colspan="4" class="border-end-0 bg-transparent"></td>
                         <td colspan="2" class="ledger-footer-totals text-end border-start">
                             @foreach($ledgerFooter as $line)
                                 <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
@@ -227,13 +233,7 @@
     }
 
     if (form && submitBtn) {
-        form.addEventListener('submit', function (e) {
-            var pid = document.getElementById('ledger_form_party_id');
-            if (!pid || !String(pid.value || '').trim()) {
-                e.preventDefault();
-                alert('Please select a party first.');
-                return;
-            }
+        form.addEventListener('submit', function () {
             showOverlay('Loading ledger…');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Loading…';
@@ -250,7 +250,7 @@
             e.preventDefault();
             var href = pdfLink.getAttribute('href');
             if (!href || href === '#') {
-                alert('Please select a party first.');
+                alert('Show the ledger first so the PDF can be generated.');
                 return;
             }
             showOverlay('Preparing PDF…');

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Daybook ledger — {{ $from->format('j M Y') }} to {{ $to->format('j M Y') }}</title>
+    <title>Ledger — {{ $from->format('j M Y') }} to {{ $to->format('j M Y') }}</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -94,18 +94,18 @@
         .signatures table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
         .signatures td {
-            width: 42%;
+            width: 33.33%;
             vertical-align: top;
             text-align: center;
-            padding: 0 8px;
+            padding: 0 6px;
         }
-        .signatures td.spacer { width: 16%; }
         .sig-line {
             border-top: 1px solid #0f172a;
             margin: 0 auto 8px auto;
-            width: 88%;
+            width: 92%;
             height: 1px;
         }
         .sig-title {
@@ -121,13 +121,15 @@
     </style>
 </head>
 <body>
-    <h1>Daybook ledger</h1>
+    <h1>Ledger</h1>
     <div class="meta">
         Period: <strong>{{ $from->format('j M Y') }}</strong> to <strong>{{ $to->format('j M Y') }}</strong>
         · Generated {{ $generatedAt->format('j M Y, g:i A') }}
     </div>
     @if(!empty($selectedParty))
-        <div class="party-line"><strong>Party:</strong> {{ $selectedParty->name }} (linked entries only)</div>
+        <div class="party-line"><strong>Party:</strong> {{ $selectedParty->name }} (party-linked entries only)</div>
+    @else
+        <div class="party-line"><strong>Scope:</strong> All parties — entries in date order for the period.</div>
     @endif
 
     @if($grandCashIn > 0 || $grandCashOut > 0 || $openingBalanceSummary != 0.0)
@@ -153,11 +155,12 @@
     <table class="ledger-table">
         <thead>
             <tr>
-                <th style="width:10%">Date</th>
-                <th style="width:13%">Payment</th>
+                <th style="width:9%">Date</th>
+                <th style="width:10%">Payment</th>
+                <th style="width:20%">Settlement</th>
                 <th>Description</th>
-                <th class="amt" style="width:14%">Amount (Rs.)</th>
-                <th class="amt" style="width:14%">Balance (Rs.)</th>
+                <th class="amt" style="width:12%">Amount (Rs.)</th>
+                <th class="amt" style="width:12%">Balance (Rs.)</th>
             </tr>
         </thead>
         <tbody>
@@ -165,14 +168,15 @@
                 <tr @if(!empty($r['is_meta'])) class="meta" @endif>
                     <td>{{ $r['date'] }}</td>
                     <td>{{ $r['payment'] }}</td>
+                    <td style="font-size:8px;">{{ $r['settlement'] ?? '—' }}</td>
                     <td>{{ $r['description'] }}</td>
                     <td class="amt">{{ $r['amount'] }}</td>
                     <td class="amt">{{ $r['balance_display'] }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" style="text-align:center;color:#64748b;padding:16px;">
-                        No lines for this party in this range.
+                    <td colspan="6" style="text-align:center;color:#64748b;padding:16px;">
+                        No entries in this range{{ !empty($selectedParty) ? ' for this party' : '' }}.
                     </td>
                 </tr>
             @endforelse
@@ -180,7 +184,7 @@
         @if(count($ledgerFooter))
         <tfoot>
             <tr>
-                <td colspan="3" class="ledger-footer-spacer"></td>
+                <td colspan="4" class="ledger-footer-spacer"></td>
                 <td colspan="2" class="ledger-footer-totals">
                     @foreach($ledgerFooter as $line)
                         <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
@@ -199,7 +203,11 @@
                     <div class="sig-title">Accountant</div>
                     <div class="sig-hint">Name &amp; signature</div>
                 </td>
-                <td class="spacer"></td>
+                <td>
+                    <div class="sig-line"></div>
+                    <div class="sig-title">Party signature</div>
+                    <div class="sig-hint">Name &amp; signature</div>
+                </td>
                 <td>
                     <div class="sig-line"></div>
                     <div class="sig-title">Chief Executive Officer (CEO)</div>
