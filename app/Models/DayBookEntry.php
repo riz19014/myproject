@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -64,6 +65,20 @@ class DayBookEntry extends Model
     public const LINK_CUSTOMER = 'customer';
 
     public const LINK_PARTY = 'party';
+
+    /**
+     * Daybook lines tied to this project (direct project_id or link_type + link_id project).
+     */
+    public function scopeLinkedToProject(Builder $query, Project $project): Builder
+    {
+        return $query->where(function ($q) use ($project) {
+            $q->where('project_id', $project->id)
+                ->orWhere(function ($q2) use ($project) {
+                    $q2->where('link_type', self::LINK_PROJECT)
+                        ->where('link_id', $project->id);
+                });
+        });
+    }
 
     public function getLinkModel(): ?Model
     {

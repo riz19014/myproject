@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DayBookEntry;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\PurchaseItem;
@@ -166,34 +167,126 @@ class PurchaseItemController extends Controller
     }
 
     /**
-     * Formal ledger PDF: chronological lines with running balance (separate from {@see pdf()}).
+     * Purchase ledger PDF: per purchase-type project, opening book total then daybook lines
+     * (party, payment description, paid amount, running balance remaining on the deal).
      */
     public function ledgerPdf()
     {
-        $purchaseItems = PurchaseItem::query()
-            ->with(['project', 'party'])
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->limit(400)
+        $projects = Project::query()
+            ->with('landType')
+            ->where('field_type', 'purchase')
+            ->orderBy('name')
             ->get();
 
-        $purchaseTotalMarla = (float) $purchaseItems->sum(fn ($i) => (float) $i->land_area_marla);
-        $purchaseTotalRs = (float) $purchaseItems->sum(fn ($i) => (float) $i->line_total_rs);
-        $purchaseLineCount = $purchaseItems->count();
+        $sections = $projects->map(fn (Project $p) => $this->buildPurchaseProjectLedgerSection($p))->all();
+
         $generatedAt = now();
+        $totalDaybookLines = (int) collect($sections)->sum(fn (array $s) => $s['entry_count']);
 
         $pdf = Pdf::loadView('purchases.ledger-pdf', [
-            'purchaseItems' => $purchaseItems,
-            'purchaseTotalMarla' => $purchaseTotalMarla,
-            'purchaseTotalRs' => $purchaseTotalRs,
-            'purchaseLineCount' => $purchaseLineCount,
+            'sections' => $sections,
             'generatedAt' => $generatedAt,
+            'projectCount' => $projects->count(),
+            'totalDaybookLines' => $totalDaybookLines,
         ]);
-        $pdf->setPaper('a4', 'landscape');
+        $pdf->setPaper('a4', 'portrait');
 
         $filename = 'purchase-land-ledger-'.$generatedAt->format('Y-m-d-His').'.pdf';
 
         return $pdf->download($filename);
+    }
+
+    /**
+     * @return array{project: Project, land_akms: string, book_total: float, rows: list<array<string, mixed>>, entry_count: int}
+     */
+    private function buildPurchaseProjectLedgerSection(Project $project): array
+    {
+        $project->loadMissing('landType');
+
+        $entries = DayBookEntry::query()
+            ->linkedToProject($project)
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
+        $parties = Party::query()->whereIn('id', $partyIds)->get()->keyBy('id');
+
+        $bookTotal = $project->total_amount !== null && $project->total_amount !== ''
+            ? (float) $project->total_amount
+            : 0.0;
+
+        $landAkms = $this->purchaseProjectLandAkmsLine($project);
+
+        $rows = [];
+        $rows[] = [
+            'is_opening' => true,
+            'date' => '',
+            'party' => '—',
+            'description' => 'Opening balance — project book total for this land (amount remaining before daybook payments below).',
+            'paid_display' => '—',
+            'balance' => $bookTotal,
+        ];
+
+        $balance = $bookTotal;
+        foreach ($entries as $e) {
+            $amt = (float) $e->amount;
+            if ($e->type === DayBookEntry::TYPE_CASH_OUT) {
+                $balance -= $amt;
+                $paidDisplay = 'Rs '.number_format($amt, 2);
+            } else {
+                $balance += $amt;
+                $paidDisplay = '-Rs '.number_format($amt, 2).' (payment in)';
+            }
+
+            $partyName = 'General';
+            if ($e->link_type === DayBookEntry::LINK_PARTY && $e->link_id) {
+                $partyName = $parties->get((int) $e->link_id)?->name ?? ('Party #'.$e->link_id);
+            }
+
+            $descParts = [];
+            if ($e->description && trim((string) $e->description) !== '') {
+                $descParts[] = trim((string) $e->description);
+            }
+            $kind = $e->type === DayBookEntry::TYPE_CASH_IN ? 'Payment in' : 'Payment out';
+            $descParts[] = $kind;
+            $settlement = $e->getSettlementLabel();
+            if ($settlement !== '' && $settlement !== '—') {
+                $descParts[] = $settlement;
+            }
+            $description = implode(' · ', $descParts);
+
+            $rows[] = [
+                'is_opening' => false,
+                'date' => $e->entry_date->format('d-M-y'),
+                'party' => $partyName,
+                'description' => $description,
+                'paid_display' => $paidDisplay,
+                'balance' => $balance,
+            ];
+        }
+
+        return [
+            'project' => $project,
+            'land_akms' => $landAkms,
+            'book_total' => $bookTotal,
+            'rows' => $rows,
+            'entry_count' => $entries->count(),
+        ];
+    }
+
+    private function purchaseProjectLandAkmsLine(Project $project): string
+    {
+        if ($project->land_area === null || $project->land_area === '' || ! $project->land_area_unit) {
+            return '—';
+        }
+        $unit = (string) $project->land_area_unit;
+        if (! in_array($unit, ['acre', 'kanal', 'marla', 'sqft'], true)) {
+            return '—';
+        }
+        $marla = LandMeasure::toMarla((float) $project->land_area, $unit);
+
+        return LandMeasure::formatAkmsLabelFromMarla($marla);
     }
 
     /**

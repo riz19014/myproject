@@ -105,7 +105,7 @@
                         <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
                         <span>Print PDF</span>
                     </a>
-                    <a href="{{ route('purchase.lines.ledger-pdf') }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Chronological ledger with running balance (formal layout)">
+                    <a href="{{ route('purchase.lines.ledger-pdf') }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Per project: book total opening, then daybook payments (party, cash/cheque/pay order, bank, ref) and balance remaining">
                         <i class="bi bi-journal-text" aria-hidden="true"></i>
                         <span>Ledger PDF</span>
                     </a>

@@ -333,13 +333,7 @@ class ProjectController extends Controller
     private function projectDayBookEntries(Project $project)
     {
         return DayBookEntry::query()
-            ->where(function ($q) use ($project) {
-                $q->where('project_id', $project->id)
-                    ->orWhere(function ($q2) use ($project) {
-                        $q2->where('link_type', DayBookEntry::LINK_PROJECT)
-                            ->where('link_id', $project->id);
-                    });
-            })
+            ->linkedToProject($project)
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
