@@ -34,6 +34,8 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase', [ProjectController::class, 'purchaseIndex'])->name('purchase.index');
     Route::get('purchase/records/create', [PurchaseItemController::class, 'create'])->name('purchase.records.create');
     Route::post('purchase/records', [PurchaseItemController::class, 'store'])->name('purchase.records.store');
+    Route::get('purchase/records/{purchase_item}/edit', [PurchaseItemController::class, 'edit'])->name('purchase.records.edit');
+    Route::put('purchase/records/{purchase_item}', [PurchaseItemController::class, 'update'])->name('purchase.records.update');
     Route::delete('purchase/records/{purchase_item}', [PurchaseItemController::class, 'destroy'])->name('purchase.records.destroy');
     Route::post('projects/quick-store', [ProjectController::class, 'quickStore'])->name('projects.quick-store');
     Route::post('parties/quick-store', [PartyController::class, 'quickStore'])->name('parties.quick-store');

@@ -20,7 +20,7 @@
             @csrf
             <input type="hidden" name="project_id" value="{{ $project->id }}">
 
-            <p class="text-muted small mb-3">Add one or more lines. Each line is one party slice: Moza, Khasra, land area, and Rs per acre. Line total is computed from area (in marla) × rate per acre.</p>
+            <p class="text-muted small mb-3">Add one or more lines. Each line is one party slice: Moza, Khasra, land area, and Rs per acre. Line total is computed from area (in marla) × rate per acre. To change an existing line, open it from Purchase → <strong>Purchase lines</strong> and use <strong>Edit</strong>.</p>
 
             @if($parties->isEmpty())
                 <div class="alert alert-theme-danger py-2 small">No parties yet. Add parties first, then return here.</div>

@@ -99,8 +99,21 @@
     <div class="card card-theme mb-4">
         <div class="card-body">
             <h2 class="h5 mb-3">Purchase lines</h2>
+            @if($projects->isNotEmpty())
+                <div class="mb-3 pb-3 border-bottom">
+                    <div class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.06em;">Add lines for project</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach($projects->sortBy('name') as $purchaseProject)
+                            <a href="{{ route('purchase.records.create', ['project' => $purchaseProject->id]) }}" class="btn btn-sm btn-outline-theme d-inline-flex align-items-center gap-1" title="Add purchase lines for {{ $purchaseProject->name }}">
+                                <span class="text-truncate" style="max-width: 14rem;">{{ $purchaseProject->name }}</span>
+                                <i class="bi bi-plus-lg flex-shrink-0" aria-hidden="true"></i>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             @if($purchaseItems->isEmpty())
-                <p class="text-muted small mb-0">No purchase lines yet. Use <strong>Add purchase</strong> to choose a purchase project and enter one or more rows (party, Moza, Khasra, area, Rs per acre).</p>
+                <p class="text-muted small mb-0">No purchase lines yet. Pick a project under <strong>Add lines for project</strong> above (or use <strong>Add purchase</strong> in the header), then enter one or more rows. Use <strong>Edit</strong> in the table to change a line.</p>
             @else
                 <div class="table-responsive">
                     <table class="table table-striped table-theme mb-0 align-middle">
@@ -115,7 +128,7 @@
                                 <th class="text-end" style="width: 120px;">Rs / acre</th>
                                 <th class="text-end" style="width: 120px;">Line total (Rs)</th>
                                 <th style="width: 100px;">Date</th>
-                                <th class="text-center" style="width: 56px;"><span class="visually-hidden">Delete</span></th>
+                                <th class="text-center" style="width: 100px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -130,7 +143,10 @@
                                     <td class="text-end small">{{ number_format((float) $item->amount_per_acre, 0) }}</td>
                                     <td class="text-end fw-semibold">{{ number_format((float) $item->line_total_rs, 0) }}</td>
                                     <td class="text-muted small">{{ $item->created_at?->format('Y-m-d') }}</td>
-                                    <td class="text-center">
+                                    <td class="text-center text-nowrap">
+                                        <a href="{{ route('purchase.records.edit', $item) }}" class="btn btn-sm btn-outline-theme p-2" title="Edit line" aria-label="Edit purchase line {{ $item->id }}">
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        </a>
                                         <form action="{{ route('purchase.records.destroy', $item) }}" method="post" class="d-inline">
                                             @csrf
                                             @method('DELETE')

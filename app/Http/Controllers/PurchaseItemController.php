@@ -61,34 +61,12 @@ class PurchaseItemController extends Controller
 
         $items = [];
         foreach ($validated['lines'] as $idx => $line) {
-            $marla = LandMeasure::marlaFromAkms(
-                (int) $line['area_acre'],
-                (int) $line['area_kanal'],
-                (int) $line['area_marla'],
-                (int) $line['area_sqft']
+            $attrs = $this->computeLineAttributes(
+                $line,
+                "lines.{$idx}.area_acre",
+                'Line '.($idx + 1).': enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'
             );
-            if ($marla <= 0) {
-                throw ValidationException::withMessages([
-                    "lines.{$idx}.area_acre" => ['Line '.($idx + 1).': enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'],
-                ]);
-            }
-            $acres = PurchaseItem::acresFromMarla($marla);
-            $amountPerAcre = (float) $line['amount_per_acre'];
-            $lineTotal = round($acres * $amountPerAcre, 2);
-
-            $items[] = [
-                'project_id' => $project->id,
-                'party_id' => (int) $line['party_id'],
-                'moza' => $line['moza'] ?? null,
-                'khasra' => $line['khasra'] ?? null,
-                'area_acre' => (int) $line['area_acre'],
-                'area_kanal' => (int) $line['area_kanal'],
-                'area_marla' => (int) $line['area_marla'],
-                'area_sqft' => (int) $line['area_sqft'],
-                'land_area_marla' => round($marla, 4),
-                'amount_per_acre' => $amountPerAcre,
-                'line_total_rs' => $lineTotal,
-            ];
+            $items[] = array_merge(['project_id' => $project->id], $attrs);
         }
 
         DB::transaction(function () use ($items) {
@@ -101,6 +79,52 @@ class PurchaseItemController extends Controller
             ->with('success', count($items).' purchase line(s) saved for '.$project->name.'.');
     }
 
+    public function edit(PurchaseItem $purchase_item)
+    {
+        $project = $purchase_item->project;
+        if ($project->field_type !== 'purchase') {
+            abort(404);
+        }
+
+        $parties = Party::query()->orderBy('name')->get();
+
+        return view('purchases.edit', [
+            'project' => $project,
+            'parties' => $parties,
+            'item' => $purchase_item,
+        ]);
+    }
+
+    public function update(Request $request, PurchaseItem $purchase_item)
+    {
+        $project = $purchase_item->project;
+        if ($project->field_type !== 'purchase') {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'party_id' => ['required', 'integer', 'exists:parties,id'],
+            'moza' => ['nullable', 'string', 'max:255'],
+            'khasra' => ['nullable', 'string', 'max:255'],
+            'area_acre' => ['required', 'integer', 'min:0'],
+            'area_kanal' => ['required', 'integer', 'min:0'],
+            'area_marla' => ['required', 'integer', 'min:0'],
+            'area_sqft' => ['required', 'integer', 'min:0'],
+            'amount_per_acre' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $attrs = $this->computeLineAttributes(
+            $validated,
+            'area_acre',
+            'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'
+        );
+
+        $purchase_item->update($attrs);
+
+        return redirect()->route('purchase.index')
+            ->with('success', 'Purchase line #'.$purchase_item->id.' updated.');
+    }
+
     public function destroy(PurchaseItem $purchase_item)
     {
         $project = $purchase_item->project;
@@ -111,5 +135,40 @@ class PurchaseItemController extends Controller
 
         return redirect()->route('purchase.index')
             ->with('success', 'Purchase line removed.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $line
+     * @return array<string, mixed>
+     */
+    private function computeLineAttributes(array $line, string $areaErrorKey, ?string $areaErrorMessage = null): array
+    {
+        $marla = LandMeasure::marlaFromAkms(
+            (int) $line['area_acre'],
+            (int) $line['area_kanal'],
+            (int) $line['area_marla'],
+            (int) $line['area_sqft'],
+        );
+        if ($marla <= 0) {
+            throw ValidationException::withMessages([
+                $areaErrorKey => [$areaErrorMessage ?? 'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'],
+            ]);
+        }
+        $acres = PurchaseItem::acresFromMarla($marla);
+        $amountPerAcre = (float) $line['amount_per_acre'];
+        $lineTotal = round($acres * $amountPerAcre, 2);
+
+        return [
+            'party_id' => (int) $line['party_id'],
+            'moza' => $line['moza'] ?? null,
+            'khasra' => $line['khasra'] ?? null,
+            'area_acre' => (int) $line['area_acre'],
+            'area_kanal' => (int) $line['area_kanal'],
+            'area_marla' => (int) $line['area_marla'],
+            'area_sqft' => (int) $line['area_sqft'],
+            'land_area_marla' => round($marla, 4),
+            'amount_per_acre' => $amountPerAcre,
+            'line_total_rs' => $lineTotal,
+        ];
     }
 }
