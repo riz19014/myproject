@@ -115,6 +115,11 @@
             @if($purchaseItems->isEmpty())
                 <p class="text-muted small mb-0">No purchase lines yet. Pick a project under <strong>Add lines for project</strong> above (or use <strong>Add purchase</strong> in the header), then enter one or more rows. Use <strong>Edit</strong> in the table to change a line.</p>
             @else
+                @php
+                    $purchaseTotalMarla = (float) $purchaseItems->sum(fn ($i) => (float) $i->land_area_marla);
+                    $purchaseTotalRs = (float) $purchaseItems->sum(fn ($i) => (float) $i->line_total_rs);
+                    $purchaseLineCount = $purchaseItems->count();
+                @endphp
                 <div class="table-responsive">
                     <table class="table table-striped table-theme mb-0 align-middle">
                         <thead>
@@ -158,6 +163,25 @@
                                 </tr>
                             @endforeach
                         </tbody>
+                        <tfoot>
+                            <tr class="border-top border-2 border-secondary border-opacity-25">
+                                <td colspan="5" class="p-3 text-end align-middle bg-body-secondary bg-opacity-25">
+                                    <div class="text-muted small fw-semibold text-uppercase mb-1" style="letter-spacing:.06em;">Totals</div>
+                                    <div class="text-body-secondary small">{{ $purchaseLineCount }} {{ $purchaseLineCount === 1 ? 'line' : 'lines' }}</div>
+                                </td>
+                                <td class="p-3 align-middle bg-body-secondary bg-opacity-25">
+                                    <div class="text-muted small fw-semibold text-uppercase mb-1" style="letter-spacing:.06em;">Total area</div>
+                                    <div class="fw-bold fs-6 lh-sm">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($purchaseTotalMarla) }}</div>
+                                    <div class="text-muted small mt-1">{{ \App\Support\LandMeasure::formatMarlaTotal($purchaseTotalMarla) }}</div>
+                                </td>
+                                <td class="p-3 text-end text-muted small align-middle bg-body-secondary bg-opacity-25">—</td>
+                                <td class="p-3 text-end align-middle bg-body-secondary bg-opacity-25">
+                                    <div class="text-muted small fw-semibold text-uppercase mb-1" style="letter-spacing:.06em;">Line total (Rs)</div>
+                                    <div class="fw-bold fs-5 text-nowrap">Rs {{ number_format($purchaseTotalRs, 0) }}</div>
+                                </td>
+                                <td colspan="2" class="p-3 align-middle bg-body-secondary bg-opacity-25"></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             @endif
