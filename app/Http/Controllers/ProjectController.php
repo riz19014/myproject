@@ -8,6 +8,7 @@ use App\Models\LandType;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\PurchaseItem;
 use App\Models\Sale;
 use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -57,12 +58,22 @@ class ProjectController extends Controller
                 ->get();
         }
 
+        $purchaseItems = collect();
+        if ($type === 'purchase') {
+            $purchaseItems = PurchaseItem::query()
+                ->with(['project', 'party'])
+                ->orderByDesc('id')
+                ->limit(400)
+                ->get();
+        }
+
         return view('projects.typed-index', [
             'type' => $type,
             'projects' => $projects,
             'totalAmount' => $totalAmount,
             'byLandType' => $byLandType,
             'sales' => $sales,
+            'purchaseItems' => $purchaseItems,
         ]);
     }
 

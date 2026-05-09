@@ -16,6 +16,8 @@
         </h1>
         @if($type === 'sale')
             <div class="text-muted small">Sale lines, land cuttings, and net saleable area by project.</div>
+        @elseif($type === 'purchase')
+            <div class="text-muted small">Purchase lines by party (Moza, Khasra, land area, amount per acre) and purchase-type projects.</div>
         @else
             <div class="text-muted small">Projects where type is <strong class="text-capitalize">{{ $type }}</strong>.</div>
         @endif
@@ -25,7 +27,8 @@
             <a href="{{ route('sale.records.create') }}" class="btn btn-pink">Add sale</a>
             <a href="{{ route('projects.create', ['context' => 'sale']) }}" class="btn btn-outline-theme">Add sale project</a>
         @else
-            <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-pink">Add Project</a>
+            <a href="{{ route('purchase.records.create') }}" class="btn btn-pink">Add purchase</a>
+            <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-outline-theme">Add purchase project</a>
         @endif
         <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">All projects</a>
     </div>
@@ -81,6 +84,60 @@
                                         <a href="{{ route('sale.records.land-cuttings.index', $sale) }}" class="btn btn-sm btn-outline-theme p-2" title="Land cutting" aria-label="Land cutting for sale {{ $sale->id }}">
                                             <i class="bi bi-scissors" aria-hidden="true"></i>
                                         </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
+@endif
+
+@if($type === 'purchase')
+    <div class="card card-theme mb-4">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Purchase lines</h2>
+            @if($purchaseItems->isEmpty())
+                <p class="text-muted small mb-0">No purchase lines yet. Use <strong>Add purchase</strong> to choose a purchase project and enter one or more rows (party, Moza, Khasra, area, Rs per acre).</p>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-striped table-theme mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 72px;">ID</th>
+                                <th>Project</th>
+                                <th>Party</th>
+                                <th>Moza</th>
+                                <th>Khasra</th>
+                                <th style="min-width: 200px;">Area</th>
+                                <th class="text-end" style="width: 120px;">Rs / acre</th>
+                                <th class="text-end" style="width: 120px;">Line total (Rs)</th>
+                                <th style="width: 100px;">Date</th>
+                                <th class="text-center" style="width: 56px;"><span class="visually-hidden">Delete</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($purchaseItems as $item)
+                                <tr>
+                                    <td>{{ $item->id }}</td>
+                                    <td class="fw-semibold">{{ $item->project?->name ?? '—' }}</td>
+                                    <td class="small">{{ $item->party?->name ?? '—' }}</td>
+                                    <td class="small">{{ $item->moza ?: '—' }}</td>
+                                    <td class="small">{{ $item->khasra ?: '—' }}</td>
+                                    <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $item->land_area_marla) }}</td>
+                                    <td class="text-end small">{{ number_format((float) $item->amount_per_acre, 0) }}</td>
+                                    <td class="text-end fw-semibold">{{ number_format((float) $item->line_total_rs, 0) }}</td>
+                                    <td class="text-muted small">{{ $item->created_at?->format('Y-m-d') }}</td>
+                                    <td class="text-center">
+                                        <form action="{{ route('purchase.records.destroy', $item) }}" method="post" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="button" class="btn btn-sm btn-outline-danger p-2 btn-delete-confirm" title="Remove line" aria-label="Remove purchase line {{ $item->id }}" data-title="Remove this purchase line?" data-text="This only deletes this row from the purchase list." data-confirm="Yes, remove">
+                                                <i class="bi bi-trash" aria-hidden="true"></i>
+                                            </button>
+                                        </form>
                                     </td>
                                 </tr>
                             @endforeach
@@ -195,6 +252,9 @@
             <div class="mt-3">
                 @if($type === 'sale')
                     <a href="{{ route('projects.create', ['context' => 'sale']) }}" class="btn btn-pink">Add sale project</a>
+                @elseif($type === 'purchase')
+                    <a href="{{ route('purchase.records.create') }}" class="btn btn-pink">Add purchase</a>
+                    <a href="{{ route('projects.create', ['context' => 'purchase']) }}" class="btn btn-outline-theme ms-2">Add purchase project</a>
                 @else
                     <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-pink">Create a project</a>
                 @endif

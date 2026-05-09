@@ -11,6 +11,7 @@ use App\Http\Controllers\PartyCategoryController;
 use App\Http\Controllers\PartyController;
 use App\Http\Controllers\PartySubCategoryController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\PurchaseItemController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleLandCuttingController;
 use App\Http\Controllers\SettingController;
@@ -31,6 +32,9 @@ Route::middleware('auth')->group(function () {
     Route::post('sale/records/{sale}/land-cuttings', [SaleLandCuttingController::class, 'store'])->name('sale.records.land-cuttings.store');
     Route::delete('sale/records/{sale}/land-cuttings/{land_cutting}', [SaleLandCuttingController::class, 'destroy'])->name('sale.records.land-cuttings.destroy');
     Route::get('purchase', [ProjectController::class, 'purchaseIndex'])->name('purchase.index');
+    Route::get('purchase/records/create', [PurchaseItemController::class, 'create'])->name('purchase.records.create');
+    Route::post('purchase/records', [PurchaseItemController::class, 'store'])->name('purchase.records.store');
+    Route::delete('purchase/records/{purchase_item}', [PurchaseItemController::class, 'destroy'])->name('purchase.records.destroy');
     Route::post('projects/quick-store', [ProjectController::class, 'quickStore'])->name('projects.quick-store');
     Route::post('parties/quick-store', [PartyController::class, 'quickStore'])->name('parties.quick-store');
     Route::resource('parties', PartyController::class)->except(['show']);
