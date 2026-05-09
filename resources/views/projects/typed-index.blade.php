@@ -98,7 +98,13 @@
 @if($type === 'purchase')
     <div class="card card-theme mb-4">
         <div class="card-body">
-            <h2 class="h5 mb-3">Purchase lines</h2>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h2 class="h5 mb-0">Purchase lines</h2>
+                <a href="{{ route('purchase.lines.pdf') }}" class="btn btn-sm btn-outline-theme d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                    <span>Print PDF</span>
+                </a>
+            </div>
             @if($projects->isNotEmpty())
                 <div class="mb-3 pb-3 border-bottom">
                     <div class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.06em;">Add lines for project</div>

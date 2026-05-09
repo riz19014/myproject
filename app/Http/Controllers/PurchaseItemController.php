@@ -6,6 +6,7 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Models\PurchaseItem;
 use App\Support\LandMeasure;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -135,6 +136,33 @@ class PurchaseItemController extends Controller
 
         return redirect()->route('purchase.index')
             ->with('success', 'Purchase line removed.');
+    }
+
+    public function pdf()
+    {
+        $purchaseItems = PurchaseItem::query()
+            ->with(['project', 'party'])
+            ->orderByDesc('id')
+            ->limit(400)
+            ->get();
+
+        $purchaseTotalMarla = (float) $purchaseItems->sum(fn ($i) => (float) $i->land_area_marla);
+        $purchaseTotalRs = (float) $purchaseItems->sum(fn ($i) => (float) $i->line_total_rs);
+        $purchaseLineCount = $purchaseItems->count();
+        $generatedAt = now();
+
+        $pdf = Pdf::loadView('purchases.lines-pdf', [
+            'purchaseItems' => $purchaseItems,
+            'purchaseTotalMarla' => $purchaseTotalMarla,
+            'purchaseTotalRs' => $purchaseTotalRs,
+            'purchaseLineCount' => $purchaseLineCount,
+            'generatedAt' => $generatedAt,
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $filename = 'purchase-land-'.$generatedAt->format('Y-m-d-His').'.pdf';
+
+        return $pdf->download($filename);
     }
 
     /**
