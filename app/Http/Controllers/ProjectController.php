@@ -353,7 +353,6 @@ class ProjectController extends Controller
             $lines = [];
             foreach ($rows as $e) {
                 $amount = (float) $e->amount;
-                $payableBefore = $landTotalRs - $paidRunning;
                 if ($e->type === DayBookEntry::TYPE_CASH_OUT) {
                     $paidRunning += $amount;
                 } else {
@@ -362,7 +361,7 @@ class ProjectController extends Controller
                 $lines[] = [
                     'entry' => $e,
                     'paid' => $paidRunning,
-                    'payable' => $payableBefore,
+                    'payable' => $landTotalRs - $paidRunning,
                 ];
             }
 

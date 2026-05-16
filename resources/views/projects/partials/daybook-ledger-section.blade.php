@@ -82,6 +82,15 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @if($hasLand)
+                                    <tr class="table-light">
+                                        <td>—</td>
+                                        <td>Land total (file)</td>
+                                        <td>—</td>
+                                        <td class="text-end font-monospace">Rs {{ number_format($section['land_total_rs'], 2) }}</td>
+                                        <td class="text-end font-monospace fw-semibold">Rs {{ number_format($section['land_total_rs'], 2) }}</td>
+                                    </tr>
+                                @endif
                                 @foreach($section['lines'] as $row)
                                     @php
                                         $e = $row['entry'];
