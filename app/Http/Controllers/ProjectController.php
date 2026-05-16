@@ -296,11 +296,39 @@ class ProjectController extends Controller
     }
 
     /**
-     * @return array{entries: \Illuminate\Support\Collection, sections: array<int, array>, totalIn: float, totalOut: float, netFlow: float}
+     * Land purchase totals per party on this project (from purchase file lines).
+     *
+     * @return \Illuminate\Support\Collection<int, object{party_id: int, land_total_rs: float, land_area_marla: float}>
+     */
+    private function partyLandTotalsForProject(Project $project)
+    {
+        return PurchaseItem::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('party_id')
+            ->selectRaw('party_id, COALESCE(SUM(line_total_rs), 0) as land_total_rs, COALESCE(SUM(land_area_marla), 0) as land_area_marla')
+            ->groupBy('party_id')
+            ->get()
+            ->keyBy('party_id');
+    }
+
+    /**
+     * Net cash paid to a party: payment out minus payment in.
+     */
+    private function daybookEntriesNetPaid($entries): float
+    {
+        $out = (float) $entries->where('type', DayBookEntry::TYPE_CASH_OUT)->sum('amount');
+        $in = (float) $entries->where('type', DayBookEntry::TYPE_CASH_IN)->sum('amount');
+
+        return $out - $in;
+    }
+
+    /**
+     * @return array{entries: \Illuminate\Support\Collection, sections: array<int, array>, projectLandTotalRs: float, totalPaid: float, totalPayable: float}
      */
     private function buildProjectLedger(Project $project): array
     {
         $entries = $this->projectDayBookEntries($project);
+        $partyLandTotals = $this->partyLandTotalsForProject($project);
 
         $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
         $parties = Party::query()
@@ -317,16 +345,26 @@ class ProjectController extends Controller
         foreach ($byParty as $partyId => $rows) {
             $rows = $rows->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])->values();
             $party = $parties->get((int) $partyId);
-            $running = 0.0;
+            $landRow = $partyLandTotals->get((int) $partyId);
+            $landTotalRs = $landRow ? (float) $landRow->land_total_rs : 0.0;
+            $landAreaMarla = $landRow ? (float) $landRow->land_area_marla : 0.0;
+
+            $paidRunning = 0.0;
             $lines = [];
             foreach ($rows as $e) {
-                if ($e->type === DayBookEntry::TYPE_CASH_IN) {
-                    $running += (float) $e->amount;
+                $amount = (float) $e->amount;
+                if ($e->type === DayBookEntry::TYPE_CASH_OUT) {
+                    $paidRunning += $amount;
                 } else {
-                    $running -= (float) $e->amount;
+                    $paidRunning -= $amount;
                 }
-                $lines[] = ['entry' => $e, 'balance' => $running];
+                $lines[] = [
+                    'entry' => $e,
+                    'paid' => $paidRunning,
+                    'payable' => $landTotalRs - $paidRunning,
+                ];
             }
+
             $subtitle = null;
             if ($party && $party->relationLoaded('subCategory') && $party->subCategory) {
                 $catName = $party->subCategory->relationLoaded('category') && $party->subCategory->category
@@ -334,12 +372,21 @@ class ProjectController extends Controller
                     : '';
                 $subtitle = trim($catName.' — '.$party->subCategory->name);
             }
+
+            $totalPaid = $this->daybookEntriesNetPaid($rows);
+            $payable = $landTotalRs - $totalPaid;
+
             $sections[] = [
                 'key' => 'party_'.$partyId,
                 'heading' => $party ? $party->name : 'Party #'.$partyId,
                 'subtitle' => $subtitle,
+                'land_total_rs' => $landTotalRs,
+                'land_area_label' => $landAreaMarla > 0
+                    ? LandMeasure::formatAkmsLabelFromMarla($landAreaMarla)
+                    : null,
+                'total_paid' => $totalPaid,
+                'payable' => $payable,
                 'lines' => $lines,
-                'net' => $running,
             ];
         }
 
@@ -347,34 +394,46 @@ class ProjectController extends Controller
 
         if ($general->isNotEmpty()) {
             $rows = $general->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])->values();
-            $running = 0.0;
+            $paidRunning = 0.0;
             $lines = [];
             foreach ($rows as $e) {
-                if ($e->type === DayBookEntry::TYPE_CASH_IN) {
-                    $running += (float) $e->amount;
+                $amount = (float) $e->amount;
+                if ($e->type === DayBookEntry::TYPE_CASH_OUT) {
+                    $paidRunning += $amount;
                 } else {
-                    $running -= (float) $e->amount;
+                    $paidRunning -= $amount;
                 }
-                $lines[] = ['entry' => $e, 'balance' => $running];
+                $lines[] = [
+                    'entry' => $e,
+                    'paid' => $paidRunning,
+                    'payable' => null,
+                ];
             }
+            $totalPaid = $this->daybookEntriesNetPaid($rows);
             array_unshift($sections, [
                 'key' => 'general',
                 'heading' => 'General (project only)',
                 'subtitle' => 'Payments linked to this project without a party',
+                'land_total_rs' => 0.0,
+                'land_area_label' => null,
+                'total_paid' => $totalPaid,
+                'payable' => null,
                 'lines' => $lines,
-                'net' => $running,
             ]);
         }
 
-        $totalIn = (float) $entries->where('type', DayBookEntry::TYPE_CASH_IN)->sum('amount');
-        $totalOut = (float) $entries->where('type', DayBookEntry::TYPE_CASH_OUT)->sum('amount');
+        $projectLandTotalRs = (float) PurchaseItem::query()
+            ->where('project_id', $project->id)
+            ->sum('line_total_rs');
+        $totalPaid = $this->daybookEntriesNetPaid($entries);
+        $totalPayable = $projectLandTotalRs - $totalPaid;
 
         return [
             'entries' => $entries,
             'ledgerSections' => $sections,
-            'ledgerTotalIn' => $totalIn,
-            'ledgerTotalOut' => $totalOut,
-            'ledgerNetFlow' => $totalIn - $totalOut,
+            'ledgerProjectLandTotalRs' => $projectLandTotalRs,
+            'ledgerTotalPaid' => $totalPaid,
+            'ledgerTotalPayable' => $totalPayable,
         ];
     }
 
