@@ -94,7 +94,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="daybook_modal_party_cnic">CNIC</label>
-                        <input type="text" class="form-control form-control-theme" id="daybook_modal_party_cnic" maxlength="14" inputmode="numeric" placeholder="34012-435172-1" autocomplete="off">
+                        <input type="text" class="form-control form-control-theme" id="daybook_modal_party_cnic" maxlength="15" inputmode="numeric" placeholder="23012-2321373-1" autocomplete="off">
                     </div>
                 </div>
                 <div class="mb-0">

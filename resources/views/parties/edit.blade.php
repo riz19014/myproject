@@ -54,7 +54,7 @@
                 </div>
                 <div class="col-md-6">
                     <label for="cnic" class="form-label">CNIC</label>
-                    <input type="text" class="form-control form-control-theme @error('cnic') is-invalid @enderror" id="cnic" name="cnic" value="{{ \App\Support\CnicFormat::display(old('cnic', $party->cnic)) }}" maxlength="14" inputmode="numeric" placeholder="34012-211172-1">
+                    <input type="text" class="form-control form-control-theme @error('cnic') is-invalid @enderror" id="cnic" name="cnic" value="{{ \App\Support\CnicFormat::display(old('cnic', $party->cnic)) }}" maxlength="15" inputmode="numeric" placeholder="23012-2321373-1">
                     @error('cnic')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror

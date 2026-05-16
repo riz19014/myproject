@@ -951,12 +951,12 @@
                 return;
             }
             if (cnicDigitsVal && PF && cnicDigitsVal.length !== PF.cnicMaxDigits) {
-                showPartyErr('CNIC must be 12 digits in format 34012-435172-1.');
+                showPartyErr('CNIC must be 13 digits in format 23012-2321373-1.');
                 if (window.daybookModalFocusText) window.daybookModalFocusText(cnicInput);
                 return;
             }
-            if (cnicDigitsVal && !PF && cnicDigitsVal.length !== 12) {
-                showPartyErr('CNIC must be 12 digits in format 34012-435172-1.');
+            if (cnicDigitsVal && !PF && cnicDigitsVal.length !== 13) {
+                showPartyErr('CNIC must be 13 digits in format 23012-2321373-1.');
                 if (window.daybookModalFocusText) window.daybookModalFocusText(cnicInput);
                 return;
             }

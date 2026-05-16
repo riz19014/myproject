@@ -142,7 +142,7 @@ class PartyController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'sub_category_id' => ['required', 'integer', 'exists:party_sub_categories,id'],
             'phone' => ['nullable', 'string', 'regex:/^\d{11}$/'],
-            'cnic' => ['nullable', 'string', 'regex:/^\d{12}$/'],
+            'cnic' => ['nullable', 'string', 'regex:/^\d{13}$/'],
             'address' => ['nullable', 'string', 'max:2000'],
         ];
 
@@ -160,7 +160,7 @@ class PartyController extends Controller
     {
         return [
             'phone.regex' => 'Phone must be exactly 11 digits (numbers only).',
-            'cnic.regex' => 'CNIC must be 12 digits in format 34012-211172-1.',
+            'cnic.regex' => 'CNIC must be 13 digits in format 23012-2321373-1.',
         ];
     }
 

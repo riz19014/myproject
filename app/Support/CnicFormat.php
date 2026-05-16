@@ -4,8 +4,8 @@ namespace App\Support;
 
 final class CnicFormat
 {
-    /** Pakistan-style groups: 5 + 6 + 1 = 12 digits (e.g. 34012-211172-1). */
-    private const SEGMENTS = [5, 6, 1];
+    /** Pakistan CNIC groups: 5 + 7 + 1 = 13 digits (e.g. 23012-2321373-1). */
+    private const SEGMENTS = [5, 7, 1];
 
     public static function digits(?string $value): string
     {

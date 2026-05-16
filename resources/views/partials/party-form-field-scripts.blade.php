@@ -1,6 +1,6 @@
 <script>
 (function () {
-    var CNIC_SEGMENTS = [5, 6, 1];
+    var CNIC_SEGMENTS = [5, 7, 1];
     var CNIC_MAX_DIGITS = CNIC_SEGMENTS.reduce(function (a, b) { return a + b; }, 0);
 
     function cnicDigits(value) {
@@ -30,8 +30,8 @@
     window.PartyFormFields.bindCnicInput = function (el) {
         if (!el || el.dataset.cnicBound === '1') return;
         el.dataset.cnicBound = '1';
-        el.setAttribute('maxlength', '14');
-        el.setAttribute('placeholder', '34012-211172-1');
+        el.setAttribute('maxlength', '15');
+        el.setAttribute('placeholder', '23012-2321373-1');
         el.setAttribute('inputmode', 'numeric');
         el.addEventListener('input', function () {
             el.value = formatCnicDisplay(el.value);

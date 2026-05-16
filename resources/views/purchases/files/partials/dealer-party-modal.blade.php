@@ -37,7 +37,7 @@
                     </div>
                     <div class="col-sm-6">
                         <label for="pf_dealer_cnic" class="form-label">CNIC</label>
-                        <input type="text" class="form-control form-control-theme" id="pf_dealer_cnic" maxlength="14" inputmode="numeric" placeholder="34012-211172-1">
+                        <input type="text" class="form-control form-control-theme" id="pf_dealer_cnic" maxlength="15" inputmode="numeric" placeholder="23012-2321373-1">
                     </div>
                 </div>
                 <div class="mb-0">

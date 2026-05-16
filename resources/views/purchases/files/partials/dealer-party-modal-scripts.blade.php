@@ -3,8 +3,6 @@
 (function () {
     var modalEl = document.getElementById('purchaseFileAddDealerModal');
     var openBtn = document.getElementById('purchase_file_add_dealer_btn');
-    var listEl = document.getElementById('purchase_file_dealers_list');
-    var emptyEl = document.getElementById('purchase_file_dealers_empty');
     var nameInput = document.getElementById('pf_dealer_name');
     var subHidden = document.getElementById('pf_dealer_sub_category_id');
     var subSearch = document.getElementById('pf_dealer_sub_search');
@@ -19,7 +17,7 @@
     var token = document.querySelector('meta[name="csrf-token"]');
     var PF = window.PartyFormFields;
 
-    if (!modalEl || !openBtn || !listEl || !saveBtn || !token || typeof bootstrap === 'undefined' || !PF) return;
+    if (!modalEl || !openBtn || !saveBtn || !token || typeof bootstrap === 'undefined' || !PF) return;
 
     var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
     var partySubRows = [];
@@ -62,33 +60,6 @@
         if (spinner) spinner.classList.toggle('d-none', !on);
     }
 
-    function ensureListVisible() {
-        if (emptyEl) emptyEl.classList.add('d-none');
-        listEl.classList.remove('d-none');
-    }
-
-    function appendDealerCheckbox(id, name) {
-        var idStr = String(id);
-        if (listEl.querySelector('input[value="' + idStr + '"]')) {
-            var existing = listEl.querySelector('input[value="' + idStr + '"]');
-            existing.checked = true;
-            return;
-        }
-        ensureListVisible();
-        var wrap = document.createElement('div');
-        wrap.className = 'form-check';
-        wrap.innerHTML =
-            '<input class="form-check-input" type="checkbox" name="dealer_party_ids[]" value="' + idStr + '" id="dealer_' + idStr + '" checked>' +
-            '<label class="form-check-label" for="dealer_' + idStr + '">' + escapeHtml(name) + '</label>';
-        listEl.appendChild(wrap);
-    }
-
-    function escapeHtml(s) {
-        var d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
-    }
-
     openBtn.addEventListener('click', function () {
         resetForm();
         modal.show();
@@ -124,7 +95,7 @@
             return;
         }
         if (cnicDigitsVal && cnicDigitsVal.length !== PF.cnicMaxDigits) {
-            showErr('CNIC must be 12 digits in format 34012-211172-1.');
+            showErr('CNIC must be 13 digits in format 23012-2321373-1.');
             if (cnicInput) cnicInput.focus();
             return;
         }
@@ -156,7 +127,9 @@
             .then(function (result) {
                 setSaving(false);
                 if (result.ok && result.data && result.data.id) {
-                    appendDealerCheckbox(result.data.id, result.data.name);
+                    if (window.PurchaseFileDealersSelect && typeof window.PurchaseFileDealersSelect.addDealer === 'function') {
+                        window.PurchaseFileDealersSelect.addDealer(result.data.id, result.data.name);
+                    }
                     modal.hide();
                     return;
                 }
