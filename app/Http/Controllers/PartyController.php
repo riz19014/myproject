@@ -10,14 +10,48 @@ use Illuminate\Http\Request;
 
 class PartyController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $name = trim((string) $request->query('name', ''));
+        $phone = trim((string) $request->query('phone', ''));
+        $cnicQuery = CnicFormat::digits((string) $request->query('cnic', ''));
+        $subCategoryId = $request->query('sub_category_id');
+        $subCategoryId = $subCategoryId !== null && $subCategoryId !== ''
+            ? (int) $subCategoryId
+            : null;
+
+        $phoneDigits = $phone !== '' ? preg_replace('/\D/', '', $phone) : '';
+
         $parties = Party::query()
             ->with(['category', 'subCategory'])
+            ->when($name !== '', function ($query) use ($name) {
+                $query->where('name', 'like', '%'.$name.'%');
+            })
+            ->when($phoneDigits !== '', function ($query) use ($phoneDigits) {
+                $query->where('phone', 'like', '%'.$phoneDigits.'%');
+            })
+            ->when($cnicQuery !== '', function ($query) use ($cnicQuery) {
+                $query->where('cnic', 'like', '%'.$cnicQuery.'%');
+            })
+            ->when($subCategoryId, function ($query) use ($subCategoryId) {
+                $query->where('sub_category_id', $subCategoryId);
+            })
             ->orderBy('id', 'desc')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('parties.index', compact('parties'));
+        $partySubCategories = $this->partySubCategories();
+        $hasFilters = $name !== '' || $phone !== '' || $cnicQuery !== '' || $subCategoryId;
+
+        return view('parties.index', compact(
+            'parties',
+            'partySubCategories',
+            'name',
+            'phone',
+            'cnicQuery',
+            'subCategoryId',
+            'hasFilters'
+        ));
     }
 
     public function create()
