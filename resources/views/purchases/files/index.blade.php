@@ -56,7 +56,7 @@
                 <table class="table table-striped table-theme mb-0 align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 72px;">ID</th>
+                            <th style="width: 56px;">#</th>
                             <th>File name</th>
                             <th style="width: 110px;">File date</th>
                             <th>Project</th>
@@ -68,7 +68,7 @@
                     <tbody>
                         @foreach($files as $file)
                             <tr>
-                                <td>{{ $file->id }}</td>
+                                <td>{{ $loop->iteration }}</td>
                                 <td class="fw-semibold">{{ $file->file_name }}</td>
                                 <td class="small text-nowrap">{{ $file->file_date?->format('d M Y') ?? '—' }}</td>
                                 <td class="small">{{ $file->project?->name ?? '—' }}</td>

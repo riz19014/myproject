@@ -81,7 +81,7 @@
                 <table class="table table-striped table-theme mb-0 align-middle">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th style="width: 56px;">#</th>
                             <th>Name</th>
                             <th>Category</th>
                             <th>Sub category</th>
@@ -94,7 +94,7 @@
                     <tbody>
                         @foreach($parties as $party)
                             <tr>
-                                <td>{{ $party->id }}</td>
+                                <td>{{ $parties->firstItem() + $loop->index }}</td>
                                 <td>{{ $party->name }}</td>
                                 <td>{{ $party->category?->name ?? '—' }}</td>
                                 <td>{{ $party->subCategory?->name ?? '—' }}</td>

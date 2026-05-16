@@ -13,9 +13,11 @@
     }
 
     function compactLabel(raw) {
-        var v = parseFloat(String(raw || '').replace(/,/g, ''));
+        var digits = String(raw || '').replace(/\D/g, '');
+        if (!digits) return '';
+        var v = parseInt(digits, 10);
         if (!isFinite(v) || v <= 0) return '';
-        return compactMainLabel(Math.floor(v + 1e-9));
+        return compactMainLabel(v);
     }
 
     function updateInput(input) {

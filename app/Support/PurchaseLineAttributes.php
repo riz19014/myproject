@@ -14,10 +14,10 @@ final class PurchaseLineAttributes
     public static function fromInput(array $line, string $areaErrorKey, ?string $areaErrorMessage = null): array
     {
         $marla = LandMeasure::marlaFromAkms(
-            (int) $line['area_acre'],
-            (int) $line['area_kanal'],
-            (int) $line['area_marla'],
-            (int) $line['area_sqft'],
+            (int) ($line['area_acre'] ?? 0),
+            (int) ($line['area_kanal'] ?? 0),
+            (int) ($line['area_marla'] ?? 0),
+            (int) ($line['area_sqft'] ?? 0),
         );
         if ($marla <= 0) {
             throw ValidationException::withMessages([
@@ -25,7 +25,7 @@ final class PurchaseLineAttributes
             ]);
         }
         $acres = PurchaseItem::acresFromMarla($marla);
-        $amountPerAcre = (float) $line['amount_per_acre'];
+        $amountPerAcre = (int) $line['amount_per_acre'];
         $lineTotal = round($acres * $amountPerAcre, 2);
 
         return [

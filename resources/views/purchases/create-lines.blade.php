@@ -66,6 +66,7 @@
                 <div class="alert alert-theme-danger py-2 small">No parties yet. Add parties first, then return here.</div>
             @else
                 <script type="application/json" id="purchase_line_parties_json">@json($parties->map(fn ($p) => ['id' => $p->id, 'label' => $p->name])->values())</script>
+                <script type="application/json" id="purchase_moza_suggestions_json">@json($mozaSuggestions ?? [])</script>
             @endif
 
             <div id="purchase-lines">
@@ -90,7 +91,9 @@
 
 @push('scripts')
 @include('purchases.partials.line-row-amount-hint-scripts')
+@include('purchases.partials.line-row-integer-scripts')
 @include('purchases.partials.line-row-party-picker-scripts')
+@include('purchases.partials.line-row-moza-suggest-scripts')
 <script>
 (function() {
     var suggestUrl = @json(route('purchase.records.suggest-file-name'));
@@ -129,9 +132,15 @@
         syncPurchaseLineFieldNames();
         updateRemoveButtons();
         if (window.PurchaseLineAmountHints) PurchaseLineAmountHints.bind(container);
+        if (window.PurchaseLineIntegers) PurchaseLineIntegers.bind(container);
+        if (window.PurchaseLineMozaSuggest) PurchaseLineMozaSuggest.bind(container);
     });
 
-    form.addEventListener('submit', function() {
+    form.addEventListener('submit', function (e) {
+        if (window.PurchaseLineIntegers && !PurchaseLineIntegers.prepareForSubmit(container)) {
+            e.preventDefault();
+            return;
+        }
         syncPurchaseLineFieldNames();
     });
 
@@ -143,15 +152,22 @@
             syncPurchaseLineFieldNames();
             updateRemoveButtons();
             if (window.PurchaseLinePartyPickers) PurchaseLinePartyPickers.refresh(container);
+            if (window.PurchaseLineIntegers) PurchaseLineIntegers.refresh(container);
+            if (window.PurchaseLineMozaSuggest) PurchaseLineMozaSuggest.refresh(container);
             if (window.PurchaseLineAmountHints) PurchaseLineAmountHints.refresh(container);
         });
     }
 
-    container.addEventListener('click', function(e) {
-        var t = e.target;
-        if (!t.classList.contains('js-remove-purchase-line')) return;
-        var block = t.closest('.purchase-line-block');
-        if (!block || container.querySelectorAll('.purchase-line-block').length <= 1) return;
+    container.addEventListener('click', function (e) {
+        var btn = e.target.closest('.js-remove-purchase-line');
+        if (!btn || btn.disabled) return;
+        var block = btn.closest('.purchase-line-block');
+        if (!block || block.dataset.removing === '1') return;
+        if (container.querySelectorAll('.purchase-line-block').length <= 1) return;
+        e.preventDefault();
+        e.stopPropagation();
+        block.dataset.removing = '1';
+        btn.disabled = true;
         block.remove();
         syncPurchaseLineFieldNames();
         updateRemoveButtons();

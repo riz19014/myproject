@@ -41,7 +41,7 @@
                 <table class="table table-striped table-theme mb-0 align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 72px;">ID</th>
+                            <th style="width: 56px;">#</th>
                             <th>Name</th>
                             <th>Land type</th>
                             <th class="text-center" style="width: 90px;">Files</th>
@@ -51,7 +51,7 @@
                     <tbody>
                         @foreach($projects as $project)
                             <tr>
-                                <td>{{ $project->id }}</td>
+                                <td>{{ $projects->firstItem() + $loop->index }}</td>
                                 <td class="fw-semibold">{{ $project->name }}</td>
                                 <td class="small text-muted">{{ $project->landType?->name ?? '—' }}</td>
                                 <td class="text-center">

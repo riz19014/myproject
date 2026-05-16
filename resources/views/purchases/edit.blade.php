@@ -76,22 +76,22 @@
                     <div class="row g-3">
                         <div class="col-6 col-md-3">
                             <label for="area_acre" class="form-label">Acre</label>
-                            <input type="number" class="form-control form-control-theme @error('area_acre') is-invalid @enderror" id="area_acre" name="area_acre" value="{{ old('area_acre', $item->area_acre) }}" min="0" step="1" required>
+                            <input type="number" class="form-control form-control-theme @error('area_acre') is-invalid @enderror" id="area_acre" name="area_acre" value="{{ old('area_acre', $item->area_acre) }}" min="0" step="1">
                             @error('area_acre')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-6 col-md-3">
                             <label for="area_kanal" class="form-label">Kanal</label>
-                            <input type="number" class="form-control form-control-theme @error('area_kanal') is-invalid @enderror" id="area_kanal" name="area_kanal" value="{{ old('area_kanal', $item->area_kanal) }}" min="0" step="1" required>
+                            <input type="number" class="form-control form-control-theme @error('area_kanal') is-invalid @enderror" id="area_kanal" name="area_kanal" value="{{ old('area_kanal', $item->area_kanal) }}" min="0" step="1">
                             @error('area_kanal')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-6 col-md-3">
                             <label for="area_marla" class="form-label">Marla</label>
-                            <input type="number" class="form-control form-control-theme @error('area_marla') is-invalid @enderror" id="area_marla" name="area_marla" value="{{ old('area_marla', $item->area_marla) }}" min="0" step="1" required>
+                            <input type="number" class="form-control form-control-theme @error('area_marla') is-invalid @enderror" id="area_marla" name="area_marla" value="{{ old('area_marla', $item->area_marla) }}" min="0" step="1">
                             @error('area_marla')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-6 col-md-3">
                             <label for="area_sqft" class="form-label">Sq ft</label>
-                            <input type="number" class="form-control form-control-theme @error('area_sqft') is-invalid @enderror" id="area_sqft" name="area_sqft" value="{{ old('area_sqft', $item->area_sqft) }}" min="0" step="1" required>
+                            <input type="number" class="form-control form-control-theme @error('area_sqft') is-invalid @enderror" id="area_sqft" name="area_sqft" value="{{ old('area_sqft', $item->area_sqft) }}" min="0" step="1">
                             @error('area_sqft')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-4">

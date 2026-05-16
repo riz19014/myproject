@@ -151,7 +151,7 @@
             <table class="table table-theme mb-0 align-middle">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th style="width: 56px;">#</th>
                         <th>Description</th>
                         <th>Payment</th>
                         <th class="text-end">Amount (Rs)</th>
@@ -163,7 +163,7 @@
                 <tbody>
                     @forelse($entries as $e)
                         <tr>
-                            <td class="daybook-id-cell">{{ $e->id }}</td>
+                            <td class="daybook-id-cell">{{ $loop->iteration }}</td>
                             <td>{{ $e->description ?: '—' }}</td>
                             <td>
                                 @if($e->type === 'cash_in')

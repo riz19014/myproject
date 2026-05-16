@@ -21,7 +21,7 @@
         <table class="table table-striped table-theme">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th style="width: 56px;">#</th>
                     <th>Name</th>
                     <th>Party sub category</th>
                     <th width="200">Actions</th>
@@ -30,7 +30,7 @@
             <tbody>
                 @forelse($landTypes as $landType)
                     <tr>
-                        <td>{{ $landType->id }}</td>
+                        <td>{{ $landTypes->firstItem() + $loop->index }}</td>
                         <td>{{ $landType->name }}</td>
                         <td>
                             @if($landType->partySubCategory)

@@ -9,6 +9,7 @@ use App\Models\PurchaseFile;
 use App\Models\PurchaseFileDocument;
 use App\Models\PurchaseItem;
 use Illuminate\Support\Facades\Storage;
+use App\Support\PartyPurchaseDefaults;
 use App\Support\PurchaseLineAttributes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,7 +110,9 @@ class PurchaseFileController extends Controller
             $lines = [[]];
         }
 
-        return view('purchases.files.sellers', compact('purchase_file', 'sellers', 'parties', 'lines'));
+        $mozaSuggestions = PartyPurchaseDefaults::distinctMozas();
+
+        return view('purchases.files.sellers', compact('purchase_file', 'sellers', 'parties', 'lines', 'mozaSuggestions'));
     }
 
     public function storeSellers(Request $request, PurchaseFile $purchase_file)
@@ -119,11 +122,11 @@ class PurchaseFileController extends Controller
             'lines.*.party_id' => ['required', 'integer', 'exists:parties,id'],
             'lines.*.moza' => ['nullable', 'string', 'max:255'],
             'lines.*.khasra' => ['nullable', 'string', 'max:255'],
-            'lines.*.area_acre' => ['required', 'integer', 'min:0'],
-            'lines.*.area_kanal' => ['required', 'integer', 'min:0'],
-            'lines.*.area_marla' => ['required', 'integer', 'min:0'],
-            'lines.*.area_sqft' => ['required', 'integer', 'min:0'],
-            'lines.*.amount_per_acre' => ['required', 'numeric', 'min:0'],
+            'lines.*.area_acre' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_kanal' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_marla' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_sqft' => ['nullable', 'integer', 'min:0'],
+            'lines.*.amount_per_acre' => ['required', 'integer', 'min:0'],
         ]);
 
         $partyIds = [];

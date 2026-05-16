@@ -13,7 +13,7 @@
         <table class="table table-striped table-theme">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th style="width: 56px;">#</th>
                     <th>Category</th>
                     <th>Name</th>
                     <th width="200">Actions</th>
@@ -22,7 +22,7 @@
             <tbody>
                 @forelse($partySubCategories as $partySubCategory)
                     <tr>
-                        <td>{{ $partySubCategory->id }}</td>
+                        <td>{{ $partySubCategories->firstItem() + $loop->index }}</td>
                         <td>{{ $partySubCategory->category->name }}</td>
                         <td>{{ $partySubCategory->name }}</td>
                         <td>

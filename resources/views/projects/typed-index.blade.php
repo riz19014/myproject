@@ -153,7 +153,7 @@
                     <table class="table table-striped table-theme mb-0 align-middle">
                         <thead>
                             <tr>
-                                <th style="width: 72px;">ID</th>
+                                <th style="width: 56px;">#</th>
                                 <th>Project</th>
                                 <th style="min-width: 7rem;">File</th>
                                 <th>Party</th>
@@ -169,7 +169,7 @@
                         <tbody>
                             @foreach($purchaseItems as $item)
                                 <tr>
-                                    <td>{{ $item->id }}</td>
+                                    <td>{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">{{ $item->project?->name ?? '—' }}</td>
                                     <td class="small">{{ $item->purchaseFile?->file_name ?: '—' }}</td>
                                     <td class="small">{{ $item->party?->name ?? '—' }}</td>
@@ -278,7 +278,7 @@
                 <table class="table table-striped table-theme mb-0 align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 72px;">ID</th>
+                            <th style="width: 56px;">#</th>
                             <th>Name</th>
                             <th style="width: 200px;">Party land</th>
                             <th class="text-center" style="width: 90px;">Files</th>
@@ -288,7 +288,7 @@
                     <tbody>
                         @foreach($rows as $project)
                             <tr>
-                                <td>{{ $project->id }}</td>
+                                <td>{{ $loop->iteration }}</td>
                                 <td class="fw-semibold">{{ $project->name }}</td>
                                 <td class="small">
                                     @php $partyMarla = \App\Support\LandMeasure::partiesTotalMarla($project->parties); @endphp

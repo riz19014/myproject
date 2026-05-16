@@ -13,7 +13,7 @@
         <table class="table table-striped table-theme">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th style="width: 56px;">#</th>
                     <th>Name</th>
                     <th width="200">Actions</th>
                 </tr>
@@ -21,7 +21,7 @@
             <tbody>
                 @forelse($partyCategories as $partyCategory)
                     <tr>
-                        <td>{{ $partyCategory->id }}</td>
+                        <td>{{ $partyCategories->firstItem() + $loop->index }}</td>
                         <td>{{ $partyCategory->name }}</td>
                         <td>
                             <a href="{{ route('party-categories.edit', $partyCategory) }}" class="btn btn-sm btn-outline-theme">Edit</a>

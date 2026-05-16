@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\PurchaseFile;
 use App\Models\PurchaseItem;
 use App\Support\LandMeasure;
+use App\Support\PartyPurchaseDefaults;
 use App\Support\PurchaseLineAttributes;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -41,7 +42,9 @@ class PurchaseItemController extends Controller
             $lines = [[]];
         }
 
-        return view('purchases.create-lines', compact('project', 'parties', 'lines'));
+        $mozaSuggestions = PartyPurchaseDefaults::distinctMozas();
+
+        return view('purchases.create-lines', compact('project', 'parties', 'lines', 'mozaSuggestions'));
     }
 
     public function suggestFileName(Request $request)
@@ -78,11 +81,11 @@ class PurchaseItemController extends Controller
             'lines.*.party_id' => ['required', 'integer', 'exists:parties,id'],
             'lines.*.moza' => ['nullable', 'string', 'max:255'],
             'lines.*.khasra' => ['nullable', 'string', 'max:255'],
-            'lines.*.area_acre' => ['required', 'integer', 'min:0'],
-            'lines.*.area_kanal' => ['required', 'integer', 'min:0'],
-            'lines.*.area_marla' => ['required', 'integer', 'min:0'],
-            'lines.*.area_sqft' => ['required', 'integer', 'min:0'],
-            'lines.*.amount_per_acre' => ['required', 'numeric', 'min:0'],
+            'lines.*.area_acre' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_kanal' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_marla' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_sqft' => ['nullable', 'integer', 'min:0'],
+            'lines.*.amount_per_acre' => ['required', 'integer', 'min:0'],
             'new_file_name' => ['nullable', 'string', 'max:255'],
             'purchase_file_id' => [
                 'nullable',
@@ -143,11 +146,11 @@ class PurchaseItemController extends Controller
             'party_id' => ['required', 'integer', 'exists:parties,id'],
             'moza' => ['nullable', 'string', 'max:255'],
             'khasra' => ['nullable', 'string', 'max:255'],
-            'area_acre' => ['required', 'integer', 'min:0'],
-            'area_kanal' => ['required', 'integer', 'min:0'],
-            'area_marla' => ['required', 'integer', 'min:0'],
-            'area_sqft' => ['required', 'integer', 'min:0'],
-            'amount_per_acre' => ['required', 'numeric', 'min:0'],
+            'area_acre' => ['nullable', 'integer', 'min:0'],
+            'area_kanal' => ['nullable', 'integer', 'min:0'],
+            'area_marla' => ['nullable', 'integer', 'min:0'],
+            'area_sqft' => ['nullable', 'integer', 'min:0'],
+            'amount_per_acre' => ['required', 'integer', 'min:0'],
             'new_file_name' => ['nullable', 'string', 'max:255'],
             'purchase_file_id' => [
                 'nullable',
