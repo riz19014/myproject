@@ -84,7 +84,7 @@
             if (!filtered.length) {
                 var li0 = document.createElement('li');
                 li0.className = 'party-sc-empty';
-                li0.textContent = 'No sub categories match.';
+                li0.textContent = cfg.emptyText || 'No matches.';
                 cfg.list.appendChild(li0);
                 showList();
                 return;

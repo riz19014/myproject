@@ -2,19 +2,27 @@
     $partyId = (int) ($line['party_id'] ?? 0);
     $partyName = $partyId ? ($parties->firstWhere('id', $partyId)?->name ?? '') : '';
 @endphp
+@once
+    @include('partials.party-sc-combo-styles')
+@endonce
 <div class="purchase-line-block border rounded p-3 mb-3 bg-body-secondary bg-opacity-10 position-relative">
     <button type="button" class="btn btn-sm btn-link text-danger js-remove-purchase-line position-absolute top-0 end-0 mt-1 me-1" aria-label="Remove line">Remove</button>
 
     <div class="row g-3 align-items-end">
         <div class="col-md-6 col-lg-4">
             <label class="form-label">Party <span class="text-danger">*</span></label>
-            <select class="form-select form-select-theme js-party-select" data-line-field="party_id" required>
-                <option value="" @if($partyId === 0) selected @endif disabled>— Select party —</option>
-                @foreach($parties as $party)
-                    <option value="{{ $party->id }}" @selected($partyId === (int) $party->id)>{{ $party->name }}</option>
-                @endforeach
-            </select>
-            <div class="js-party-name-display small text-muted mt-1">{{ $partyName !== '' ? $partyName : 'Party name appears here when you select a party…' }}</div>
+            <div class="party-sc-combo js-party-picker">
+                <input type="hidden" data-line-field="party_id" value="{{ $partyId > 0 ? $partyId : '' }}" required>
+                <input type="text"
+                    class="form-control form-control-theme js-party-picker-search"
+                    value="{{ $partyName }}"
+                    placeholder="Search party by name…"
+                    autocomplete="off"
+                    role="combobox"
+                    aria-expanded="false"
+                    aria-autocomplete="list">
+                <ul class="party-sc-listbox d-none js-party-picker-list" role="listbox" hidden></ul>
+            </div>
         </div>
         <div class="col-6 col-md-3 col-lg-2">
             <label class="form-label">Moza</label>

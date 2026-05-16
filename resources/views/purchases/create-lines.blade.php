@@ -64,6 +64,8 @@
 
             @if($parties->isEmpty())
                 <div class="alert alert-theme-danger py-2 small">No parties yet. Add parties first, then return here.</div>
+            @else
+                <script type="application/json" id="purchase_line_parties_json">@json($parties->map(fn ($p) => ['id' => $p->id, 'label' => $p->name])->values())</script>
             @endif
 
             <div id="purchase-lines">
@@ -88,6 +90,7 @@
 
 @push('scripts')
 @include('purchases.partials.line-row-amount-hint-scripts')
+@include('purchases.partials.line-row-party-picker-scripts')
 <script>
 (function() {
     var suggestUrl = @json(route('purchase.records.suggest-file-name'));
@@ -139,6 +142,7 @@
             container.insertAdjacentHTML('beforeend', html);
             syncPurchaseLineFieldNames();
             updateRemoveButtons();
+            if (window.PurchaseLinePartyPickers) PurchaseLinePartyPickers.refresh(container);
             if (window.PurchaseLineAmountHints) PurchaseLineAmountHints.refresh(container);
         });
     }
@@ -151,18 +155,6 @@
         block.remove();
         syncPurchaseLineFieldNames();
         updateRemoveButtons();
-    });
-
-    container.addEventListener('change', function(e) {
-        var sel = e.target;
-        if (!sel.classList || !sel.classList.contains('js-party-select')) return;
-        var opt = sel.options[sel.selectedIndex];
-        var name = opt && opt.value ? opt.text : '';
-        var block = sel.closest('.purchase-line-block');
-        var disp = block && block.querySelector('.js-party-name-display');
-        if (disp) {
-            disp.textContent = name || 'Party name appears here when you select a party…';
-        }
     });
 
     function collectLinesPayload() {

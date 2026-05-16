@@ -71,6 +71,7 @@
                 No parties yet. <a href="{{ route('parties.index') }}">Add parties</a> first.
             </div>
         @else
+            <script type="application/json" id="purchase_line_parties_json">@json($parties->map(fn ($p) => ['id' => $p->id, 'label' => $p->name])->values())</script>
             <form method="post" action="{{ route('purchase.files.sellers.store', $purchase_file) }}" id="file-sellers-form">
                 @csrf
                 <div id="file-seller-lines">
@@ -94,6 +95,7 @@
 
 @push('scripts')
 @include('purchases.partials.line-row-amount-hint-scripts')
+@include('purchases.partials.line-row-party-picker-scripts')
 <script>
 (function() {
     var form = document.getElementById('file-sellers-form');
@@ -132,6 +134,7 @@
             container.insertAdjacentHTML('beforeend', html);
             syncNames();
             updateRemoveButtons();
+            if (window.PurchaseLinePartyPickers) PurchaseLinePartyPickers.refresh(container);
             if (window.PurchaseLineAmountHints) PurchaseLineAmountHints.refresh(container);
         });
     }
@@ -143,18 +146,6 @@
         block.remove();
         syncNames();
         updateRemoveButtons();
-    });
-
-    container.addEventListener('change', function(e) {
-        var sel = e.target;
-        if (!sel.classList || !sel.classList.contains('js-party-select')) return;
-        var opt = sel.options[sel.selectedIndex];
-        var name = opt && opt.value ? opt.text : '';
-        var block = sel.closest('.purchase-line-block');
-        var disp = block && block.querySelector('.js-party-name-display');
-        if (disp) {
-            disp.textContent = name || 'Party name appears here when you select a party…';
-        }
     });
 
     syncNames();
