@@ -12,181 +12,74 @@
     </div>
 </div>
 
-@if($project->land_area !== null || $project->field_type || $project->landType)
+@if($project->landType)
 <div class="card card-theme mb-4">
     <div class="card-body py-3">
         <h5 class="mb-2">Land</h5>
         <dl class="row mb-0 small">
-            @if($project->land_area !== null && $project->land_area !== '')
-                <dt class="col-sm-3 text-muted">Area</dt>
-                <dd class="col-sm-9 mb-1">{{ rtrim(rtrim(number_format((float) $project->land_area, 4, '.', ''), '0'), '.') ?: '0' }}
-                    @if($project->land_area_unit)
-                        @php
-                            $u = $project->land_area_unit;
-                            $uLabel = match ($u) {
-                                'acre' => 'acre',
-                                'kanal' => 'kanal',
-                                'marla' => 'marla',
-                                'sqft' => 'sq ft',
-                                default => $u,
-                            };
-                        @endphp
-                        {{ $uLabel }}
-                    @endif
-                </dd>
-            @endif
-            @if($project->field_type)
-                <dt class="col-sm-3 text-muted">Field type</dt>
-                <dd class="col-sm-9 mb-1 text-capitalize">{{ $project->field_type }}</dd>
-            @endif
-            @if($project->landType)
-                <dt class="col-sm-3 text-muted">Land type</dt>
-                <dd class="col-sm-9 mb-0">{{ $project->landType->name }}</dd>
-            @endif
+            <dt class="col-sm-3 text-muted">Land type</dt>
+            <dd class="col-sm-9 mb-0">{{ $project->landType->name }}</dd>
         </dl>
     </div>
 </div>
 @endif
 
-@if($project->description || $project->notes)
-<div class="card card-theme mb-4">
-    <div class="card-body">
-        @if($project->description)<p class="mb-1">{{ $project->description }}</p>@endif
-        @if($project->notes)<p class="mb-0 text-muted small">{{ $project->notes }}</p>@endif
-    </div>
-</div>
-@endif
 
-{{-- Add file (e.g. 50 files from DHA) --}}
+{{-- Purchase files for this project --}}
 <div class="card card-theme mb-4">
     <div class="card-body">
-        <h5 class="mb-3">Add File to Project</h5>
-        <form action="{{ route('projects.files.store', $project) }}" method="POST" class="row g-2 align-items-end">
-            @csrf
-            <div class="col-md-4">
-                <label for="file_number" class="form-label">File Number</label>
-                <input type="text" class="form-control form-control-theme" id="file_number" name="file_number" placeholder="e.g. F-001" required>
-            </div>
-            <div class="col-md-4">
-                <label for="notes" class="form-label">Notes</label>
-                <input type="text" class="form-control form-control-theme" name="notes" placeholder="Optional">
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-pink">Add File</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- Files list --}}
-<div class="card card-theme mb-4">
-    <div class="card-body">
-        <h5 class="mb-3">Files ({{ $project->projectFiles->count() }})</h5>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="mb-0">Files ({{ $project->purchaseFiles->count() }})</h5>
+            <a href="{{ route('purchase.files.create', ['project' => $project->id]) }}" class="btn btn-sm btn-pink">Add file</a>
+        </div>
         <div class="table-responsive">
-            <table class="table table-striped table-theme">
+            <table class="table table-striped table-theme mb-0 align-middle">
                 <thead>
                     <tr>
-                        <th>File #</th>
-                        <th>Status</th>
-                        <th>Customer</th>
-                        <th>Sale Amount</th>
-                        <th>Documents</th>
-                        <th width="220">Actions</th>
+                        <th>File name</th>
+                        <th style="width: 100px;">Date</th>
+                        <th>Sellers</th>
+                        <th>Total land area</th>
+                        <th class="text-center" style="width: 56px;">View</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($project->projectFiles as $file)
+                    @forelse($project->purchaseFiles as $file)
+                        @php
+                            $sellerNames = $file->purchaseItems
+                                ->map(fn ($item) => $item->party?->name)
+                                ->filter()
+                                ->unique()
+                                ->values();
+                            $fileTotalMarla = (float) $file->purchaseItems->sum(fn ($item) => (float) $item->land_area_marla);
+                        @endphp
                         <tr>
-                            <td>{{ $file->file_number }}</td>
-                            <td>
-                                @if($file->status === 'sold')
-                                    <span class="badge badge-pink">Sold</span>
+                            <td class="fw-semibold">{{ $file->file_name }}</td>
+                            <td class="small text-nowrap">{{ $file->file_date?->format('d M Y') ?? '—' }}</td>
+                            <td class="small">
+                                @if($sellerNames->isNotEmpty())
+                                    {{ $sellerNames->join(', ') }}
                                 @else
-                                    <span class="badge badge-outline">Available</span>
+                                    <span class="text-muted">—</span>
                                 @endif
                             </td>
-                            <td>{{ $file->customer?->name ?? '—' }}</td>
-                            <td>{{ $file->sale_amount ? number_format($file->sale_amount) : '—' }}</td>
-                            <td>{{ $file->documents->count() }}</td>
-                            <td>
-                                @if($file->status === 'available')
-                                    <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#sellFileModal{{ $file->id }}">Sell</button>
-                                    <div class="modal fade" id="sellFileModal{{ $file->id }}" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--border-dark); color: var(--text-dark);">
-                                                <div class="modal-header border-secondary">
-                                                    <h5 class="modal-title">Sell File {{ $file->file_number }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <form action="{{ route('projects.files.sell', [$project, $file]) }}" method="POST">
-                                                    @csrf
-                                                    @method('PUT')
-                                                    <div class="modal-body">
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Customer <span class="text-danger">*</span></label>
-                                                            <select name="customer_id" class="form-select form-select-theme" required>
-                                                                <option value="">Select customer</option>
-                                                                @foreach(\App\Models\Customer::orderBy('name')->get() as $c)
-                                                                    <option value="{{ $c->id }}">{{ $c->name }} @if($c->phone)({{ $c->phone }})@endif</option>
-                                                                @endforeach
-                                                            </select>
-                                                            <small class="text-muted"><a href="{{ route('customers.create') }}" target="_blank">Add new customer</a></small>
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Sale Amount</label>
-                                                            <input type="number" step="0.01" name="sale_amount" class="form-control form-control-theme" placeholder="0">
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Sale Date</label>
-                                                            <input type="date" name="sale_date" class="form-control form-control-theme" value="{{ date('Y-m-d') }}">
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer border-secondary">
-                                                        <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-pink">Mark as Sold</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
+                            <td class="small font-monospace">
+                                @if($fileTotalMarla > 0)
+                                    {{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileTotalMarla) }}
+                                @else
+                                    <span class="text-muted">—</span>
                                 @endif
-                                <button type="button" class="btn btn-sm btn-outline-theme" data-bs-toggle="modal" data-bs-target="#uploadDocModal{{ $file->id }}">Upload Doc</button>
-                                <div class="modal fade" id="uploadDocModal{{ $file->id }}" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--border-dark); color: var(--text-dark);">
-                                            <div class="modal-header border-secondary">
-                                                <h5 class="modal-title">Upload documents – {{ $file->file_number }}</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <form action="{{ route('projects.files.documents.store', [$project, $file]) }}" method="POST" enctype="multipart/form-data">
-                                                @csrf
-                                                <div class="modal-body">
-                                                    <input type="file" name="documents[]" class="form-control form-control-theme mb-2" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
-                                                    <p class="small text-muted mb-0">You can select multiple files. No strict limit.</p>
-                                                </div>
-                                                <div class="modal-footer border-secondary">
-                                                    <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="submit" class="btn btn-pink">Upload</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                                @foreach($file->documents as $doc)
-                                    <span class="d-inline-block me-1 mt-1">
-                                        <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-sm btn-outline-theme">{{ $doc->name ?? 'Doc' }}</a>
-                                        <form action="{{ route('projects.files.documents.destroy', [$project, $file, $doc->id]) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="button" class="btn btn-sm btn-danger-theme btn-delete-confirm" data-title="Remove document?">×</button>
-                                        </form>
-                                    </span>
-                                @endforeach
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ route('purchase.files.sellers', $file) }}" class="btn btn-sm btn-outline-theme" title="View sellers">
+                                    <i class="bi bi-eye" aria-hidden="true"></i>
+                                    <span class="visually-hidden">View</span>
+                                </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center">No files yet. Add files using the form above (e.g. when DHA provides files).</td>
+                            <td colspan="5" class="text-center text-muted">No purchase files for this project yet. <a href="{{ route('purchase.files.create', ['project' => $project->id]) }}">Add one</a>.</td>
                         </tr>
                     @endforelse
                 </tbody>

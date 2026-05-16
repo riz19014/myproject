@@ -11,6 +11,7 @@ class Party extends Model
     protected $fillable = [
         'name',
         'phone',
+        'cnic',
         'address',
         'category_id',
         'sub_category_id',
@@ -40,4 +41,6 @@ class Party extends Model
             ->withPivot(['land_area', 'land_area_unit'])
             ->withTimestamps();
     }
+
+    
 }

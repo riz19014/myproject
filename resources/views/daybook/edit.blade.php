@@ -43,6 +43,7 @@
                     'daybookPaymentMethodDefault' => $daybookPaymentMethodDefault ?? 'cash',
                     'daybookPaymentBankDefault' => $daybookPaymentBankDefault ?? '',
                     'daybookPaymentReferenceDefault' => $daybookPaymentReferenceDefault ?? '',
+                    'daybookPurchaseFileIdDefault' => $daybookPurchaseFileIdDefault ?? '',
                 ])
             </div>
             <div class="daybook-form-inner pt-0 pb-4">
@@ -67,5 +68,6 @@
 @endpush
 
 @push('scripts')
+@include('partials.party-form-field-scripts')
 @include('daybook.partials.entry-form-scripts')
 @endpush

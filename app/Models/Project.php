@@ -11,22 +11,8 @@ class Project extends Model
 {
     protected $fillable = [
         'name',
-        'land_area',
-        'land_area_unit',
-        'field_type',
         'land_type_id',
-        'total_amount',
-        'description',
-        'notes',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'land_area' => 'decimal:4',
-            'total_amount' => 'decimal:2',
-        ];
-    }
 
     public function landType(): BelongsTo
     {
@@ -58,5 +44,10 @@ class Project extends Model
     public function purchaseItems(): HasMany
     {
         return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function purchaseFiles(): HasMany
+    {
+        return $this->hasMany(PurchaseFile::class);
     }
 }

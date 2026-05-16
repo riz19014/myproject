@@ -17,7 +17,7 @@
         @if($type === 'sale')
             <div class="text-muted small">Sale lines, land cuttings, and net saleable area by project.</div>
         @elseif($type === 'purchase')
-            <div class="text-muted small">Purchase lines by party (Moza, Khasra, land area, amount per acre) and purchase-type projects.</div>
+            <div class="text-muted small">Purchase lines by party (Moza, Khasra, land area, amount per acre) and projects.</div>
         @else
             <div class="text-muted small">Projects where type is <strong class="text-capitalize">{{ $type }}</strong>.</div>
         @endif
@@ -28,7 +28,8 @@
             <a href="{{ route('projects.create', ['context' => 'sale']) }}" class="btn btn-outline-theme">Add sale project</a>
         @else
             <a href="{{ route('purchase.records.create') }}" class="btn btn-pink">Add purchase</a>
-            <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-outline-theme">Add purchase project</a>
+            <a href="{{ route('purchase.files.create') }}" class="btn btn-outline-theme">Add purchase file</a>
+            <a href="{{ route('projects.create', ['context' => $type]) }}" class="btn btn-outline-theme">Add project</a>
         @endif
         <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">All projects</a>
     </div>
@@ -123,6 +124,22 @@
                         @endforeach
                     </div>
                 </div>
+                <div class="mb-3 pb-3 border-bottom">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div class="text-muted small fw-semibold text-uppercase" style="letter-spacing:.06em;">Purchase files</div>
+                        <a href="{{ route('purchase.files.index') }}" class="btn btn-sm btn-outline-theme">All purchase files</a>
+                    </div>
+                    <p class="text-muted small mb-2">Each file has a name, project, and one or more dealers.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach($projects->sortBy('name') as $purchaseProject)
+                            <a href="{{ route('purchase.files.index', ['project' => $purchaseProject->id]) }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2" title="Purchase files for {{ $purchaseProject->name }}">
+                                <i class="bi bi-folder2-open flex-shrink-0" aria-hidden="true"></i>
+                                <span class="text-truncate" style="max-width: 11rem;">{{ $purchaseProject->name }}</span>
+                                <span class="badge rounded-pill bg-secondary bg-opacity-25 text-dark border">{{ $purchaseProject->purchase_files_count }} {{ $purchaseProject->purchase_files_count === 1 ? 'file' : 'files' }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
             @endif
             @if($purchaseItems->isEmpty())
                 <p class="text-muted small mb-0">No purchase lines yet. Pick a project under <strong>Add lines for project</strong> above (or use <strong>Add purchase</strong> in the header), then enter one or more rows. Use <strong>Edit</strong> in the table to change a line.</p>
@@ -138,6 +155,7 @@
                             <tr>
                                 <th style="width: 72px;">ID</th>
                                 <th>Project</th>
+                                <th style="min-width: 7rem;">File</th>
                                 <th>Party</th>
                                 <th>Moza</th>
                                 <th>Khasra</th>
@@ -153,6 +171,7 @@
                                 <tr>
                                     <td>{{ $item->id }}</td>
                                     <td class="fw-semibold">{{ $item->project?->name ?? '—' }}</td>
+                                    <td class="small">{{ $item->purchaseFile?->file_name ?: '—' }}</td>
                                     <td class="small">{{ $item->party?->name ?? '—' }}</td>
                                     <td class="small">{{ $item->moza ?: '—' }}</td>
                                     <td class="small">{{ $item->khasra ?: '—' }}</td>
@@ -177,7 +196,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="border-top border-2 border-secondary border-opacity-25">
-                                <td colspan="5" class="p-3 text-end align-middle bg-body-secondary bg-opacity-25">
+                                <td colspan="6" class="p-3 text-end align-middle bg-body-secondary bg-opacity-25">
                                     <div class="text-muted small fw-semibold text-uppercase mb-1" style="letter-spacing:.06em;">Totals</div>
                                     <div class="text-body-secondary small">{{ $purchaseLineCount }} {{ $purchaseLineCount === 1 ? 'line' : 'lines' }}</div>
                                 </td>
@@ -241,7 +260,9 @@
         $landTypeName = $landTypeId && $rows->first() && $rows->first()->landType
             ? $rows->first()->landType->name
             : ($landTypeId ? ('Land type #' . $landTypeId) : 'Uncategorized');
-        $sectionTotal = (float) $rows->sum('total_amount');
+        $sectionTotal = $type === 'sale'
+            ? (float) $sales->whereIn('project_id', $rows->pluck('id'))->sum('total_amount')
+            : (float) $purchaseItems->whereIn('project_id', $rows->pluck('id'))->sum('line_total_rs');
     @endphp
 
     <div class="card card-theme mb-4">
@@ -259,8 +280,7 @@
                         <tr>
                             <th style="width: 72px;">ID</th>
                             <th>Name</th>
-                            <th style="width: 160px;">Area</th>
-                            <th class="text-end" style="width: 180px;">Total (Rs)</th>
+                            <th style="width: 200px;">Party land</th>
                             <th class="text-center" style="width: 90px;">Files</th>
                             <th style="width: 220px;">Actions</th>
                         </tr>
@@ -270,23 +290,17 @@
                             <tr>
                                 <td>{{ $project->id }}</td>
                                 <td class="fw-semibold">{{ $project->name }}</td>
-                                <td>
-                                    @if($project->land_area !== null && $project->land_area !== '')
-                                        {{ rtrim(rtrim(number_format((float) $project->land_area, 4, '.', ''), '0'), '.') ?: '0' }}
-                                        {{ $project->land_area_unit ?? '' }}
+                                <td class="small">
+                                    @php $partyMarla = \App\Support\LandMeasure::partiesTotalMarla($project->parties); @endphp
+                                    @if($partyMarla > 0)
+                                        {{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($partyMarla) }}
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
-                                <td class="text-end fw-semibold">
-                                    @if($project->total_amount !== null && $project->total_amount !== '')
-                                        {{ number_format((float) $project->total_amount, 0) }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td class="text-center">{{ $project->project_files_count }}</td>
+                                <td class="text-center">{{ $project->purchase_files_count }}</td>
                                 <td>
+                                    <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="btn btn-sm btn-outline-secondary">Files</a>
                                     <a href="{{ route('projects.show', $project) }}" class="btn btn-sm btn-outline-theme">View</a>
                                     <a href="{{ route('projects.edit', $project) }}" class="btn btn-sm btn-outline-theme">Edit</a>
                                 </td>

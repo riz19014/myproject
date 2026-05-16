@@ -46,7 +46,10 @@
                 <input type="number" class="form-control form-control-theme" data-line-field="area_sqft" value="{{ (int) ($line['area_sqft'] ?? 0) }}" min="0" step="1" required>
             </div>
             <div class="col-md-4">
-                <label class="form-label">Amount per acre (Rs) <span class="text-danger">*</span></label>
+                <label class="form-label">
+                    Amount per acre (Rs) <span class="text-danger">*</span>
+                    <span class="js-amount-per-acre-hint text-muted fw-normal ms-1 d-none"></span>
+                </label>
                 <input type="number" class="form-control form-control-theme" data-line-field="amount_per_acre" value="{{ isset($line['amount_per_acre']) ? $line['amount_per_acre'] : '' }}" min="0" step="0.01" required placeholder="0">
             </div>
         </div>

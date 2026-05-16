@@ -56,7 +56,7 @@
 </div>
 
 <div class="modal fade" id="daybookCreatePartyModal" tabindex="-1" aria-labelledby="daybookCreatePartyModalLabel" aria-hidden="true" data-bs-focus="false">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title" id="daybookCreatePartyModalLabel">Create party</h2>
@@ -64,32 +64,85 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted small mb-3">Category is set from the sub category you choose.</p>
-                <div class="mb-3">
-                    <label class="form-label" for="daybook_modal_party_name">Party name</label>
-                    <input type="text" class="form-control form-control-theme" id="daybook_modal_party_name" placeholder="e.g. Ali Traders" autocomplete="off">
-                </div>
-                <div class="mb-0 daybook-party-sc-combo">
-                    <label class="form-label" for="daybook_modal_party_sub_search">Sub category</label>
-                    <input type="hidden" id="daybook_modal_party_sub_category" value="">
-                    <input type="text"
-                        class="form-control form-control-theme"
-                        id="daybook_modal_party_sub_search"
-                        placeholder="Search sub category…"
-                        autocomplete="off"
-                        role="combobox"
-                        aria-expanded="false"
-                        aria-controls="daybook_party_sc_listbox"
-                        aria-autocomplete="list">
-                    <ul class="daybook-party-sc-listbox d-none" id="daybook_party_sc_listbox" role="listbox" hidden></ul>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="daybook_modal_party_name">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-theme" id="daybook_modal_party_name" placeholder="e.g. Ali Traders" autocomplete="off" maxlength="255">
+                    </div>
+                    <div class="col-md-6 daybook-party-sc-combo">
+                        <label class="form-label" for="daybook_modal_party_sub_search">Party sub category <span class="text-danger">*</span></label>
+                        <input type="hidden" id="daybook_modal_party_sub_category" value="">
+                        <input type="text"
+                            class="form-control form-control-theme"
+                            id="daybook_modal_party_sub_search"
+                            placeholder="Search sub category…"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-controls="daybook_party_sc_listbox"
+                            aria-autocomplete="list">
+                        <ul class="daybook-party-sc-listbox d-none" id="daybook_party_sc_listbox" role="listbox" hidden></ul>
+                    </div>
                 </div>
                 <script type="application/json" id="daybook-party-sub-json">@json($partySubCategories->map(function ($sc) {
                     return ['id' => $sc->id, 'label' => ($sc->category?->name ?? '—').' — '.$sc->name];
                 })->values())</script>
-                <p class="text-danger small mt-2 mb-0 d-none" id="daybook_modal_party_error" role="alert"></p>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="daybook_modal_party_phone">Phone</label>
+                        <input type="text" class="form-control form-control-theme" id="daybook_modal_party_phone" maxlength="11" inputmode="numeric" placeholder="11 digits e.g. 03001234567" autocomplete="off">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="daybook_modal_party_cnic">CNIC</label>
+                        <input type="text" class="form-control form-control-theme" id="daybook_modal_party_cnic" maxlength="14" inputmode="numeric" placeholder="34012-435172-1" autocomplete="off">
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="daybook_modal_party_address">Address</label>
+                    <textarea class="form-control form-control-theme" id="daybook_modal_party_address" rows="2" maxlength="2000" placeholder="Optional"></textarea>
+                </div>
+                <p class="text-danger small mt-3 mb-0 d-none" id="daybook_modal_party_error" role="alert"></p>
             </div>
             <div class="modal-footer flex-nowrap gap-2">
                 <button type="button" class="btn btn-outline-theme flex-grow-1 flex-sm-grow-0" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-pink flex-grow-1 flex-sm-grow-0" id="daybook_modal_party_submit">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="daybookCreatePartySubCategoryModal" tabindex="-1" aria-labelledby="daybookCreatePartySubCategoryModalLabel" aria-hidden="true" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="daybookCreatePartySubCategoryModalLabel">Create sub category</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <label class="form-label mb-0" for="daybook_modal_party_sub_cat_category_id">Party category <span class="text-danger">*</span></label>
+                        <a href="{{ route('party-categories.index') }}" target="_blank" rel="noopener noreferrer" class="small text-decoration-none fw-medium">Manage categories</a>
+                    </div>
+                    <select class="form-select form-select-theme" id="daybook_modal_party_sub_cat_category_id">
+                        <option value="">Select category</option>
+                        @foreach($partyCategories as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                    @if($partyCategories->isEmpty())
+                        <p class="text-muted small mt-2 mb-0">No party categories yet. Add one under <strong>Manage categories</strong>.</p>
+                    @endif
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="daybook_modal_party_sub_cat_name">Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-theme" id="daybook_modal_party_sub_cat_name" placeholder="e.g. Seller, Buyer" autocomplete="off" maxlength="255">
+                </div>
+                <p class="text-danger small mt-3 mb-0 d-none" id="daybook_modal_party_sub_cat_error" role="alert"></p>
+            </div>
+            <div class="modal-footer flex-nowrap gap-2">
+                <button type="button" class="btn btn-outline-theme flex-grow-1 flex-sm-grow-0" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-pink flex-grow-1 flex-sm-grow-0" id="daybook_modal_party_sub_cat_submit">Save</button>
             </div>
         </div>
     </div>

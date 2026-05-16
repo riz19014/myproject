@@ -38,6 +38,28 @@ class PartySubCategoryController extends Controller
             ->with('success', 'Party sub category created successfully.');
     }
 
+    /**
+     * Create a party sub category from the daybook modal (JSON).
+     */
+    public function quickStore(Request $request)
+    {
+        $validated = $request->validate([
+            'category_id' => ['required', 'integer', 'exists:party_categories,id'],
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $partySubCategory = PartySubCategory::create([
+            'category_id' => $validated['category_id'],
+            'name' => trim($validated['name']),
+        ]);
+        $partySubCategory->load('category');
+
+        return response()->json([
+            'id' => $partySubCategory->id,
+            'label' => ($partySubCategory->category?->name ?? '—').' — '.$partySubCategory->name,
+        ]);
+    }
+
     public function edit(PartySubCategory $party_sub_category)
     {
         $partyCategories = PartyCategory::orderBy('name')->get();

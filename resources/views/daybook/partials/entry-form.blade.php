@@ -13,7 +13,7 @@
             <div class="col-12 col-lg-4">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="daybook_form_project_search">Project</label>
-                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_project_create">+ Create project</button>
+                    <button type="button" class="btn btn-sm btn-outline-theme daybook-field-add-btn px-2 py-0" id="daybook_form_project_create" aria-label="Create project" title="Create project"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="daybook-form-combo @error('project_id') is-invalid @enderror">
                     <input type="hidden" name="project_id" id="daybook_form_project_id" value="{{ old('project_id', $daybookProjectIdDefault ?? '') }}">
@@ -33,11 +33,25 @@
                 @error('project_id')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
+                <div class="mt-2" id="daybook_form_file_wrap">
+                    <label class="form-label daybook-label mb-1" for="daybook_form_purchase_file_id">File <span class="text-muted fw-normal">(optional)</span></label>
+                    <select
+                        name="purchase_file_id"
+                        id="daybook_form_purchase_file_id"
+                        class="form-select form-select-theme @error('purchase_file_id') is-invalid @enderror"
+                        disabled
+                    >
+                        <option value="">— Select project first —</option>
+                    </select>
+                    @error('purchase_file_id')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
             </div>
             <div class="col-12 col-lg-4">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="daybook_form_party_search">Party</label>
-                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_form_party_create">+ Create new party</button>
+                    <button type="button" class="btn btn-sm btn-outline-theme daybook-field-add-btn px-2 py-0" id="daybook_form_party_create" aria-label="Create party" title="Create party"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="daybook-form-combo @error('party_id') is-invalid @enderror">
                     <input type="hidden" name="party_id" id="daybook_form_party_id" value="{{ old('party_id', $daybookPartyIdDefault ?? '') }}">
@@ -61,7 +75,10 @@
             <div class="col-12 col-lg-4">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="daybook_form_party_sub_search">Sub category <span class="text-muted fw-normal">(optional)</span></label>
-                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_party_sub_reset" aria-label="Clear sub category">Reset</button>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-theme daybook-field-add-btn px-2 py-0" id="daybook_form_party_sub_create" aria-label="Create sub category" title="Create sub category"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_party_sub_reset" aria-label="Clear sub category">Reset</button>
+                    </div>
                 </div>
                 <div class="daybook-form-combo @error('party_sub_category_id') is-invalid @enderror">
                     <input type="hidden" name="party_sub_category_id" id="daybook_form_party_sub_category_id" value="{{ old('party_sub_category_id', $daybookPartySubCategoryIdDefault ?? '') }}">
@@ -84,6 +101,7 @@
             </div>
         </div>
         <script type="application/json" id="daybook-form-projects-json">@json($daybookProjectsJson)</script>
+        <script type="application/json" id="daybook-form-purchase-file-default">@json(old('purchase_file_id', $daybookPurchaseFileIdDefault ?? ''))</script>
         <script type="application/json" id="daybook-form-parties-json">@json($parties->map(function ($p) {
             return ['id' => $p->id, 'label' => $p->name, 'sub_category_id' => $p->sub_category_id];
         })->values())</script>

@@ -142,7 +142,10 @@
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <h2 class="mb-0 d-flex align-items-center flex-wrap">Entries <span class="daybook-count-badge" title="Lines this day">{{ $entries->count() }}</span></h2>
             </div>
-            <span class="text-muted small fw-medium">{{ $day->format('l, j M Y') }}</span>
+            <div class="d-flex flex-column align-items-end gap-1 text-end">
+                <span class="text-muted small fw-medium">{{ $day->format('l, j M Y') }}</span>
+                <span class="small text-muted">Full history and search: <a href="{{ route('daybook.entries', ['date' => $day->toDateString()]) }}">Daybook entries</a>.</span>
+            </div>
         </div>
         <div class="table-responsive daybook-table-shell" role="region" aria-label="Daybook entries for this date">
             <table class="table table-theme mb-0 align-middle">
@@ -215,6 +218,7 @@
 @endpush
 
 @push('scripts')
+@include('partials.party-form-field-scripts')
 @include('daybook.partials.entry-form-scripts')
 <script>
 (function () {

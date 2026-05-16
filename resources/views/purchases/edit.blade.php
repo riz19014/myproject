@@ -25,6 +25,28 @@
             @method('PUT')
 
             <div class="border rounded p-3 mb-4 bg-body-secondary bg-opacity-10">
+                <div class="fw-semibold small mb-2">Purchase file <span class="text-muted fw-normal">(optional)</span></div>
+                <p class="text-muted small mb-3">Link this party line to a named file on the project (e.g. one DHA file for combined land). Create a new name or pick an existing file.</p>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label for="purchase_file_id" class="form-label">Existing file</label>
+                        <select class="form-select form-select-theme @error('purchase_file_id') is-invalid @enderror" id="purchase_file_id" name="purchase_file_id">
+                            <option value="">— None —</option>
+                            @foreach($project->purchaseFiles as $pf)
+                                <option value="{{ $pf->id }}" @selected((int) old('purchase_file_id', $item->purchase_file_id) === (int) $pf->id)>{{ $pf->file_name }}</option>
+                            @endforeach
+                        </select>
+                        @error('purchase_file_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-7">
+                        <label for="new_file_name" class="form-label">Or new file name</label>
+                        <input type="text" class="form-control form-control-theme @error('new_file_name') is-invalid @enderror" id="new_file_name" name="new_file_name" value="{{ old('new_file_name') }}" maxlength="255" placeholder="Overrides selection above if filled (e.g. 23 kanal 5 marla)" autocomplete="off">
+                        @error('new_file_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+            </div>
+
+            <div class="border rounded p-3 mb-4 bg-body-secondary bg-opacity-10">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-6 col-lg-4">
                         <label for="party_id" class="form-label">Party <span class="text-danger">*</span></label>

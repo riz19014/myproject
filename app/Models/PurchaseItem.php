@@ -9,6 +9,7 @@ class PurchaseItem extends Model
 {
     protected $fillable = [
         'project_id',
+        'purchase_file_id',
         'party_id',
         'moza',
         'khasra',
@@ -33,6 +34,11 @@ class PurchaseItem extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function purchaseFile(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseFile::class);
     }
 
     public function party(): BelongsTo

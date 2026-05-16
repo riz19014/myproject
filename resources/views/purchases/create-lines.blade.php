@@ -20,7 +20,47 @@
             @csrf
             <input type="hidden" name="project_id" value="{{ $project->id }}">
 
-            <p class="text-muted small mb-3">Add one or more lines. Each line is one party slice: Moza, Khasra, land area, and Rs per acre. Line total is computed from area (in marla) × rate per acre. To change an existing line, open it from Purchase → <strong>Purchase lines</strong> and use <strong>Edit</strong>.</p>
+            <p class="text-muted small mb-3">Add one or more lines (party, Moza, Khasra, area, Rs per acre). Optionally group under a <strong>purchase file</strong> with dealers — <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}">manage files</a>.</p>
+
+            <div class="border rounded p-3 mb-4 bg-body-secondary bg-opacity-10">
+                <div class="fw-semibold small mb-2">Put these lines under a purchase file <span class="text-muted fw-normal">(optional)</span></div>
+                <p class="text-muted small mb-3 mb-md-0">Files live on the project (e.g. DHA). All lines saved in this batch share the same file. Leave both empty to save without a file, or pick an existing file, or create a new file name.</p>
+                <div class="row g-3 align-items-end mt-1">
+                    <div class="col-md-5">
+                        <label for="purchase_file_id" class="form-label">Existing file</label>
+                        <select class="form-select form-select-theme @error('purchase_file_id') is-invalid @enderror" id="purchase_file_id" name="purchase_file_id">
+                            <option value="">— None —</option>
+                            @foreach($project->purchaseFiles as $pf)
+                                <option value="{{ $pf->id }}" @selected((string) old('purchase_file_id') === (string) $pf->id)>
+                                    {{ $pf->file_name }}@if($pf->dealers->isNotEmpty()) ({{ $pf->dealers->pluck('name')->join(', ') }})@endif
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('purchase_file_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-4">
+                        <label for="new_file_name" class="form-label">Or new file name</label>
+                        <input type="text" class="form-control form-control-theme @error('new_file_name') is-invalid @enderror" id="new_file_name" name="new_file_name" value="{{ old('new_file_name') }}" maxlength="255" placeholder="e.g. 23 kanal 5 marla" autocomplete="off">
+                        @error('new_file_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-theme w-100" id="purchase-suggest-file-name" @if($parties->isEmpty()) disabled @endif>Suggest from areas</button>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <label class="form-label small mb-1">Dealers for <strong>new</strong> file</label>
+                    <div class="border rounded p-2 bg-body" style="max-height: 140px; overflow-y: auto;">
+                        @foreach($parties as $party)
+                            <div class="form-check form-check-inline me-3">
+                                <input class="form-check-input" type="checkbox" name="dealer_party_ids[]" value="{{ $party->id }}" id="line_dealer_{{ $party->id }}" @checked(in_array($party->id, old('dealer_party_ids', [])))>
+                                <label class="form-check-label small" for="line_dealer_{{ $party->id }}">{{ $party->name }}</label>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+                <p class="text-muted small mt-2 mb-0">“Suggest from areas” adds the acre/kanal/marla/sq ft of every line below and fills <strong>Or new file name</strong> (e.g. <em>23 kanal 5 marla</em>). You can edit it before saving.</p>
+            </div>
 
             @if($parties->isEmpty())
                 <div class="alert alert-theme-danger py-2 small">No parties yet. Add parties first, then return here.</div>
@@ -47,8 +87,12 @@
 @endsection
 
 @push('scripts')
+@include('purchases.partials.line-row-amount-hint-scripts')
 <script>
 (function() {
+    var suggestUrl = @json(route('purchase.records.suggest-file-name'));
+    var csrf = document.querySelector('meta[name="csrf-token"]');
+    var csrfToken = csrf ? csrf.getAttribute('content') : '';
     var form = document.getElementById('purchase-lines-form');
     var container = document.getElementById('purchase-lines');
     var tpl = document.getElementById('purchase-line-template');
@@ -81,6 +125,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         syncPurchaseLineFieldNames();
         updateRemoveButtons();
+        if (window.PurchaseLineAmountHints) PurchaseLineAmountHints.bind(container);
     });
 
     form.addEventListener('submit', function() {
@@ -94,6 +139,7 @@
             container.insertAdjacentHTML('beforeend', html);
             syncPurchaseLineFieldNames();
             updateRemoveButtons();
+            if (window.PurchaseLineAmountHints) PurchaseLineAmountHints.refresh(container);
         });
     }
 
@@ -118,6 +164,52 @@
             disp.textContent = name || 'Party name appears here when you select a party…';
         }
     });
+
+    function collectLinesPayload() {
+        syncPurchaseLineFieldNames();
+        var blocks = container.querySelectorAll('.purchase-line-block');
+        var lines = [];
+        blocks.forEach(function(block) {
+            function val(field) {
+                var el = block.querySelector('[data-line-field="' + field + '"]');
+                return el ? parseInt(el.value || '0', 10) || 0 : 0;
+            }
+            lines.push({
+                area_acre: val('area_acre'),
+                area_kanal: val('area_kanal'),
+                area_marla: val('area_marla'),
+                area_sqft: val('area_sqft'),
+            });
+        });
+        return { lines: lines };
+    }
+
+    var suggestBtn = document.getElementById('purchase-suggest-file-name');
+    var newFileInput = document.getElementById('new_file_name');
+    if (suggestBtn && newFileInput) {
+        suggestBtn.addEventListener('click', function() {
+            suggestBtn.disabled = true;
+            fetch(suggestUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(collectLinesPayload()),
+            }).then(function(r) {
+                return r.json().then(function(data) {
+                    if (!r.ok) throw data;
+                    if (data && data.name) newFileInput.value = data.name;
+                });
+            }).catch(function() {
+                alert('Could not build a suggestion. Check each line has valid area numbers.');
+            }).finally(function() {
+                suggestBtn.disabled = false;
+            });
+        });
+    }
 })();
 </script>
 @endpush

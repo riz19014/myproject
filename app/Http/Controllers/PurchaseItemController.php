@@ -5,11 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\DayBookEntry;
 use App\Models\Party;
 use App\Models\Project;
+use App\Models\PurchaseFile;
 use App\Models\PurchaseItem;
 use App\Support\LandMeasure;
+use App\Support\PurchaseLineAttributes;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseItemController extends Controller
@@ -18,7 +22,6 @@ class PurchaseItemController extends Controller
     {
         $purchaseProjects = Project::query()
             ->with('landType')
-            ->where('field_type', 'purchase')
             ->orderBy('name')
             ->get();
 
@@ -28,7 +31,7 @@ class PurchaseItemController extends Controller
         }
 
         $project = Project::query()
-            ->where('field_type', 'purchase')
+            ->with(['purchaseFiles' => fn ($q) => $q->with('dealers')->orderBy('file_name')])
             ->findOrFail((int) $projectId);
 
         $parties = Party::query()->orderBy('name')->get();
@@ -39,6 +42,32 @@ class PurchaseItemController extends Controller
         }
 
         return view('purchases.create-lines', compact('project', 'parties', 'lines'));
+    }
+
+    public function suggestFileName(Request $request)
+    {
+        $validated = $request->validate([
+            'lines' => ['present', 'array'],
+            'lines.*.area_acre' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_kanal' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_marla' => ['nullable', 'integer', 'min:0'],
+            'lines.*.area_sqft' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $total = 0.0;
+        foreach ($validated['lines'] as $line) {
+            $total += LandMeasure::marlaFromAkms(
+                (int) ($line['area_acre'] ?? 0),
+                (int) ($line['area_kanal'] ?? 0),
+                (int) ($line['area_marla'] ?? 0),
+                (int) ($line['area_sqft'] ?? 0),
+            );
+        }
+
+        return response()->json([
+            'name' => LandMeasure::formatSpokenKanalMarlaFromMarla($total),
+            'total_marla' => round($total, 4),
+        ]);
     }
 
     public function store(Request $request)
@@ -54,12 +83,19 @@ class PurchaseItemController extends Controller
             'lines.*.area_marla' => ['required', 'integer', 'min:0'],
             'lines.*.area_sqft' => ['required', 'integer', 'min:0'],
             'lines.*.amount_per_acre' => ['required', 'numeric', 'min:0'],
+            'new_file_name' => ['nullable', 'string', 'max:255'],
+            'purchase_file_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('purchase_files', 'id')->where(fn ($q) => $q->where('project_id', (int) $request->input('project_id'))),
+            ],
+            'dealer_party_ids' => ['nullable', 'array'],
+            'dealer_party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
         ]);
 
         $project = Project::query()->findOrFail($validated['project_id']);
-        if ($project->field_type !== 'purchase') {
-            abort(403, 'Only purchase-type projects accept purchase records.');
-        }
+
+        $purchaseFileId = $this->resolvePurchaseFileId($project, $request);
 
         $items = [];
         foreach ($validated['lines'] as $idx => $line) {
@@ -68,7 +104,10 @@ class PurchaseItemController extends Controller
                 "lines.{$idx}.area_acre",
                 'Line '.($idx + 1).': enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'
             );
-            $items[] = array_merge(['project_id' => $project->id], $attrs);
+            $items[] = array_merge([
+                'project_id' => $project->id,
+                'purchase_file_id' => $purchaseFileId,
+            ], $attrs);
         }
 
         DB::transaction(function () use ($items) {
@@ -84,11 +123,10 @@ class PurchaseItemController extends Controller
     public function edit(PurchaseItem $purchase_item)
     {
         $project = $purchase_item->project;
-        if ($project->field_type !== 'purchase') {
-            abort(404);
-        }
 
         $parties = Party::query()->orderBy('name')->get();
+
+        $project->load(['purchaseFiles' => fn ($q) => $q->with('dealers')->orderBy('file_name')]);
 
         return view('purchases.edit', [
             'project' => $project,
@@ -100,9 +138,6 @@ class PurchaseItemController extends Controller
     public function update(Request $request, PurchaseItem $purchase_item)
     {
         $project = $purchase_item->project;
-        if ($project->field_type !== 'purchase') {
-            abort(404);
-        }
 
         $validated = $request->validate([
             'party_id' => ['required', 'integer', 'exists:parties,id'],
@@ -113,6 +148,14 @@ class PurchaseItemController extends Controller
             'area_marla' => ['required', 'integer', 'min:0'],
             'area_sqft' => ['required', 'integer', 'min:0'],
             'amount_per_acre' => ['required', 'numeric', 'min:0'],
+            'new_file_name' => ['nullable', 'string', 'max:255'],
+            'purchase_file_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('purchase_files', 'id')->where(fn ($q) => $q->where('project_id', $project->id)),
+            ],
+            'dealer_party_ids' => ['nullable', 'array'],
+            'dealer_party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
         ]);
 
         $attrs = $this->computeLineAttributes(
@@ -121,7 +164,9 @@ class PurchaseItemController extends Controller
             'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'
         );
 
-        $purchase_item->update($attrs);
+        $purchaseFileId = $this->resolvePurchaseFileId($project, $request);
+
+        $purchase_item->update(array_merge($attrs, ['purchase_file_id' => $purchaseFileId]));
 
         return redirect()->route('purchase.index')
             ->with('success', 'Purchase line #'.$purchase_item->id.' updated.');
@@ -130,9 +175,6 @@ class PurchaseItemController extends Controller
     public function destroy(PurchaseItem $purchase_item)
     {
         $project = $purchase_item->project;
-        if ($project->field_type !== 'purchase') {
-            abort(404);
-        }
         $purchase_item->delete();
 
         return redirect()->route('purchase.index')
@@ -142,7 +184,7 @@ class PurchaseItemController extends Controller
     public function pdf()
     {
         $purchaseItems = PurchaseItem::query()
-            ->with(['project', 'party'])
+            ->with(['project', 'party', 'purchaseFile.dealers'])
             ->orderByDesc('id')
             ->limit(400)
             ->get();
@@ -174,7 +216,6 @@ class PurchaseItemController extends Controller
     {
         $projects = Project::query()
             ->with('landType')
-            ->where('field_type', 'purchase')
             ->orderBy('name')
             ->get();
 
@@ -212,9 +253,7 @@ class PurchaseItemController extends Controller
         $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
         $parties = Party::query()->whereIn('id', $partyIds)->get()->keyBy('id');
 
-        $bookTotal = $project->total_amount !== null && $project->total_amount !== ''
-            ? (float) $project->total_amount
-            : 0.0;
+        $bookTotal = (float) $project->purchaseItems()->sum('line_total_rs');
 
         $landAkms = $this->purchaseProjectLandAkmsLine($project);
 
@@ -223,7 +262,7 @@ class PurchaseItemController extends Controller
             'is_opening' => true,
             'date' => '',
             'party' => '—',
-            'description' => 'Opening balance — project book total for this land (amount remaining before daybook payments below).',
+            'description' => 'Opening balance — total purchase line amount for this project (amount remaining before daybook payments below).',
             'paid_display' => '—',
             'balance' => $bookTotal,
         ];
@@ -277,16 +316,79 @@ class PurchaseItemController extends Controller
 
     private function purchaseProjectLandAkmsLine(Project $project): string
     {
-        if ($project->land_area === null || $project->land_area === '' || ! $project->land_area_unit) {
+        $marla = (float) $project->purchaseItems()->sum('land_area_marla');
+        if ($marla <= 0) {
+            $project->loadMissing('parties');
+            $marla = LandMeasure::partiesTotalMarla($project->parties);
+        }
+        if ($marla <= 0) {
             return '—';
         }
-        $unit = (string) $project->land_area_unit;
-        if (! in_array($unit, ['acre', 'kanal', 'marla', 'sqft'], true)) {
-            return '—';
-        }
-        $marla = LandMeasure::toMarla((float) $project->land_area, $unit);
 
         return LandMeasure::formatAkmsLabelFromMarla($marla);
+    }
+
+    /**
+     * New file name wins over an existing file pick. Empty both leaves purchase lines ungrouped (null file).
+     */
+    private function resolvePurchaseFileId(Project $project, Request $request): ?int
+    {
+        $newName = trim((string) $request->input('new_file_name', ''));
+        if ($newName !== '') {
+            Validator::make(
+                ['new_file_name' => $newName],
+                [
+                    'new_file_name' => [
+                        'required',
+                        'string',
+                        'max:255',
+                        Rule::unique('purchase_files', 'file_name')->where(fn ($q) => $q->where('project_id', $project->id)),
+                    ],
+                ],
+                ['new_file_name.unique' => 'A purchase file with this name already exists for this project. Choose another name or link to the existing file.']
+            )->validate();
+
+            $file = $project->purchaseFiles()->create([
+                'file_name' => $newName,
+            ]);
+
+            $this->syncPurchaseFileDealers($file, $request);
+
+            return $file->id;
+        }
+
+        $raw = $request->input('purchase_file_id');
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $id = (int) $raw;
+        $file = $project->purchaseFiles()->whereKey($id)->first();
+        if (! $file) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => ['Pick a purchase file that belongs to this project.'],
+            ]);
+        }
+
+        if ($request->has('dealer_party_ids')) {
+            $this->syncPurchaseFileDealers($file, $request);
+        }
+
+        return $id;
+    }
+
+    private function syncPurchaseFileDealers(PurchaseFile $file, Request $request): void
+    {
+        $dealerIds = collect($request->input('dealer_party_ids', []))
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($dealerIds !== []) {
+            $file->dealers()->sync($dealerIds);
+        }
     }
 
     /**
@@ -295,32 +397,6 @@ class PurchaseItemController extends Controller
      */
     private function computeLineAttributes(array $line, string $areaErrorKey, ?string $areaErrorMessage = null): array
     {
-        $marla = LandMeasure::marlaFromAkms(
-            (int) $line['area_acre'],
-            (int) $line['area_kanal'],
-            (int) $line['area_marla'],
-            (int) $line['area_sqft'],
-        );
-        if ($marla <= 0) {
-            throw ValidationException::withMessages([
-                $areaErrorKey => [$areaErrorMessage ?? 'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'],
-            ]);
-        }
-        $acres = PurchaseItem::acresFromMarla($marla);
-        $amountPerAcre = (float) $line['amount_per_acre'];
-        $lineTotal = round($acres * $amountPerAcre, 2);
-
-        return [
-            'party_id' => (int) $line['party_id'],
-            'moza' => $line['moza'] ?? null,
-            'khasra' => $line['khasra'] ?? null,
-            'area_acre' => (int) $line['area_acre'],
-            'area_kanal' => (int) $line['area_kanal'],
-            'area_marla' => (int) $line['area_marla'],
-            'area_sqft' => (int) $line['area_sqft'],
-            'land_area_marla' => round($marla, 4),
-            'amount_per_acre' => $amountPerAcre,
-            'line_total_rs' => $lineTotal,
-        ];
+        return PurchaseLineAttributes::fromInput($line, $areaErrorKey, $areaErrorMessage);
     }
 }

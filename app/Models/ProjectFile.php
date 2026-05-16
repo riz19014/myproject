@@ -9,7 +9,16 @@ use Illuminate\Http\UploadedFile;
 
 class ProjectFile extends Model
 {
-    protected $fillable = ['project_id', 'file_number', 'status', 'sale_amount', 'customer_id', 'sale_date', 'notes'];
+    protected $fillable = [
+        'project_id',
+        'dealer_party_id',
+        'file_number',
+        'status',
+        'sale_amount',
+        'customer_id',
+        'sale_date',
+        'notes',
+    ];
 
     protected function casts(): array
     {
@@ -22,6 +31,11 @@ class ProjectFile extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function dealerParty(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'dealer_party_id');
     }
 
     public function customer(): BelongsTo

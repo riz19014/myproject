@@ -9,14 +9,18 @@ use App\Models\Factory;
 use App\Models\Land;
 use App\Models\LandType;
 use App\Models\Party;
+use App\Models\PartyCategory;
 use App\Models\PartySubCategory;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Models\PurchaseFile;
 use App\Models\Setting;
+use App\Support\DaybookVoucher;
 use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class DayBookController extends Controller
@@ -550,7 +554,7 @@ class DayBookController extends Controller
 
         $entries = DayBookEntry::query()
             ->whereDate('entry_date', $day)
-            ->with(['partySubCategory.category'])
+            ->with(['partySubCategory.category', 'purchaseFile'])
             ->orderBy('id')
             ->get();
 
@@ -591,6 +595,7 @@ class DayBookController extends Controller
             ->get();
 
         $landTypes = LandType::orderBy('name')->get();
+        $partyCategories = PartyCategory::orderBy('name')->get();
 
         return view('daybook.index', [
             'day' => $day,
@@ -607,8 +612,200 @@ class DayBookController extends Controller
             'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
+            'partyCategories' => $partyCategories,
             'landTypes' => $landTypes,
         ]);
+    }
+
+    /**
+     * Global searchable list of recent daybook lines (separate from the daily daybook screen).
+     */
+    public function entries(Request $request)
+    {
+        $highlightDate = null;
+        if ($request->filled('date')) {
+            try {
+                $highlightDate = Carbon::parse($request->query('date'))->toDateString();
+            } catch (\Throwable) {
+                $highlightDate = null;
+            }
+        }
+
+        $sidebarEntryRows = $this->buildDaybookSidebarRows(1200);
+
+        return view('daybook.entries', [
+            'sidebarEntryRows' => $sidebarEntryRows,
+            'highlightDate' => $highlightDate,
+        ]);
+    }
+
+    /**
+     * Recent daybook lines for the global entries screen: precomputed labels and a flat search string.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildDaybookSidebarRows(int $limit): Collection
+    {
+        $entries = DayBookEntry::query()
+            ->with(['project.landType', 'partySubCategory.category', 'purchaseFile'])
+            ->orderByDesc('entry_date')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        if ($entries->isEmpty()) {
+            return collect();
+        }
+
+        $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->filter()->unique()->all();
+        $projectLinkIds = $entries->where('link_type', DayBookEntry::LINK_PROJECT)->pluck('link_id')->filter()->unique()->all();
+        $landIds = $entries->where('link_type', DayBookEntry::LINK_LAND)->pluck('link_id')->filter()->unique()->all();
+        $plotIds = $entries->where('link_type', DayBookEntry::LINK_PLOT)->pluck('link_id')->filter()->unique()->all();
+        $factoryIds = $entries->where('link_type', DayBookEntry::LINK_FACTORY)->pluck('link_id')->filter()->unique()->all();
+        $customerIds = $entries->where('link_type', DayBookEntry::LINK_CUSTOMER)->pluck('link_id')->filter()->unique()->all();
+
+        $parties = Party::query()->whereIn('id', $partyIds)->get()->keyBy('id');
+        $projectsByLink = Project::query()->whereIn('id', $projectLinkIds)->with('landType')->get()->keyBy('id');
+        $lands = Land::query()->whereIn('id', $landIds)->get()->keyBy('id');
+        $plots = Plot::query()->whereIn('id', $plotIds)->with('land')->get()->keyBy('id');
+        $factories = Factory::query()->whereIn('id', $factoryIds)->get()->keyBy('id');
+        $customers = Customer::query()->whereIn('id', $customerIds)->get()->keyBy('id');
+
+        return $entries->map(function (DayBookEntry $e) use ($parties, $projectsByLink, $lands, $plots, $factories, $customers) {
+            $linkLabel = $this->daybookSidebarLinkLabel($e, $parties, $projectsByLink, $lands, $plots, $factories, $customers);
+            $linkProject = ($e->link_type === DayBookEntry::LINK_PROJECT && $e->link_id)
+                ? $projectsByLink->get((int) $e->link_id)
+                : null;
+            $linkedProjectAreaLine = $linkProject ? $this->formatDaybookProjectLandLine($linkProject) : '';
+            $subCat = $e->getPartySubCategoryLabel();
+            $categoryName = $e->partySubCategory?->category?->name ?? '';
+            $settlement = $e->getSettlementLabel();
+            $ctxProject = $e->project;
+            $projectName = $ctxProject?->name ?? '';
+            $projectArea = $ctxProject ? $this->formatDaybookProjectLandLine($ctxProject) : '';
+            $landTypeName = $ctxProject?->landType?->name ?? '';
+            $purchaseFileName = $e->purchaseFile?->file_name ?? '';
+            $typeLabel = $e->type === DayBookEntry::TYPE_CASH_IN ? 'Payment in' : 'Payment out';
+            $dateStr = $e->entry_date->format('Y-m-d');
+            $dateDisp = $e->entry_date->format('j M Y');
+            $dateDispShort = $e->entry_date->format('d-M-y');
+
+            $parts = array_filter([
+                (string) $e->id,
+                $dateStr,
+                $dateDisp,
+                $dateDispShort,
+                strtolower($e->description ?? ''),
+                $e->type,
+                $typeLabel,
+                (string) $e->amount,
+                number_format((float) $e->amount, 0),
+                number_format((float) $e->amount, 2),
+                strtolower($e->payment_method ?? ''),
+                strtolower($e->payment_bank ?? ''),
+                strtolower($e->payment_reference ?? ''),
+                strtolower($settlement),
+                strtolower($linkLabel),
+                strtolower($linkProject?->name ?? ''),
+                strtolower($linkedProjectAreaLine),
+                strtolower($e->link_type ?? ''),
+                $e->link_id !== null ? (string) $e->link_id : '',
+                strtolower($projectName),
+                strtolower($projectArea),
+                strtolower($landTypeName),
+                strtolower($purchaseFileName),
+                strtolower($subCat),
+                strtolower($categoryName),
+            ]);
+
+            $searchBlob = mb_strtolower(implode(' ', $parts), 'UTF-8');
+
+            return [
+                'id' => $e->id,
+                'url' => route('daybook.show', $e),
+                'entry_date' => $dateStr,
+                'date_display' => $dateDisp,
+                'description' => $e->description,
+                'type_label' => $typeLabel,
+                'amount' => (float) $e->amount,
+                'amount_display' => $e->type === DayBookEntry::TYPE_CASH_IN
+                    ? '+'.number_format((float) $e->amount, 0)
+                    : '−'.number_format((float) $e->amount, 0),
+                'settlement' => $settlement,
+                'link_label' => $linkLabel,
+                'linked_project_name' => $linkProject?->name ?? '',
+                'linked_project_area' => $linkedProjectAreaLine,
+                'project_name' => $projectName,
+                'project_area' => $projectArea,
+                'sub_category' => $subCat,
+                'category' => $categoryName,
+                'land_type' => $landTypeName,
+                'purchase_file_name' => $purchaseFileName,
+                'is_today' => $e->entry_date->toDateString() === Carbon::today()->toDateString(),
+                'search_blob' => $searchBlob,
+            ];
+        });
+    }
+
+    private function daybookSidebarLinkLabel(
+        DayBookEntry $e,
+        Collection $parties,
+        Collection $projectsByLink,
+        Collection $lands,
+        Collection $plots,
+        Collection $factories,
+        Collection $customers
+    ): string {
+        if ($e->link_type === DayBookEntry::LINK_OFFICE || ! $e->link_type) {
+            return 'Office';
+        }
+        if ($e->link_type === DayBookEntry::LINK_PARTY && $e->link_id) {
+            $p = $parties->get((int) $e->link_id);
+
+            return 'Party: '.($p?->name ?? ('#'.$e->link_id));
+        }
+        if ($e->link_type === DayBookEntry::LINK_PROJECT && $e->link_id) {
+            $p = $projectsByLink->get((int) $e->link_id);
+
+            return $p?->name ?? ('Project #'.$e->link_id);
+        }
+        if ($e->link_type === DayBookEntry::LINK_LAND && $e->link_id) {
+            $l = $lands->get((int) $e->link_id);
+
+            return $l?->name ?? ('Land #'.$e->link_id);
+        }
+        if ($e->link_type === DayBookEntry::LINK_PLOT && $e->link_id) {
+            $plot = $plots->get((int) $e->link_id);
+            if (! $plot) {
+                return 'Plot #'.$e->link_id;
+            }
+            $landName = $plot->relationLoaded('land') && $plot->land ? $plot->land->name : '—';
+
+            return 'Plot: '.$plot->plot_number.' ('.$landName.')';
+        }
+        if ($e->link_type === DayBookEntry::LINK_FACTORY && $e->link_id) {
+            $f = $factories->get((int) $e->link_id);
+
+            return $f?->name ?? ('Factory #'.$e->link_id);
+        }
+        if ($e->link_type === DayBookEntry::LINK_CUSTOMER && $e->link_id) {
+            $c = $customers->get((int) $e->link_id);
+
+            return $c?->name ?? ('Customer #'.$e->link_id);
+        }
+
+        return '—';
+    }
+
+    private function formatDaybookProjectLandLine(Project $project): string
+    {
+        $project->loadMissing('parties');
+        $marla = LandMeasure::partiesTotalMarla($project->parties);
+        if ($marla <= 0) {
+            return '';
+        }
+
+        return LandMeasure::formatAkmsLabelFromMarla($marla).' · '.LandMeasure::formatMarlaTotal($marla);
     }
 
     /**
@@ -618,15 +815,62 @@ class DayBookController extends Controller
     {
         return Project::query()
             ->orderBy('name')
-            ->with('parties')
+            ->with([
+                'parties',
+                'purchaseFiles' => fn ($q) => $q->orderBy('file_name'),
+            ])
             ->get()
             ->map(function (Project $p) {
                 return array_merge(
-                    ['id' => $p->id, 'label' => $p->name],
+                    [
+                        'id' => $p->id,
+                        'label' => $p->name,
+                        'purchase_files' => $p->purchaseFiles->map(fn (PurchaseFile $f) => [
+                            'id' => $f->id,
+                            'label' => $f->file_name,
+                        ])->values()->all(),
+                    ],
                     LandMeasure::projectPartyAreaPayload($p)
                 );
             })
             ->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>|\Illuminate\Http\RedirectResponse
+     */
+    private function applyPurchaseFileToEntry(array $validated, ?int $contextProjectId)
+    {
+        $fileId = $validated['purchase_file_id'] ?? null;
+        unset($validated['purchase_file_id']);
+
+        if (empty($fileId)) {
+            $validated['purchase_file_id'] = null;
+
+            return $validated;
+        }
+
+        if (empty($contextProjectId)) {
+            return back()
+                ->withErrors(['purchase_file_id' => 'Select a project before choosing a file.'])
+                ->withInput();
+        }
+
+        $belongs = PurchaseFile::query()
+            ->where('id', (int) $fileId)
+            ->where('project_id', (int) $contextProjectId)
+            ->exists();
+
+        if (! $belongs) {
+            return back()
+                ->withErrors(['purchase_file_id' => 'The selected file does not belong to this project.'])
+                ->withInput();
+        }
+
+        $validated['purchase_file_id'] = (int) $fileId;
+
+        return $validated;
     }
 
     public function ledger(Request $request)
@@ -919,6 +1163,7 @@ class DayBookController extends Controller
                     ['nullable']
                 ),
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
+                'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
                 'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
@@ -926,6 +1171,7 @@ class DayBookController extends Controller
             ],
             [
                 'project_id.exists' => 'The selected project is invalid.',
+                'purchase_file_id.exists' => 'The selected file is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
                 'payment_bank.in' => 'Please choose a bank from the list.',
@@ -965,9 +1211,16 @@ class DayBookController extends Controller
             $validated['party_sub_category_id'] = null;
         }
 
+        $purchaseFileResult = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
+        if ($purchaseFileResult instanceof \Illuminate\Http\RedirectResponse) {
+            return $purchaseFileResult;
+        }
+        $validated = $purchaseFileResult;
+
         $validated = $this->normalizePaymentSettlement($validated);
 
-        DayBookEntry::create($validated);
+        $entry = DayBookEntry::create($validated);
+        DaybookVoucher::assignIfMissing($entry);
 
         $dateParam = $request->input('return_date', $validated['entry_date']);
 
@@ -978,14 +1231,23 @@ class DayBookController extends Controller
 
     public function show(DayBookEntry $entry)
     {
-        $entry->load('partySubCategory.category');
+        $entry->load(['partySubCategory.category', 'purchaseFile']);
+        $entry = DaybookVoucher::assignIfMissing($entry);
 
         return view('daybook.show', compact('entry'));
     }
 
+    public function voucher(DayBookEntry $entry)
+    {
+        $entry->load(['partySubCategory.category', 'purchaseFile']);
+        $entry = DaybookVoucher::assignIfMissing($entry);
+
+        return view('daybook.voucher', compact('entry'));
+    }
+
     public function edit(DayBookEntry $entry)
     {
-        $entry->load('partySubCategory.category');
+        $entry->load(['partySubCategory.category', 'purchaseFile']);
 
         $projects = Project::orderBy('name')->get();
         $parties = Party::orderBy('name')->get();
@@ -995,6 +1257,7 @@ class DayBookController extends Controller
             ->orderBy('name')
             ->get();
         $landTypes = LandType::orderBy('name')->get();
+        $partyCategories = PartyCategory::orderBy('name')->get();
 
         $formPartyId = $entry->link_type === DayBookEntry::LINK_PARTY ? $entry->link_id : null;
         $formProjectId = null;
@@ -1010,6 +1273,7 @@ class DayBookController extends Controller
             'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
+            'partyCategories' => $partyCategories,
             'landTypes' => $landTypes,
             'daybookProjectIdDefault' => $formProjectId !== null ? (string) $formProjectId : '',
             'daybookPartyIdDefault' => $formPartyId !== null ? (string) $formPartyId : '',
@@ -1021,6 +1285,7 @@ class DayBookController extends Controller
             'daybookPaymentMethodDefault' => $entry->payment_method ?? DayBookEntry::PAYMENT_CASH,
             'daybookPaymentBankDefault' => $entry->payment_bank ?? '',
             'daybookPaymentReferenceDefault' => $entry->payment_reference ?? '',
+            'daybookPurchaseFileIdDefault' => $entry->purchase_file_id !== null ? (string) $entry->purchase_file_id : '',
         ]);
     }
 
@@ -1056,6 +1321,7 @@ class DayBookController extends Controller
                     ['nullable']
                 ),
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
+                'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
                 'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
@@ -1063,6 +1329,7 @@ class DayBookController extends Controller
             ],
             [
                 'project_id.exists' => 'The selected project is invalid.',
+                'purchase_file_id.exists' => 'The selected file is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
                 'payment_bank.in' => 'Please choose a bank from the list.',
@@ -1101,6 +1368,12 @@ class DayBookController extends Controller
         if (empty($validated['party_sub_category_id'])) {
             $validated['party_sub_category_id'] = null;
         }
+
+        $purchaseFileResult = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
+        if ($purchaseFileResult instanceof \Illuminate\Http\RedirectResponse) {
+            return $purchaseFileResult;
+        }
+        $validated = $purchaseFileResult;
 
         $validated = $this->normalizePaymentSettlement($validated);
 

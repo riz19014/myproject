@@ -57,6 +57,43 @@ final class LandMeasure
         return $n.' '.$u;
     }
 
+    /**
+     * Spoken-style land total for naming a project file (e.g. "23 kanal 5 marla").
+     * Uses whole marla only; any fractional remainder is appended as "+ X.XX marla".
+     */
+    public static function formatSpokenKanalMarlaFromMarla(float $totalMarla): string
+    {
+        $eps = 1e-6;
+        if ($totalMarla <= $eps && $totalMarla >= -$eps) {
+            return '0 marla';
+        }
+        $whole = (int) floor($totalMarla + $eps);
+        $frac = max(0.0, $totalMarla - $whole);
+        $k = intdiv($whole, 20);
+        $m = $whole - $k * 20;
+        $parts = [];
+        if ($k > 0) {
+            $parts[] = $k.' kanal';
+        }
+        if ($m > 0) {
+            $parts[] = $m.' marla';
+        }
+        if ($parts === []) {
+            $s = '';
+        } else {
+            $s = implode(' ', $parts);
+        }
+        if ($frac > 1e-5) {
+            $frag = rtrim(rtrim(number_format($frac, 2, '.', ''), '0'), '.');
+            $s = $s === '' ? $frag.' marla' : $s.' + '.$frag.' marla';
+        }
+        if ($s === '') {
+            return rtrim(rtrim(number_format($totalMarla, 2, '.', ''), '0'), '.').' marla';
+        }
+
+        return $s;
+    }
+
     /** Human-readable collective total for read-only UI. */
     public static function formatMarlaTotal(float $marla): string
     {

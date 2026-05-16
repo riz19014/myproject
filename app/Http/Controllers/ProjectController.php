@@ -18,11 +18,25 @@ use Illuminate\Validation\ValidationException;
 
 class ProjectController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $projects = Project::withCount('projectFiles')->orderBy('id', 'desc')->paginate(10);
+        $search = trim((string) $request->query('q', ''));
 
-        return view('projects.index', compact('projects'));
+        $projects = Project::query()
+            ->with('landType')
+            ->withCount('purchaseFiles')
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.$search.'%';
+                $query->where(function ($q) use ($like) {
+                    $q->where('name', 'like', $like)
+                        ->orWhereHas('landType', fn ($lt) => $lt->where('name', 'like', $like));
+                });
+            })
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('projects.index', compact('projects', 'search'));
     }
 
     public function saleIndex()
@@ -40,13 +54,14 @@ class ProjectController extends Controller
         abort_unless(in_array($type, ['sale', 'purchase'], true), 404);
 
         $projects = Project::query()
-            ->with(['landType'])
-            ->withCount('projectFiles')
-            ->where('field_type', $type)
+            ->with(['landType', 'parties'])
+            ->withCount($type === 'purchase' ? 'purchaseFiles' : 'projectFiles')
             ->orderBy('id', 'desc')
             ->get();
 
-        $totalAmount = (float) $projects->sum('total_amount');
+        $totalAmount = $type === 'sale'
+            ? (float) Sale::query()->sum('total_amount')
+            : (float) PurchaseItem::query()->sum('line_total_rs');
         $byLandType = $projects->groupBy(fn (Project $p) => $p->land_type_id ?: 0);
 
         $sales = collect();
@@ -61,7 +76,7 @@ class ProjectController extends Controller
         $purchaseItems = collect();
         if ($type === 'purchase') {
             $purchaseItems = PurchaseItem::query()
-                ->with(['project', 'party'])
+                ->with(['project', 'party', 'purchaseFile.dealers'])
                 ->orderByDesc('id')
                 ->limit(400)
                 ->get();
@@ -87,62 +102,23 @@ class ProjectController extends Controller
         }
         $context = in_array($context, ['sale', 'purchase'], true) ? $context : null;
 
-        $assignableProjects = collect();
-        if ($context !== null) {
-            $assignableProjects = Project::query()
-                ->with('landType')
-                ->orderBy('name')
-                ->get();
-        }
-
-        return view('projects.create', compact('landTypes', 'context', 'assignableProjects'));
+        return view('projects.create', compact('landTypes', 'context'));
     }
 
     public function store(Request $request)
     {
-        if ($request->input('submit_action') === 'assign') {
-            $validated = $request->validate([
-                'assign_project_id' => ['required', 'integer', 'exists:projects,id'],
-                'context' => ['required', 'string', Rule::in(['sale', 'purchase'])],
-            ]);
-            $project = Project::query()->findOrFail($validated['assign_project_id']);
-            if ($project->field_type === $validated['context']) {
-                $label = $validated['context'] === 'sale' ? 'Sale' : 'Purchase';
-                throw ValidationException::withMessages([
-                    'assign_project_id' => ['This project is already marked as '.$label.'.'],
-                ]);
-            }
-            $project->update(['field_type' => $validated['context']]);
-            $label = $validated['context'] === 'sale' ? 'Sale' : 'Purchase';
-
-            return redirect()->route($validated['context'].'.index')
-                ->with('success', 'Project added to '.$label.'.');
-        }
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'land_area' => ['nullable', 'numeric', 'min:0'],
-            'land_area_unit' => ['nullable', 'string', Rule::in(['acre', 'kanal', 'marla', 'sqft'])],
-            'field_type' => ['nullable', 'string', Rule::in(['sale', 'purchase'])],
             'land_type_id' => ['nullable', 'integer', 'exists:land_types,id'],
-            'total_amount' => ['nullable', 'numeric', 'min:0'],
-            'description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'context' => ['nullable', 'string', Rule::in(['sale', 'purchase'])],
         ]);
-        $fieldType = $validated['field_type'] ?? null;
-        if ($fieldType === '') {
-            $fieldType = null;
+
+        $project = Project::create($validated);
+
+        $context = $request->input('context');
+        if (in_array($context, ['sale', 'purchase'], true)) {
+            return redirect()->route($context.'.index')
+                ->with('success', 'Project created successfully.');
         }
-        if ($fieldType === null
-            && isset($validated['context'])
-            && in_array($validated['context'], ['sale', 'purchase'], true)) {
-            $validated['field_type'] = $validated['context'];
-        } else {
-            $validated['field_type'] = $fieldType;
-        }
-        unset($validated['context']);
-        Project::create($validated);
 
         return redirect()->route('projects.index')->with('success', 'Project created successfully.');
     }
@@ -156,18 +132,11 @@ class ProjectController extends Controller
             $validated = $request->validate([
                 'name' => ['required', 'string', 'max:255'],
                 'land_type_id' => ['required', 'integer', 'exists:land_types,id'],
-                'field_type' => ['nullable', 'string', Rule::in(['sale', 'purchase'])],
             ]);
 
             $project = Project::create([
                 'name' => $validated['name'],
-                'land_area' => null,
-                'land_area_unit' => null,
-                'field_type' => $validated['field_type'] ?? null,
                 'land_type_id' => $validated['land_type_id'],
-                'total_amount' => 0,
-                'description' => null,
-                'notes' => null,
             ]);
             $project->load('parties');
 
@@ -191,9 +160,7 @@ class ProjectController extends Controller
                 'area_kanal' => ['required', 'integer', 'min:0'],
                 'area_marla' => ['required', 'integer', 'min:0'],
                 'area_sqft' => ['required', 'integer', 'min:0'],
-                'field_type' => ['required', 'string', Rule::in(['sale', 'purchase'])],
                 'land_type_id' => ['required', 'integer', 'exists:land_types,id'],
-                'total_amount' => ['required', 'numeric', 'min:0'],
             ]);
 
             $marlaTotal = LandMeasure::marlaFromAkms(
@@ -210,13 +177,7 @@ class ProjectController extends Controller
 
             $project = Project::create([
                 'name' => $validated['name'],
-                'land_area' => round($marlaTotal, 4),
-                'land_area_unit' => 'marla',
-                'field_type' => $validated['field_type'],
-                'total_amount' => $validated['total_amount'],
                 'land_type_id' => $validated['land_type_id'],
-                'description' => null,
-                'notes' => null,
             ]);
             $project->load('parties');
 
@@ -228,9 +189,7 @@ class ProjectController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'field_type' => ['required', 'string', Rule::in(['sale', 'purchase'])],
             'land_type_id' => ['required', 'integer', 'exists:land_types,id'],
-            'total_amount' => ['required', 'numeric', 'min:0'],
             'party_ids' => ['required', 'array', 'min:1'],
             'party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
             'party_areas' => ['required', 'array', 'min:1'],
@@ -293,13 +252,7 @@ class ProjectController extends Controller
 
         $project = Project::create([
             'name' => $validated['name'],
-            'land_area' => round($totalMarla, 4),
-            'land_area_unit' => 'marla',
-            'field_type' => $validated['field_type'],
-            'total_amount' => $validated['total_amount'],
             'land_type_id' => $validated['land_type_id'],
-            'description' => null,
-            'notes' => null,
         ]);
 
         $sync = [];
@@ -321,7 +274,10 @@ class ProjectController extends Controller
 
     public function show(Project $project)
     {
-        $project->load(['projectFiles.customer', 'projectFiles.documents', 'landType']);
+        $project->load([
+            'purchaseFiles' => fn ($q) => $q->with(['purchaseItems.party'])->orderByDesc('file_date')->orderBy('file_name'),
+            'landType',
+        ]);
         $ledger = $this->buildProjectLedger($project);
 
         return view('projects.show', array_merge(compact('project'), $ledger));
@@ -427,14 +383,11 @@ class ProjectController extends Controller
      */
     private function projectLedgerLandAkmsLine(Project $project): string
     {
-        if ($project->land_area === null || $project->land_area === '' || ! $project->land_area_unit) {
+        $project->loadMissing('parties');
+        $marla = LandMeasure::partiesTotalMarla($project->parties);
+        if ($marla <= 0) {
             return '—';
         }
-        $unit = (string) $project->land_area_unit;
-        if (! in_array($unit, ['acre', 'kanal', 'marla', 'sqft'], true)) {
-            return '—';
-        }
-        $marla = LandMeasure::toMarla((float) $project->land_area, $unit);
 
         return LandMeasure::formatAkmsLabelFromMarla($marla);
     }
@@ -494,12 +447,9 @@ class ProjectController extends Controller
         $generatedAt = now();
         $ledgerFlatRows = $this->buildProjectLedgerFlatRows($project);
         $projectLandAkms = $this->projectLedgerLandAkmsLine($project);
-        $projectTotalBookAmount = $project->total_amount !== null && $project->total_amount !== ''
-            ? (float) $project->total_amount
-            : null;
 
         $pdf = Pdf::loadView('projects.ledger-pdf', array_merge(
-            compact('project', 'generatedAt', 'ledgerFlatRows', 'projectLandAkms', 'projectTotalBookAmount'),
+            compact('project', 'generatedAt', 'ledgerFlatRows', 'projectLandAkms'),
             [
                 'entryCount' => $ledger['entries']->count(),
             ]
@@ -522,13 +472,7 @@ class ProjectController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'land_area' => ['nullable', 'numeric', 'min:0'],
-            'land_area_unit' => ['nullable', 'string', Rule::in(['acre', 'kanal', 'marla', 'sqft'])],
-            'field_type' => ['nullable', 'string', Rule::in(['sale', 'purchase'])],
             'land_type_id' => ['nullable', 'integer', 'exists:land_types,id'],
-            'total_amount' => ['nullable', 'numeric', 'min:0'],
-            'description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
         ]);
         $project->update($validated);
 
@@ -545,11 +489,22 @@ class ProjectController extends Controller
     // Add file to project (e.g. 50 files from DHA)
     public function addFile(Request $request, Project $project)
     {
-        $validated = $request->validate([
+        $rules = [
             'file_number' => ['required', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
-        ]);
-        $project->projectFiles()->create(array_merge($validated, ['status' => 'available']));
+            'dealer_party_id' => ['nullable', 'integer', 'exists:parties,id'],
+        ];
+
+        $validated = $request->validate($rules);
+
+        $data = [
+            'file_number' => $validated['file_number'],
+            'notes' => $validated['notes'] ?? null,
+            'status' => 'available',
+            'dealer_party_id' => $validated['dealer_party_id'] ?? null,
+        ];
+
+        $project->projectFiles()->create($data);
 
         return redirect()->route('projects.show', $project)->with('success', 'File added to project.');
     }

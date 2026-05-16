@@ -743,4 +743,72 @@
         font-size: 1rem;
         border-radius: 10px;
     }
+
+    /* Global daybook entries sidebar (index) */
+    .daybook-page.daybook-page--with-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    @media (min-width: 992px) {
+        .daybook-page.daybook-page--with-sidebar {
+            flex-direction: row;
+            align-items: flex-start;
+        }
+        .daybook-entries-sidebar {
+            width: min(400px, 36vw);
+            flex-shrink: 0;
+            max-height: calc(100vh - 2.5rem);
+            position: sticky;
+            top: 0.35rem;
+        }
+        .daybook-page-main {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+    .daybook-sidebar-heading {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 0 0 0.35rem 0;
+    }
+    .daybook-sidebar-scroll {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: min(52vh, 420px);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.5);
+    }
+    @media (min-width: 992px) {
+        .daybook-sidebar-scroll {
+            max-height: calc(100vh - 15rem);
+        }
+    }
+    .daybook-sidebar-table thead th {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #64748b;
+        border-bottom-width: 1px;
+        white-space: nowrap;
+        padding: 0.45rem 0.5rem;
+    }
+    .daybook-sidebar-table tbody td {
+        padding: 0.45rem 0.5rem;
+        vertical-align: top;
+        border-color: rgba(15, 23, 42, 0.06);
+    }
+    .daybook-entries-page .daybook-entries-global-scroll {
+        max-height: min(70vh, 640px);
+    }
+    @media (min-width: 992px) {
+        .daybook-entries-page .daybook-entries-global-scroll {
+            max-height: calc(100vh - 16rem);
+        }
+    }
 </style>

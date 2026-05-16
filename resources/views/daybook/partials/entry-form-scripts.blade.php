@@ -57,6 +57,8 @@
     var projectList = document.getElementById('daybook_form_project_listbox');
     var projectWrap = projectSearch ? projectSearch.closest('.daybook-form-combo') : null;
     var projectJsonEl = document.getElementById('daybook-form-projects-json');
+    var purchaseFileSelect = document.getElementById('daybook_form_purchase_file_id');
+    var purchaseFileDefaultEl = document.getElementById('daybook-form-purchase-file-default');
 
     var partyHidden = document.getElementById('daybook_form_party_id');
     var partySearch = document.getElementById('daybook_form_party_search');
@@ -110,6 +112,51 @@
     window.__daybookFormProjectRows = formProjectRows;
     window.__daybookFormPartyRows = formPartyRows;
 
+    var purchaseFileDefault = '';
+    if (purchaseFileDefaultEl) {
+        try {
+            purchaseFileDefault = JSON.parse(purchaseFileDefaultEl.textContent) || '';
+        } catch (e) {
+            purchaseFileDefault = '';
+        }
+    }
+
+    function syncPurchaseFileSelect(projectId, selectedFileId) {
+        if (!purchaseFileSelect) return;
+        var pid = String(projectId || '').trim();
+        var selected = String(selectedFileId != null ? selectedFileId : '').trim();
+        purchaseFileSelect.innerHTML = '';
+        if (!pid) {
+            var opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = '— Select project first —';
+            purchaseFileSelect.appendChild(opt0);
+            purchaseFileSelect.value = '';
+            purchaseFileSelect.disabled = true;
+            return;
+        }
+        var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
+        var files = (project && project.purchase_files) ? project.purchase_files : [];
+        var optBlank = document.createElement('option');
+        optBlank.value = '';
+        optBlank.textContent = files.length ? '— No file —' : '— No files for this project —';
+        purchaseFileSelect.appendChild(optBlank);
+        files.forEach(function (f) {
+            var opt = document.createElement('option');
+            opt.value = String(f.id);
+            opt.textContent = f.label;
+            purchaseFileSelect.appendChild(opt);
+        });
+        purchaseFileSelect.disabled = false;
+        if (selected && files.some(function (f) { return String(f.id) === selected; })) {
+            purchaseFileSelect.value = selected;
+        } else {
+            purchaseFileSelect.value = '';
+        }
+    }
+
+    window.__daybookSyncPurchaseFileSelect = syncPurchaseFileSelect;
+
     function hideProjectList() {
         projectList.classList.add('d-none');
         projectList.setAttribute('hidden', '');
@@ -155,6 +202,7 @@
             btn.addEventListener('click', function () {
                 projectHidden.value = String(row.id);
                 projectSearch.value = row.label;
+                syncPurchaseFileSelect(row.id, '');
                 hideProjectList();
             });
             li.appendChild(btn);
@@ -305,6 +353,9 @@
         if (projectHidden.value) {
             var pr = formProjectRows.find(function (r) { return String(r.id) === String(projectHidden.value); });
             if (pr) projectSearch.value = pr.label;
+            syncPurchaseFileSelect(projectHidden.value, purchaseFileDefault);
+        } else {
+            syncPurchaseFileSelect('', '');
         }
         if (partyHidden.value) {
             var py = formPartyRows.find(function (r) { return String(r.id) === String(partyHidden.value); });
@@ -322,6 +373,7 @@
     });
     projectSearch.addEventListener('input', function () {
         projectHidden.value = '';
+        syncPurchaseFileSelect('', '');
         openFilteredProjectList();
     });
     projectSearch.addEventListener('keydown', function (e) {
@@ -382,6 +434,22 @@
         if (partyWrap && !partyWrap.contains(e.target)) hidePartyFormList();
         if (subWrap && !subWrap.contains(e.target)) hideSubFormList();
     });
+
+    window.__daybookPushPartySubCategory = function (row) {
+        if (!row || row.id == null || !row.label) return;
+        var nid = String(row.id);
+        if (!formSubRows.some(function (r) { return String(r.id) === nid; })) {
+            formSubRows.push({ id: row.id, label: row.label });
+        }
+        if (subHidden && subSearch) {
+            subHidden.value = nid;
+            subSearch.value = row.label;
+            syncSubResetVisibility();
+        }
+        if (typeof window.__daybookPartyModalSubRowsPush === 'function') {
+            window.__daybookPartyModalSubRowsPush(row);
+        }
+    };
 })();
 
 (function () {
@@ -628,6 +696,7 @@
                         var row = {
                             id: result.data.id,
                             label: result.data.name,
+                            purchase_files: [],
                             party_areas: result.data.party_areas || {},
                             parties_total_marla: result.data.parties_total_marla || 0,
                             parties_total_label: result.data.parties_total_label || ''
@@ -646,6 +715,9 @@
                         }
                         projectFormHidden.value = nid;
                         projectFormSearch.value = result.data.name;
+                        if (typeof window.__daybookSyncPurchaseFileSelect === 'function') {
+                            window.__daybookSyncPurchaseFileSelect(nid, '');
+                        }
                         resetProjectModalFields();
                         showModalErr('');
                         modal.hide();
@@ -680,10 +752,19 @@
     var subSearch = document.getElementById('daybook_modal_party_sub_search');
     var subList = document.getElementById('daybook_party_sc_listbox');
     var subJsonEl = document.getElementById('daybook-party-sub-json');
+    var phoneInput = document.getElementById('daybook_modal_party_phone');
+    var cnicInput = document.getElementById('daybook_modal_party_cnic');
+    var addressInput = document.getElementById('daybook_modal_party_address');
     var saveBtn = document.getElementById('daybook_modal_party_submit');
     var errEl = document.getElementById('daybook_modal_party_error');
     var token = document.querySelector('meta[name="csrf-token"]');
+    var PF = window.PartyFormFields;
     if (!partyFormHidden || !partyFormSearch || !partyFormCreateBtn || !modalEl || !token || typeof bootstrap === 'undefined') return;
+
+    if (PF) {
+        PF.bindCnicInput(cnicInput);
+        PF.bindPhoneInput(phoneInput, 11);
+    }
 
     var partySubRows = [];
     if (subJsonEl) {
@@ -693,6 +774,14 @@
             partySubRows = [];
         }
     }
+
+    window.__daybookPartyModalSubRowsPush = function (row) {
+        if (!row || row.id == null || !row.label) return;
+        var nid = String(row.id);
+        if (!partySubRows.some(function (r) { return String(r.id) === nid; })) {
+            partySubRows.push({ id: row.id, label: row.label });
+        }
+    };
 
     var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
 
@@ -709,6 +798,14 @@
             subSearch.setAttribute('aria-expanded', 'false');
         }
         hideSubList();
+    }
+
+    function clearPartyModalFields() {
+        if (nameInput) nameInput.value = '';
+        clearSubCategoryPicker();
+        if (phoneInput) phoneInput.value = '';
+        if (cnicInput) cnicInput.value = '';
+        if (addressInput) addressInput.value = '';
     }
 
     function hideSubList() {
@@ -803,8 +900,7 @@
 
     partyFormCreateBtn.addEventListener('click', function () {
         showPartyErr('');
-        if (nameInput) nameInput.value = '';
-        clearSubCategoryPicker();
+        clearPartyModalFields();
         partyFormCreateBtn.blur();
         modal.show();
     });
@@ -818,7 +914,7 @@
     modalEl.addEventListener('hidden.bs.modal', function () {
         showPartyErr('');
         if (saveBtn) saveBtn.disabled = false;
-        clearSubCategoryPicker();
+        clearPartyModalFields();
     });
 
     if (nameInput) {
@@ -835,6 +931,9 @@
             showPartyErr('');
             var name = (nameInput.value || '').trim();
             var subId = subHidden.value;
+            var phone = (phoneInput && phoneInput.value || '').trim();
+            var cnicDigitsVal = PF ? PF.cnicDigits(cnicInput && cnicInput.value) : (cnicInput && cnicInput.value || '').replace(/\D/g, '');
+            var address = (addressInput && addressInput.value || '').trim();
             if (!name) {
                 showPartyErr('Please enter a party name.');
                 if (window.daybookModalFocusText) window.daybookModalFocusText(nameInput);
@@ -846,6 +945,21 @@
                 openFilteredList();
                 return;
             }
+            if (phone && phone.length !== 11) {
+                showPartyErr('Phone must be exactly 11 digits.');
+                if (window.daybookModalFocusText) window.daybookModalFocusText(phoneInput);
+                return;
+            }
+            if (cnicDigitsVal && PF && cnicDigitsVal.length !== PF.cnicMaxDigits) {
+                showPartyErr('CNIC must be 12 digits in format 34012-435172-1.');
+                if (window.daybookModalFocusText) window.daybookModalFocusText(cnicInput);
+                return;
+            }
+            if (cnicDigitsVal && !PF && cnicDigitsVal.length !== 12) {
+                showPartyErr('CNIC must be 12 digits in format 34012-435172-1.');
+                if (window.daybookModalFocusText) window.daybookModalFocusText(cnicInput);
+                return;
+            }
             saveBtn.disabled = true;
             fetch('{{ route('parties.quick-store') }}', {
                 method: 'POST',
@@ -855,7 +969,13 @@
                     'X-CSRF-TOKEN': token.getAttribute('content'),
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({ name: name, sub_category_id: parseInt(subId, 10) })
+                body: JSON.stringify({
+                    name: name,
+                    sub_category_id: parseInt(subId, 10),
+                    phone: phone || null,
+                    cnic: cnicDigitsVal || null,
+                    address: address || null
+                })
             })
                 .then(function (res) {
                     return res.json().then(function (data) {
@@ -877,14 +997,18 @@
                         if (typeof window.__daybookProjectModalPartyRowsPush === 'function') {
                             window.__daybookProjectModalPartyRowsPush(result.data.id, result.data.name);
                         }
-                        nameInput.value = '';
-                        clearSubCategoryPicker();
+                        clearPartyModalFields();
                         showPartyErr('');
                         modal.hide();
                     } else {
                         var msg = 'Could not create party.';
                         if (result.data && result.data.errors) {
-                            if (result.data.errors.name) msg = result.data.errors.name[0];
+                            var parts = [];
+                            Object.keys(result.data.errors).forEach(function (k) {
+                                parts = parts.concat(result.data.errors[k]);
+                            });
+                            if (parts.length) msg = parts.join(' ');
+                            else if (result.data.errors.name) msg = result.data.errors.name[0];
                             else if (result.data.errors.sub_category_id) msg = result.data.errors.sub_category_id[0];
                         } else if (result.data && result.data.message) {
                             msg = result.data.message;
@@ -898,6 +1022,123 @@
                 });
         });
     }
+})();
+
+(function () {
+    var formSubCreateBtn = document.getElementById('daybook_form_party_sub_create');
+    var modalEl = document.getElementById('daybookCreatePartySubCategoryModal');
+    var categorySelect = document.getElementById('daybook_modal_party_sub_cat_category_id');
+    var nameInput = document.getElementById('daybook_modal_party_sub_cat_name');
+    var saveBtn = document.getElementById('daybook_modal_party_sub_cat_submit');
+    var errEl = document.getElementById('daybook_modal_party_sub_cat_error');
+    var token = document.querySelector('meta[name="csrf-token"]');
+    if (!formSubCreateBtn || !modalEl || !categorySelect || !nameInput || !saveBtn || !token || typeof bootstrap === 'undefined') return;
+
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
+
+    function showErr(msg) {
+        if (!errEl) return;
+        errEl.textContent = msg || '';
+        errEl.classList.toggle('d-none', !msg);
+    }
+
+    function clearFields() {
+        categorySelect.value = '';
+        nameInput.value = '';
+        showErr('');
+    }
+
+    formSubCreateBtn.addEventListener('click', function () {
+        clearFields();
+        formSubCreateBtn.blur();
+        modal.show();
+    });
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+        if (window.daybookModalFocusText) {
+            window.daybookModalFocusText(nameInput, { scheduleEnsure: true });
+        }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        saveBtn.disabled = false;
+        clearFields();
+    });
+
+    if (nameInput) {
+        nameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!saveBtn.disabled) saveBtn.click();
+            }
+        });
+    }
+
+    saveBtn.addEventListener('click', function () {
+        showErr('');
+        var categoryId = categorySelect.value;
+        var name = (nameInput.value || '').trim();
+        if (!categoryId) {
+            showErr('Please select a party category.');
+            categorySelect.focus();
+            return;
+        }
+        if (!name) {
+            showErr('Please enter a name.');
+            if (window.daybookModalFocusText) window.daybookModalFocusText(nameInput);
+            return;
+        }
+        saveBtn.disabled = true;
+        fetch('{{ route('party-sub-categories.quick-store') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': token.getAttribute('content'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                category_id: parseInt(categoryId, 10),
+                name: name
+            })
+        })
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    return { ok: res.ok, data: data };
+                }).catch(function () {
+                    return { ok: false, data: {} };
+                });
+            })
+            .then(function (result) {
+                saveBtn.disabled = false;
+                if (result.ok && result.data && result.data.id) {
+                    if (typeof window.__daybookPushPartySubCategory === 'function') {
+                        window.__daybookPushPartySubCategory({
+                            id: result.data.id,
+                            label: result.data.label
+                        });
+                    }
+                    clearFields();
+                    modal.hide();
+                } else {
+                    var msg = 'Could not create sub category.';
+                    if (result.data && result.data.errors) {
+                        var parts = [];
+                        Object.keys(result.data.errors).forEach(function (k) {
+                            parts = parts.concat(result.data.errors[k]);
+                        });
+                        if (parts.length) msg = parts.join(' ');
+                    } else if (result.data && result.data.message) {
+                        msg = result.data.message;
+                    }
+                    showErr(msg);
+                }
+            })
+            .catch(function () {
+                saveBtn.disabled = false;
+                showErr('Something went wrong. Try again.');
+            });
+    });
 })();
 
 (function () {

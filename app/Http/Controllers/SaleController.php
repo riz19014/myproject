@@ -9,7 +9,6 @@ use App\Models\Sale;
 use App\Models\SaleParticipant;
 use App\Support\LandMeasure;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
@@ -19,7 +18,6 @@ class SaleController extends Controller
         if ($projectId === null || $projectId === '') {
             $projects = Project::query()
                 ->with('landType')
-                ->where('field_type', 'sale')
                 ->orderBy('name')
                 ->get();
 
@@ -27,7 +25,6 @@ class SaleController extends Controller
         }
 
         $project = Project::query()
-            ->where('field_type', 'sale')
             ->findOrFail((int) $projectId);
 
         $parties = Party::query()->with(['subCategory.category'])->orderBy('name')->get();
@@ -52,11 +49,6 @@ class SaleController extends Controller
         ]);
 
         $project = Project::query()->findOrFail($validated['project_id']);
-        if ($project->field_type !== 'sale') {
-            throw ValidationException::withMessages([
-                'project_id' => ['Project must be a Sale project.'],
-            ]);
-        }
 
         $marla = LandMeasure::marlaFromAkms(
             (int) $validated['area_acre'],

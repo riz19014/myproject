@@ -97,13 +97,14 @@
             <thead>
                 <tr>
                     <th style="width: 4%;">ID</th>
-                    <th style="width: 14%;">Project</th>
-                    <th style="width: 14%;">Party</th>
-                    <th style="width: 9%;">Moza</th>
-                    <th style="width: 9%;">Khasra</th>
-                    <th style="width: 22%;">Area</th>
-                    <th style="width: 9%;" class="num">Rs / acre</th>
-                    <th style="width: 11%;" class="num">Line total (Rs)</th>
+                    <th style="width: 11%;">File</th>
+                    <th style="width: 11%;">Project</th>
+                    <th style="width: 12%;">Party</th>
+                    <th style="width: 8%;">Moza</th>
+                    <th style="width: 8%;">Khasra</th>
+                    <th style="width: 18%;">Area</th>
+                    <th style="width: 8%;" class="num">Rs / acre</th>
+                    <th style="width: 10%;" class="num">Line total (Rs)</th>
                     <th style="width: 8%;" class="cen">Date</th>
                 </tr>
             </thead>
@@ -111,6 +112,7 @@
                 @foreach($purchaseItems as $item)
                     <tr>
                         <td class="cen">{{ $item->id }}</td>
+                        <td class="small">{{ e($item->purchaseFile?->file_name ?? '—') }}</td>
                         <td>{{ e($item->project?->name ?? '—') }}</td>
                         <td>{{ e($item->party?->name ?? '—') }}</td>
                         <td>{{ e($item->moza ?? '') ?: '—' }}</td>
@@ -124,7 +126,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="5" class="num" style="vertical-align: middle;">
+                    <td colspan="6" class="num" style="vertical-align: middle;">
                         <div class="tfoot-lbl">Totals</div>
                     </td>
                     <td style="vertical-align: middle;">

@@ -10,6 +10,7 @@ class DayBookEntry extends Model
 {
     protected $fillable = [
         'entry_date',
+        'voucher_no',
         'type',
         'amount',
         'description',
@@ -19,6 +20,7 @@ class DayBookEntry extends Model
         'link_type',
         'link_id',
         'project_id',
+        'purchase_file_id',
         'party_sub_category_id',
     ];
 
@@ -33,6 +35,11 @@ class DayBookEntry extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function purchaseFile(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseFile::class);
     }
 
     public function partySubCategory(): BelongsTo
@@ -110,10 +117,25 @@ class DayBookEntry extends Model
             return 'Plot: '.$m->plot_number.' ('.$m->land->name.')';
         }
         if ($m instanceof Party) {
-            return 'Party: '.($m->name ?? ('#'.$this->link_id));
+            return $this->appendPurchaseFileToLabel('Party: '.($m->name ?? ('#'.$this->link_id)));
         }
 
-        return $m->name ?? ('#'.$this->link_id);
+        return $this->appendPurchaseFileToLabel($m->name ?? ('#'.$this->link_id));
+    }
+
+    public function getPurchaseFileLabel(): string
+    {
+        return $this->purchaseFile?->file_name ?? '—';
+    }
+
+    private function appendPurchaseFileToLabel(string $label): string
+    {
+        $fileName = $this->purchaseFile?->file_name;
+        if ($fileName) {
+            return $label.' · File: '.$fileName;
+        }
+
+        return $label;
     }
 
     public function getPartySubCategoryLabel(): string
@@ -125,6 +147,11 @@ class DayBookEntry extends Model
         $cat = $sc->category?->name ?? '—';
 
         return $cat.' — '.$sc->name;
+    }
+
+    public function getVoucherNumber(): string
+    {
+        return \App\Support\DaybookVoucher::display($this->voucher_no);
     }
 
     public function getSettlementLabel(): string

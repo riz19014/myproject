@@ -91,9 +91,6 @@
         @if($project->landType)
             <div><strong>Land type:</strong> {{ $project->landType->name }}</div>
         @endif
-        @if($projectTotalBookAmount !== null)
-            <div><strong>Total project amount (book):</strong> Rs {{ number_format($projectTotalBookAmount, 2) }}</div>
-        @endif
         <div><strong>Generated:</strong> {{ $generatedAt->format('j F Y, g:i A') }} &nbsp;|&nbsp; <strong>Lines:</strong> {{ $entryCount }} &nbsp;|&nbsp; {{ config('app.name') }}</div>
     </div>
 
