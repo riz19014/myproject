@@ -51,6 +51,8 @@ class PartyController extends Controller
 
     public function update(Request $request, Party $party)
     {
+        $this->normalizePartyInput($request);
+
         $validated = $request->validate(
             $this->partyFieldRules(),
             $this->partyFieldMessages()
