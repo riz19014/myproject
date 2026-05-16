@@ -3,11 +3,30 @@
         position: relative;
         z-index: 4;
     }
+    #purchaseFileAddDealerModal .modal-content {
+        display: flex;
+        flex-direction: column;
+        max-height: min(90vh, calc(100dvh - 2rem));
+    }
     #purchaseFileAddDealerModal .modal-body {
         overflow: visible;
+        position: relative;
+        z-index: 2;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    #purchaseFileAddDealerModal .modal-footer {
+        position: relative;
+        z-index: 20;
+        flex-shrink: 0;
+        background: var(--card-bg, #fff);
     }
     #purchaseFileAddDealerModal .party-sc-combo {
+        position: relative;
         z-index: 6;
+    }
+    #purchaseFileAddDealerModal .party-sc-listbox {
+        max-height: min(160px, 28vh);
     }
     .party-sc-listbox {
         position: absolute;
