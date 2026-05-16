@@ -501,17 +501,11 @@ class ProjectController extends Controller
 
     public function ledgerPdf(Project $project)
     {
-        $project->loadMissing('landType');
         $ledger = $this->buildProjectLedger($project);
-        $generatedAt = now();
-        $ledgerFlatRows = $this->buildProjectLedgerFlatRows($project);
-        $projectLandAkms = $this->projectLedgerLandAkmsLine($project);
 
         $pdf = Pdf::loadView('projects.ledger-pdf', array_merge(
-            compact('project', 'generatedAt', 'ledgerFlatRows', 'projectLandAkms'),
-            [
-                'entryCount' => $ledger['entries']->count(),
-            ]
+            compact('project'),
+            $ledger
         ));
         $pdf->setPaper('a4', 'portrait');
 

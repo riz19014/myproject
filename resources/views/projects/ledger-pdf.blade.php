@@ -7,123 +7,197 @@
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 9.5pt;
-            color: #111111;
-            margin: 16mm 14mm 18mm 14mm;
+            font-size: 9pt;
+            color: #111;
+            margin: 14mm 12mm 16mm 12mm;
             line-height: 1.35;
         }
         h1 {
-            font-size: 15pt;
+            font-size: 14pt;
             font-weight: bold;
-            margin: 0 0 2mm 0;
-            padding-bottom: 3mm;
-            border-bottom: 1pt solid #000000;
-            letter-spacing: 0.02em;
+            margin: 0 0 1mm 0;
         }
-        .project-title {
+        .project-name {
             font-size: 11pt;
             font-weight: bold;
-            margin: 4mm 0 1mm 0;
+            margin: 0 0 4mm 0;
         }
-        .land-line {
-            font-size: 10pt;
-            margin: 0 0 3mm 0;
-        }
-        .land-line .lbl { font-weight: bold; }
-        .meta-block {
-            font-size: 8.5pt;
-            color: #333333;
-            margin-bottom: 5mm;
-            line-height: 1.45;
-        }
-        .meta-block strong { color: #000000; font-weight: bold; }
-
-        .ledger {
+        .summary {
             width: 100%;
             border-collapse: collapse;
             font-size: 8.5pt;
             margin-bottom: 5mm;
         }
+        .summary td {
+            border: 0.5pt solid #333;
+            padding: 2mm 2.5mm;
+            width: 33.33%;
+            vertical-align: top;
+        }
+        .summary .lbl {
+            display: block;
+            font-size: 7.5pt;
+            color: #555;
+            margin-bottom: 0.5mm;
+        }
+        .summary .val {
+            font-weight: bold;
+        }
+        .section {
+            margin-bottom: 5mm;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            font-size: 10pt;
+            font-weight: bold;
+            margin: 0 0 0.5mm 0;
+        }
+        .section-sub {
+            font-size: 8pt;
+            color: #444;
+            margin: 0 0 2mm 0;
+        }
+        .ledger {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8.5pt;
+        }
         .ledger th {
-            border: 0.5pt solid #000000;
-            background: #eeeeee;
-            padding: 2.5mm 2.5mm;
+            border: 0.5pt solid #000;
+            background: #eee;
+            padding: 2mm 2mm;
             text-align: left;
             font-weight: bold;
-            vertical-align: bottom;
         }
         .ledger th.amt { text-align: right; }
         .ledger td {
-            border: 0.5pt solid #333333;
-            padding: 2mm 2.5mm;
+            border: 0.5pt solid #333;
+            padding: 1.8mm 2mm;
             vertical-align: top;
         }
         .ledger td.amt {
             text-align: right;
-            font-family: DejaVu Sans Mono, DejaVu Sans, sans-serif;
             white-space: nowrap;
         }
-        .ledger thead { display: table-header-group; }
-        .ledger tbody tr { page-break-inside: avoid; }
-
+        .ledger tr.opening td { background: #f5f5f5; }
+        .ledger tr.footer td {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
         .empty-note {
             font-size: 9pt;
-            color: #444444;
-            padding: 4mm 0;
-        }
-
-        .footer-note {
-            margin-top: 5mm;
-            padding-top: 3mm;
-            border-top: 0.5pt solid #666666;
-            font-size: 7.5pt;
-            color: #444444;
-            text-align: center;
+            color: #444;
         }
     </style>
 </head>
 <body>
     <h1>Ledger</h1>
-    <div class="project-title">{{ $project->name }}</div>
-    <div class="land-line"><span class="lbl">Project land (A — K — M — SQFT):</span> {{ $projectLandAkms }}</div>
+    <div class="project-name">{{ $project->name }}</div>
 
-    <div class="meta-block">
-        @if($project->landType)
-            <div><strong>Land type:</strong> {{ $project->landType->name }}</div>
-        @endif
-        <div><strong>Generated:</strong> {{ $generatedAt->format('j F Y, g:i A') }} &nbsp;|&nbsp; <strong>Lines:</strong> {{ $entryCount }} &nbsp;|&nbsp; {{ config('app.name') }}</div>
-    </div>
-
-    @if(count($ledgerFlatRows) === 0)
-        <p class="empty-note">No daybook entries are linked to this project yet.</p>
+    @if($entries->isEmpty())
+        <p class="empty-note">No daybook entries linked to this project.</p>
     @else
-        <table class="ledger">
-            <thead>
-                <tr>
-                    <th style="width:11%;">Date</th>
-                    <th style="width:18%;">Party</th>
-                    <th style="width:36%;">Payment</th>
-                    <th class="amt" style="width:15%;">Amount paid</th>
-                    <th class="amt" style="width:20%;">Balance amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($ledgerFlatRows as $row)
-                    <tr>
-                        <td>{{ $row['date'] }}</td>
-                        <td>{{ $row['party'] }}</td>
-                        <td>{{ $row['payment'] }}</td>
-                        <td class="amt">{{ $row['amount_in'] ? '+' : '−' }}Rs {{ number_format($row['amount'], 2) }}</td>
-                        <td class="amt">Rs {{ number_format($row['running'], 2) }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
+        <table class="summary">
+            <tr>
+                <td>
+                    <span class="lbl">Total land (files)</span>
+                    <span class="val">Rs {{ number_format($ledgerProjectLandTotalRs, 2) }}</span>
+                </td>
+                <td>
+                    <span class="lbl">Total paid (DayBook)</span>
+                    <span class="val">Rs {{ number_format($ledgerTotalPaid, 2) }}</span>
+                </td>
+                <td>
+                    <span class="lbl">Balance payable</span>
+                    <span class="val">
+                        @if($ledgerTotalPayable >= 0)
+                            Rs {{ number_format($ledgerTotalPayable, 2) }}
+                        @else
+                            Overpaid Rs {{ number_format(abs($ledgerTotalPayable), 2) }}
+                        @endif
+                    </span>
+                </td>
+            </tr>
         </table>
-    @endif
 
-    <div class="footer-note">
-        Balance amount is the cumulative position for this project after each line, in date order.<br>
-        Party column shows the linked party name, or &quot;General&quot; for entries without a party link.
-    </div>
+        @foreach($ledgerSections as $section)
+            @php
+                $hasLand = ($section['land_total_rs'] ?? 0) > 0;
+                $sectionPayable = $section['payable'] ?? null;
+                $sectionOverpaid = $hasLand && $sectionPayable !== null && $sectionPayable < 0;
+            @endphp
+            <div class="section">
+                <div class="section-title">{{ $section['heading'] }}</div>
+                @if(!empty($section['subtitle']))
+                    <div class="section-sub">{{ $section['subtitle'] }}</div>
+                @endif
+
+                <table class="ledger">
+                    <thead>
+                        <tr>
+                            <th style="width:14%;">Date</th>
+                            <th style="width:38%;">Description</th>
+                            <th style="width:18%;">Payment</th>
+                            <th class="amt" style="width:15%;">Amount</th>
+                            <th class="amt" style="width:15%;">{{ $hasLand ? 'Balance payable' : 'Paid so far' }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if($hasLand)
+                            <tr class="opening">
+                                <td>—</td>
+                                <td>Land total (file)</td>
+                                <td>—</td>
+                                <td class="amt">—</td>
+                                <td class="amt">Rs {{ number_format($section['land_total_rs'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @foreach($section['lines'] as $row)
+                            @php
+                                $e = $row['entry'];
+                                $rowPayable = $row['payable'];
+                                $rowOverpaid = $hasLand && $rowPayable !== null && $rowPayable < 0;
+                            @endphp
+                            <tr>
+                                <td>{{ $e->entry_date->format('d M Y') }}</td>
+                                <td>{{ $e->description ?: '—' }}</td>
+                                <td>{{ $e->type === 'cash_in' ? 'Payment in' : 'Payment out' }}</td>
+                                <td class="amt">Rs {{ number_format((float) $e->amount, 2) }}</td>
+                                <td class="amt">
+                                    @if($rowPayable === null)
+                                        Rs {{ number_format($row['paid'], 2) }}
+                                    @elseif($rowOverpaid)
+                                        Overpaid Rs {{ number_format(abs($rowPayable), 2) }}
+                                    @else
+                                        Rs {{ number_format($rowPayable, 2) }}
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                        <tr class="footer">
+                            <td colspan="4" class="amt" style="text-align:right;">
+                                @if($hasLand)
+                                    Balance payable — {{ $section['heading'] }}
+                                @else
+                                    Total paid — {{ $section['heading'] }}
+                                @endif
+                            </td>
+                            <td class="amt">
+                                @if($hasLand)
+                                    @if($sectionOverpaid)
+                                        Overpaid Rs {{ number_format(abs($sectionPayable), 2) }}
+                                    @else
+                                        Rs {{ number_format($sectionPayable, 2) }}
+                                    @endif
+                                @else
+                                    Rs {{ number_format($section['total_paid'], 2) }}
+                                @endif
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        @endforeach
+    @endif
 </body>
 </html>
