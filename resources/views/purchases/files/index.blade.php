@@ -362,9 +362,30 @@
             '</div>';
     }
 
+    function setSaleLandButtonLoading(btn, loading) {
+        if (!btn) {
+            return;
+        }
+        if (loading) {
+            if (!btn.dataset.saleLandOriginalHtml) {
+                btn.dataset.saleLandOriginalHtml = btn.innerHTML;
+            }
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Sale land';
+            return;
+        }
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        if (btn.dataset.saleLandOriginalHtml) {
+            btn.innerHTML = btn.dataset.saleLandOriginalHtml;
+        }
+    }
+
     document.querySelectorAll('.btn-sale-land-confirm').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
+            var triggerBtn = this;
             var formId = this.dataset.formId;
             Swal.fire({
                 title: 'Sale land?',
@@ -388,6 +409,7 @@
                 if (result.isConfirmed && formId) {
                     var form = document.getElementById(formId);
                     if (form) {
+                        setSaleLandButtonLoading(triggerBtn, true);
                         form.submit();
                     }
                 }
