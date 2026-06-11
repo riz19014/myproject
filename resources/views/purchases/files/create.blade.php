@@ -44,7 +44,10 @@
                         <i class="bi bi-person-plus" aria-hidden="true"></i> Add dealer
                     </button>
                 </div>
-                @include('purchases.files.partials.dealers-multi-select', ['parties' => $parties])
+                @include('purchases.files.partials.dealers-multi-select', [
+                    'parties' => $parties,
+                    'showDealerCommissions' => true,
+                ])
                 @error('dealer_party_ids')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
             </div>
             <button type="submit" class="btn btn-pink">Create file</button>

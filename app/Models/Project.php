@@ -12,7 +12,15 @@ class Project extends Model
     protected $fillable = [
         'name',
         'land_type_id',
+        'marla_per_acre',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'marla_per_acre' => 'decimal:4',
+        ];
+    }
 
     public function landType(): BelongsTo
     {
@@ -49,5 +57,15 @@ class Project extends Model
     public function purchaseFiles(): HasMany
     {
         return $this->hasMany(PurchaseFile::class);
+    }
+
+    public function saleExemptionComponents(): HasMany
+    {
+        return $this->hasMany(ProjectSaleExemptionComponent::class)->orderBy('sort_order');
+    }
+
+    public function saleExemptionPlotTypes(): HasMany
+    {
+        return $this->hasMany(ProjectSaleExemptionPlotType::class);
     }
 }

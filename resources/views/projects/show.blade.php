@@ -8,7 +8,8 @@
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-pink">Download ledger PDF</a>
         <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-theme">Edit</a>
-        <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">Back to List</a>
+        <a href="{{ route('projects.show', $project) }}" class="btn btn-outline-theme">Back to project</a>
+        <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">All projects</a>
     </div>
 </div>
 

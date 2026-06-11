@@ -14,13 +14,20 @@ class PurchaseFile extends Model
         'project_id',
         'file_name',
         'file_date',
+        'sale_land_at',
     ];
 
     protected function casts(): array
     {
         return [
             'file_date' => 'date',
+            'sale_land_at' => 'datetime',
         ];
+    }
+
+    public function isSaleLand(): bool
+    {
+        return $this->sale_land_at !== null;
     }
 
     public function project(): BelongsTo
@@ -31,6 +38,7 @@ class PurchaseFile extends Model
     public function dealers(): BelongsToMany
     {
         return $this->belongsToMany(Party::class, 'purchase_file_dealers')
+            ->withPivot('commission_rs')
             ->withTimestamps();
     }
 
@@ -42,6 +50,11 @@ class PurchaseFile extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(PurchaseFileDocument::class);
+    }
+
+    public function saleLandMozaOverrides(): HasMany
+    {
+        return $this->hasMany(PurchaseFileSaleLandMozaOverride::class);
     }
 
     public function addDocument(UploadedFile $file): PurchaseFileDocument

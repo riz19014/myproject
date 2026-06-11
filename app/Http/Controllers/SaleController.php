@@ -3,52 +3,52 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
-use App\Models\Party;
 use App\Models\Project;
+use App\Models\ProjectFile;
 use App\Models\Sale;
 use App\Models\SaleParticipant;
 use App\Support\LandMeasure;
+use App\Support\SaleExemptionConfig;
+use App\Support\SaleExemptionRules;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
-    public function create(Request $request)
+    public function index()
     {
-        $projectId = $request->query('project');
-        if ($projectId === null || $projectId === '') {
-            $projects = Project::query()
-                ->with('landType')
-                ->orderBy('name')
-                ->get();
+        $projects = Project::query()
+            ->with('landType')
+            ->withCount('projectFiles')
+            ->orderBy('name')
+            ->get();
 
-            return view('sales.create-select-project', compact('projects'));
-        }
-
-        $project = Project::query()
-            ->findOrFail((int) $projectId);
-
-        $parties = Party::query()->with(['subCategory.category'])->orderBy('name')->get();
-        $customers = Customer::query()->orderBy('name')->get();
-
-        return view('sales.create-details', compact('project', 'parties', 'customers'));
+        return view('sales.index', compact('projects'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ProjectFile $projectFile)
+    {
+        $projectFile->load('project');
+        $saleType = $request->input('sale_type', Sale::TYPE_DIRECT);
+
+        if ($saleType === Sale::TYPE_PERCENTAGE) {
+            return $this->storePercentage($request, $projectFile);
+        }
+
+        return $this->storeDirect($request, $projectFile);
+    }
+
+    private function storeDirect(Request $request, ProjectFile $projectFile): \Illuminate\Http\RedirectResponse
     {
         $validated = $request->validate([
-            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'area_acre' => ['required', 'integer', 'min:0'],
             'area_kanal' => ['required', 'integer', 'min:0'],
             'area_marla' => ['required', 'integer', 'min:0'],
             'area_sqft' => ['required', 'integer', 'min:0'],
             'total_amount' => ['required', 'numeric', 'min:0'],
-            'party_ids' => ['nullable', 'array'],
-            'party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
-            'customer_ids' => ['nullable', 'array'],
-            'customer_ids.*' => ['integer', 'distinct', 'exists:customers,id'],
         ]);
-
-        $project = Project::query()->findOrFail($validated['project_id']);
 
         $marla = LandMeasure::marlaFromAkms(
             (int) $validated['area_acre'],
@@ -62,17 +62,18 @@ class SaleController extends Controller
             ]);
         }
 
-        $partyIds = collect($validated['party_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
-        $customerIds = collect($validated['customer_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
-
-        if (count($partyIds) === 0 && count($customerIds) === 0) {
+        $remaining = $projectFile->remainingMarla();
+        if ($marla > $remaining + 0.0001) {
             throw ValidationException::withMessages([
-                'party_ids' => ['Select at least one party (dealer) or buyer (customer).'],
+                'area_acre' => ['Plot size exceeds remaining file land ('.LandMeasure::formatAkmsLabelFromMarla($remaining).').'],
             ]);
         }
 
-        $sale = Sale::create([
-            'project_id' => $project->id,
+        Sale::create([
+            'project_id' => $projectFile->project_id,
+            'project_file_id' => $projectFile->id,
+            'sale_type' => Sale::TYPE_DIRECT,
+            'customer_id' => $validated['customer_id'],
             'area_acre' => $validated['area_acre'],
             'area_kanal' => $validated['area_kanal'],
             'area_marla' => $validated['area_marla'],
@@ -81,21 +82,90 @@ class SaleController extends Controller
             'total_amount' => $validated['total_amount'],
         ]);
 
-        foreach ($partyIds as $pid) {
-            SaleParticipant::create([
-                'sale_id' => $sale->id,
-                'party_id' => $pid,
-                'customer_id' => null,
-            ]);
-        }
-        foreach ($customerIds as $cid) {
-            SaleParticipant::create([
-                'sale_id' => $sale->id,
-                'party_id' => null,
-                'customer_id' => $cid,
+        return redirect()->route('sale.files.sale.create', [
+            'projectFile' => $projectFile,
+            'type' => Sale::TYPE_DIRECT,
+        ])->with('success', 'Direct sale recorded.');
+    }
+
+    private function storePercentage(Request $request, ProjectFile $projectFile): \Illuminate\Http\RedirectResponse
+    {
+        $projectFile->load('project');
+        $config = SaleExemptionConfig::forFile($projectFile);
+        $componentSlugs = $config->componentSlugs();
+
+        $validated = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'component' => ['required', 'string', 'max:40', Rule::in($componentSlugs)],
+            'plot_type' => ['required', 'string', 'max:40'],
+            'plot_quantity' => ['required', 'integer', 'min:1', 'max:999'],
+            'total_amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $component = $validated['component'];
+        $plotType = $validated['plot_type'];
+        $options = $config->plotOptionsForComponent($component);
+        if (! array_key_exists($plotType, $options)) {
+            throw ValidationException::withMessages([
+                'plot_type' => ['Invalid plot type for this component.'],
             ]);
         }
 
-        return redirect()->route('sale.index')->with('success', 'Sale recorded successfully.');
+        $marlaPerPlot = $config->plotMarla($component, $plotType);
+        $qty = (int) $validated['plot_quantity'];
+        $totalMarla = round($marlaPerPlot * $qty, 4);
+
+        $fileMarla = (float) $projectFile->land_area_marla;
+        $pool = $config->poolMarla($fileMarla, $component);
+        $componentLabel = $config->findComponent($component)?->label ?? $component;
+
+        $used = (float) Sale::query()
+            ->where('project_file_id', $projectFile->id)
+            ->where('sale_type', Sale::TYPE_PERCENTAGE)
+            ->where('component', $component)
+            ->sum('land_area_marla');
+
+        if ($used + $totalMarla > $pool + 0.0001) {
+            throw ValidationException::withMessages([
+                'plot_quantity' => [
+                    'Exceeds '.$componentLabel
+                    .' pool. Available: '.LandMeasure::formatAkmsLabelFromMarla(max(0, $pool - $used)).'.',
+                ],
+            ]);
+        }
+
+        Sale::create([
+            'project_id' => $projectFile->project_id,
+            'project_file_id' => $projectFile->id,
+            'sale_type' => Sale::TYPE_PERCENTAGE,
+            'component' => $component,
+            'plot_type' => $plotType,
+            'plot_quantity' => $qty,
+            'customer_id' => $validated['customer_id'],
+            'area_acre' => 0,
+            'area_kanal' => 0,
+            'area_marla' => 0,
+            'area_sqft' => 0,
+            'land_area_marla' => $totalMarla,
+            'total_amount' => $validated['total_amount'],
+        ]);
+
+        return redirect()->route('sale.files.sale.create', [
+            'projectFile' => $projectFile,
+            'type' => Sale::TYPE_PERCENTAGE,
+        ])->with('success', 'Percentage sale recorded.');
+    }
+
+    /** @deprecated Legacy project-level sale; kept for old URLs. */
+    public function create(Request $request)
+    {
+        $projectId = $request->query('project');
+        if ($projectId) {
+            $project = Project::query()->findOrFail((int) $projectId);
+
+            return redirect()->route('sale.files.index', $project);
+        }
+
+        return redirect()->route('sale.index');
     }
 }

@@ -23,7 +23,7 @@ class PurchaseFileController extends Controller
         $search = trim((string) $request->query('q', ''));
 
         $files = PurchaseFile::query()
-            ->with(['project.landType'])
+            ->with(['project.landType', 'purchaseItems.party'])
             ->withCount(['purchaseItems', 'documents'])
             ->when($projectId, fn ($q) => $q->where('project_id', (int) $projectId))
             ->when($search !== '', function ($query) use ($search) {
@@ -71,6 +71,8 @@ class PurchaseFileController extends Controller
             'file_date' => ['required', 'date'],
             'dealer_party_ids' => ['nullable', 'array'],
             'dealer_party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
+            'dealer_commissions' => ['nullable', 'array'],
+            'dealer_commissions.*' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $file = PurchaseFile::create([
@@ -84,9 +86,7 @@ class PurchaseFileController extends Controller
             ->unique()
             ->values()
             ->all();
-        if ($dealerIds !== []) {
-            $file->dealers()->sync($dealerIds);
-        }
+        $this->syncDealersWithCommissions($file, $dealerIds, $request);
 
         return redirect()
             ->route('purchase.files.index', ['project' => $file->project_id])
@@ -201,6 +201,8 @@ class PurchaseFileController extends Controller
             'file_date' => ['required', 'date'],
             'dealer_party_ids' => ['nullable', 'array'],
             'dealer_party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
+            'dealer_commissions' => ['nullable', 'array'],
+            'dealer_commissions.*' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $purchase_file->update([
@@ -213,11 +215,37 @@ class PurchaseFileController extends Controller
             ->unique()
             ->values()
             ->all();
-        $purchase_file->dealers()->sync($dealerIds);
+        $this->syncDealersWithCommissions($purchase_file, $dealerIds, $request);
 
         return redirect()
             ->route('purchase.files.index', ['project' => $purchase_file->project_id])
             ->with('success', 'Purchase file updated.');
+    }
+
+    public function markSaleLand(PurchaseFile $purchase_file)
+    {
+        if ($purchase_file->isSaleLand()) {
+            return redirect()
+                ->route('purchase.files.index', ['project' => $purchase_file->project_id])
+                ->with('info', 'Purchase file "'.$purchase_file->file_name.'" is already marked as sale land.');
+        }
+
+        $purchase_file->load('purchaseItems');
+        $hasLand = $purchase_file->purchaseItems->contains(
+            fn (PurchaseItem $item) => (float) $item->land_area_marla > 0
+        );
+
+        if (! $hasLand) {
+            return redirect()
+                ->route('purchase.files.index', ['project' => $purchase_file->project_id])
+                ->with('error', 'Add sellers with land area to "'.$purchase_file->file_name.'" before marking as sale land.');
+        }
+
+        $purchase_file->update(['sale_land_at' => now()]);
+
+        return redirect()
+            ->route('projects.sale-land', $purchase_file->project_id)
+            ->with('success', 'Purchase file "'.$purchase_file->file_name.'" processed for sale land. Formula files generated from project exemption rules.');
     }
 
     public function destroy(PurchaseFile $purchase_file)
@@ -277,6 +305,22 @@ class PurchaseFileController extends Controller
         return redirect()
             ->route('purchase.files.documents', $purchase_file)
             ->with('success', 'Document removed.');
+    }
+
+    /**
+     * @param  list<int>  $dealerIds
+     */
+    private function syncDealersWithCommissions(PurchaseFile $file, array $dealerIds, Request $request): void
+    {
+        $commissions = $request->input('dealer_commissions', []);
+        $sync = [];
+        foreach ($dealerIds as $partyId) {
+            $raw = $commissions[$partyId] ?? $commissions[(string) $partyId] ?? null;
+            $sync[$partyId] = [
+                'commission_rs' => ($raw === null || $raw === '') ? null : (int) $raw,
+            ];
+        }
+        $file->dealers()->sync($sync);
     }
 
     /**

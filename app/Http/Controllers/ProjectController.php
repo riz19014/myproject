@@ -8,9 +8,15 @@ use App\Models\LandType;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\PurchaseFile;
+use App\Models\PurchaseFileSaleLandMozaOverride;
 use App\Models\PurchaseItem;
 use App\Models\Sale;
 use App\Support\LandMeasure;
+use App\Support\LandPrecision;
+use App\Support\ProjectExemptionDefaults;
+use App\Support\SaleExemptionConfig;
+use App\Support\SaleLandMozaGroups;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -41,7 +47,7 @@ class ProjectController extends Controller
 
     public function saleIndex()
     {
-        return $this->typedIndex('sale');
+        return redirect()->route('sale.index');
     }
 
     public function purchaseIndex()
@@ -224,7 +230,7 @@ class ProjectController extends Controller
                 ]);
             }
             $byParty[$pid] = [
-                'land_area' => round($marlaParty, 4),
+                'land_area' => LandPrecision::forStorage($marlaParty),
                 'land_area_unit' => 'marla',
             ];
         }
@@ -274,6 +280,13 @@ class ProjectController extends Controller
 
     public function show(Project $project)
     {
+        $project->load('landType');
+
+        return view('projects.hub', compact('project'));
+    }
+
+    public function purchase(Project $project)
+    {
         $project->load([
             'purchaseFiles' => fn ($q) => $q->with(['purchaseItems.party'])->orderByDesc('file_date')->orderBy('file_name'),
             'landType',
@@ -281,6 +294,74 @@ class ProjectController extends Controller
         $ledger = $this->buildProjectLedger($project);
 
         return view('projects.show', array_merge(compact('project'), $ledger));
+    }
+
+    public function saleLand(Project $project)
+    {
+        $project->load('landType');
+        ProjectExemptionDefaults::ensureForProject($project);
+
+        $exemptionConfig = SaleExemptionConfig::forProject($project);
+        $saleLandSheet = SaleLandMozaGroups::spreadsheetForProject($project);
+        $marlaPerAcreLand = $exemptionConfig->marlaPerAcreLand();
+
+        $sales = Sale::query()
+            ->where('project_id', $project->id)
+            ->whereNull('project_file_id')
+            ->with(['participants.party', 'participants.customer', 'landCuttings'])
+            ->orderByDesc('id')
+            ->get();
+
+        return view('projects.sale-land', compact(
+            'project',
+            'sales',
+            'saleLandSheet',
+            'exemptionConfig',
+            'marlaPerAcreLand',
+        ));
+    }
+
+    public function updateSaleLandMozaRow(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'purchase_file_id' => ['required', 'integer'],
+            'moza_key' => ['required', 'string', 'max:255'],
+            'field' => ['required', 'string', Rule::in(['land_provider', 'transfer_to'])],
+            'value' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $purchaseFile = PurchaseFile::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('sale_land_at')
+            ->findOrFail((int) $validated['purchase_file_id']);
+
+        $value = trim((string) ($validated['value'] ?? ''));
+        $field = $validated['field'];
+
+        $override = PurchaseFileSaleLandMozaOverride::query()->firstOrNew([
+            'purchase_file_id' => $purchaseFile->id,
+            'moza_key' => $validated['moza_key'],
+        ]);
+
+        $override->{$field} = $value !== '' ? $value : null;
+
+        if ($override->land_provider === null && $override->transfer_to === null) {
+            if ($override->exists) {
+                $override->delete();
+            }
+        } else {
+            $override->save();
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'field' => $field,
+                'value' => $value !== '' ? $value : '—',
+            ]);
+        }
+
+        return back()->with('success', 'Sale land row updated.');
     }
 
     /**
@@ -550,16 +631,36 @@ class ProjectController extends Controller
 
         $validated = $request->validate($rules);
 
+        $areaRules = [
+            'area_acre' => ['nullable', 'integer', 'min:0'],
+            'area_kanal' => ['nullable', 'integer', 'min:0'],
+            'area_marla' => ['nullable', 'integer', 'min:0'],
+            'area_sqft' => ['nullable', 'integer', 'min:0'],
+        ];
+        $validated = array_merge($validated, $request->validate($areaRules));
+
+        $marla = LandMeasure::marlaFromAkms(
+            (int) ($validated['area_acre'] ?? 0),
+            (int) ($validated['area_kanal'] ?? 0),
+            (int) ($validated['area_marla'] ?? 0),
+            (int) ($validated['area_sqft'] ?? 0)
+        );
+
         $data = [
             'file_number' => $validated['file_number'],
             'notes' => $validated['notes'] ?? null,
             'status' => 'available',
             'dealer_party_id' => $validated['dealer_party_id'] ?? null,
+            'area_acre' => (int) ($validated['area_acre'] ?? 0),
+            'area_kanal' => (int) ($validated['area_kanal'] ?? 0),
+            'area_marla' => (int) ($validated['area_marla'] ?? 0),
+            'area_sqft' => (int) ($validated['area_sqft'] ?? 0),
+            'land_area_marla' => LandPrecision::forStorage($marla),
         ];
 
         $project->projectFiles()->create($data);
 
-        return redirect()->route('projects.show', $project)->with('success', 'File added to project.');
+        return redirect()->route('purchase.files.index', ['project' => $project->id])->with('success', 'File added to project.');
     }
 
     // Sell file to customer
@@ -577,7 +678,7 @@ class ProjectController extends Controller
             'sale_date' => $validated['sale_date'] ?? now(),
         ]);
 
-        return redirect()->route('projects.show', $project)->with('success', 'File marked as sold.');
+        return redirect()->route('purchase.files.index', ['project' => $project->id])->with('success', 'File marked as sold.');
     }
 
     // Upload document for a project file
@@ -588,7 +689,7 @@ class ProjectController extends Controller
             $projectFile->addDocument($file);
         }
 
-        return redirect()->route('projects.show', $project)->with('success', 'Document(s) uploaded.');
+        return redirect()->route('purchase.files.index', ['project' => $project->id])->with('success', 'Document(s) uploaded.');
     }
 
     public function destroyFileDocument(Project $project, ProjectFile $projectFile, int $document)
@@ -596,6 +697,6 @@ class ProjectController extends Controller
         $doc = $projectFile->documents()->findOrFail($document);
         $doc->delete();
 
-        return redirect()->route('projects.show', $project)->with('success', 'Document removed.');
+        return redirect()->route('purchase.files.index', ['project' => $project->id])->with('success', 'Document removed.');
     }
 }

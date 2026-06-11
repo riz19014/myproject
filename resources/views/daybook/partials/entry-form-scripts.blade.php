@@ -57,7 +57,9 @@
     var projectList = document.getElementById('daybook_form_project_listbox');
     var projectWrap = projectSearch ? projectSearch.closest('.daybook-form-combo') : null;
     var projectJsonEl = document.getElementById('daybook-form-projects-json');
+    var projectResetBtn = document.getElementById('daybook_form_project_reset');
     var purchaseFileSelect = document.getElementById('daybook_form_purchase_file_id');
+    var fileResetBtn = document.getElementById('daybook_form_file_reset');
     var purchaseFileDefaultEl = document.getElementById('daybook-form-purchase-file-default');
 
     var partyHidden = document.getElementById('daybook_form_party_id');
@@ -66,6 +68,7 @@
     var partyWrap = partySearch ? partySearch.closest('.daybook-form-combo') : null;
     var partyJsonEl = document.getElementById('daybook-form-parties-json');
     var partyCreateBtn = document.getElementById('daybook_form_party_create');
+    var partyResetBtn = document.getElementById('daybook_form_party_reset');
 
     var subHidden = document.getElementById('daybook_form_party_sub_category_id');
     var subSearch = document.getElementById('daybook_form_party_sub_search');
@@ -76,12 +79,42 @@
 
     if (!projectHidden || !projectSearch || !projectList || !partyHidden || !partySearch || !partyList) return;
 
+    function toggleResetBtn(btn, visible) {
+        if (!btn) return;
+        btn.classList.toggle('d-none', !visible);
+        btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    }
+
+    function syncProjectResetVisibility() {
+        if (!projectResetBtn || !projectHidden) return;
+        toggleResetBtn(projectResetBtn, String(projectHidden.value || '').trim() !== '');
+    }
+
+    function syncPartyResetVisibility() {
+        if (!partyResetBtn || !partyHidden) return;
+        toggleResetBtn(partyResetBtn, String(partyHidden.value || '').trim() !== '');
+    }
+
+    function syncFileResetVisibility() {
+        if (!fileResetBtn || !purchaseFileSelect) return;
+        var hasProject = projectHidden && String(projectHidden.value || '').trim() !== '';
+        var hasFile = hasProject && !purchaseFileSelect.disabled && String(purchaseFileSelect.value || '').trim() !== '';
+        toggleResetBtn(fileResetBtn, hasFile);
+    }
+
     function syncSubResetVisibility() {
         if (!subResetBtn || !subHidden) return;
-        var has = String(subHidden.value || '').trim() !== '';
-        subResetBtn.classList.toggle('d-none', !has);
-        subResetBtn.setAttribute('aria-hidden', has ? 'false' : 'true');
+        toggleResetBtn(subResetBtn, String(subHidden.value || '').trim() !== '');
     }
+
+    function syncAllFieldResetVisibility() {
+        syncProjectResetVisibility();
+        syncPartyResetVisibility();
+        syncFileResetVisibility();
+        syncSubResetVisibility();
+    }
+
+    window.__daybookSyncAllFieldResetVisibility = syncAllFieldResetVisibility;
 
     var formProjectRows = [];
     if (projectJsonEl) {
@@ -153,6 +186,7 @@
         } else {
             purchaseFileSelect.value = '';
         }
+        syncFileResetVisibility();
     }
 
     window.__daybookSyncPurchaseFileSelect = syncPurchaseFileSelect;
@@ -204,6 +238,7 @@
                 projectSearch.value = row.label;
                 syncPurchaseFileSelect(row.id, '');
                 hideProjectList();
+                syncProjectResetVisibility();
             });
             li.appendChild(btn);
             projectList.appendChild(li);
@@ -277,6 +312,7 @@
                     }
                     syncSubResetVisibility();
                 }
+                syncPartyResetVisibility();
             });
             li.appendChild(btn);
             partyList.appendChild(li);
@@ -365,8 +401,12 @@
             var sb = formSubRows.find(function (r) { return String(r.id) === String(subHidden.value); });
             if (sb) subSearch.value = sb.label;
         }
-        syncSubResetVisibility();
+        syncAllFieldResetVisibility();
     })();
+
+    if (purchaseFileSelect) {
+        purchaseFileSelect.addEventListener('change', syncFileResetVisibility);
+    }
 
     projectSearch.addEventListener('focus', function () {
         openFilteredProjectList();
@@ -374,6 +414,7 @@
     projectSearch.addEventListener('input', function () {
         projectHidden.value = '';
         syncPurchaseFileSelect('', '');
+        syncProjectResetVisibility();
         openFilteredProjectList();
     });
     projectSearch.addEventListener('keydown', function (e) {
@@ -393,6 +434,7 @@
             subSearch.value = '';
             syncSubResetVisibility();
         }
+        syncPartyResetVisibility();
         openFilteredPartyFormList();
     });
     partySearch.addEventListener('keydown', function (e) {
@@ -426,6 +468,42 @@
             hideSubFormList();
             syncSubResetVisibility();
             subSearch.focus();
+        });
+    }
+
+    if (projectResetBtn && projectHidden && projectSearch) {
+        projectResetBtn.addEventListener('click', function () {
+            projectHidden.value = '';
+            projectSearch.value = '';
+            syncPurchaseFileSelect('', '');
+            hideProjectList();
+            syncProjectResetVisibility();
+            projectSearch.focus();
+        });
+    }
+
+    if (partyResetBtn && partyHidden && partySearch) {
+        partyResetBtn.addEventListener('click', function () {
+            partyHidden.value = '';
+            partySearch.value = '';
+            if (subHidden && subSearch) {
+                subHidden.value = '';
+                subSearch.value = '';
+                syncSubResetVisibility();
+            }
+            hidePartyFormList();
+            syncPartyResetVisibility();
+            partySearch.focus();
+        });
+    }
+
+    if (fileResetBtn && purchaseFileSelect) {
+        fileResetBtn.addEventListener('click', function () {
+            if (!purchaseFileSelect.disabled) {
+                purchaseFileSelect.value = '';
+            }
+            syncFileResetVisibility();
+            purchaseFileSelect.focus();
         });
     }
 
@@ -718,6 +796,9 @@
                         if (typeof window.__daybookSyncPurchaseFileSelect === 'function') {
                             window.__daybookSyncPurchaseFileSelect(nid, '');
                         }
+                        if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') {
+                            window.__daybookSyncAllFieldResetVisibility();
+                        }
                         resetProjectModalFields();
                         showModalErr('');
                         modal.hide();
@@ -996,6 +1077,9 @@
                         partyFormSearch.value = result.data.name;
                         if (typeof window.__daybookProjectModalPartyRowsPush === 'function') {
                             window.__daybookProjectModalPartyRowsPush(result.data.id, result.data.name);
+                        }
+                        if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') {
+                            window.__daybookSyncAllFieldResetVisibility();
                         }
                         clearPartyModalFields();
                         showPartyErr('');

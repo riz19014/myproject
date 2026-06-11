@@ -24,7 +24,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         @if($type === 'sale')
-            <a href="{{ route('sale.records.create') }}" class="btn btn-pink">Add sale</a>
+            <a href="{{ route('sale.index') }}" class="btn btn-pink">Sale</a>
             <a href="{{ route('projects.create', ['context' => 'sale']) }}" class="btn btn-outline-theme">Add sale project</a>
         @else
             <a href="{{ route('purchase.records.create') }}" class="btn btn-pink">Add purchase</a>
@@ -298,11 +298,15 @@
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
-                                <td class="text-center">{{ $project->purchase_files_count }}</td>
+                                <td class="text-center">{{ $type === 'sale' ? $project->project_files_count : $project->purchase_files_count }}</td>
                                 <td>
-                                    <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="btn btn-sm btn-outline-secondary">Files</a>
+                                    @if($type === 'sale')
+                                        <a href="{{ route('sale.files.index', $project) }}" class="btn btn-sm btn-pink">Files</a>
+                                    @else
+                                        <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="btn btn-sm btn-outline-secondary">Files</a>
+                                    @endif
                                     <a href="{{ route('projects.show', $project) }}" class="btn btn-sm btn-outline-theme">View</a>
-                                    <a href="{{ route('projects.edit', $project) }}" class="btn btn-sm btn-outline-theme">Edit</a>
+                                    <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-theme btn-sm">Edit</a>
                                 </td>
                             </tr>
                         @endforeach

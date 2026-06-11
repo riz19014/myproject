@@ -55,7 +55,7 @@
                                 <td class="fw-semibold">{{ $project->name }}</td>
                                 <td class="small text-muted">{{ $project->landType?->name ?? '—' }}</td>
                                 <td class="text-center">
-                                    <a href="{{ route('projects.show', $project) }}" class="badge badge-pink rounded-pill text-decoration-none fw-semibold px-3 py-2" title="View project files">
+                                    <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="badge badge-pink rounded-pill text-decoration-none fw-semibold px-3 py-2" title="Purchase files">
                                         {{ $project->purchase_files_count }}
                                     </a>
                                 </td>

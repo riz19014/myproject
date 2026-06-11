@@ -15,6 +15,8 @@ use App\Http\Controllers\PurchaseFileController;
 use App\Http\Controllers\PurchaseItemController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleLandCuttingController;
+use App\Http\Controllers\ProjectSaleExemptionController;
+use App\Http\Controllers\SaleProjectFileController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -26,9 +28,16 @@ Route::get('/', function () {
 Route::middleware('auth')->group(function () {
     Route::resource('users', UserController::class);
     Route::resource('customers', CustomerController::class)->except(['show']);
-    Route::get('sale', [ProjectController::class, 'saleIndex'])->name('sale.index');
+    Route::get('sale', [SaleController::class, 'index'])->name('sale.index');
+    Route::get('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'edit'])->name('sale.projects.exemption.edit');
+    Route::put('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'update'])->name('sale.projects.exemption.update');
+    Route::get('sale/projects/{project}/files', [SaleProjectFileController::class, 'index'])->name('sale.files.index');
+    Route::get('sale/projects/{project}/files/create', [SaleProjectFileController::class, 'create'])->name('sale.files.create');
+    Route::post('sale/projects/{project}/files', [SaleProjectFileController::class, 'store'])->name('sale.files.store');
+    Route::get('sale/files/{projectFile}/sale', [SaleProjectFileController::class, 'saleCreate'])->name('sale.files.sale.create');
+    Route::put('sale/files/{projectFile}/area', [SaleProjectFileController::class, 'updateArea'])->name('sale.files.area.update');
+    Route::post('sale/files/{projectFile}/sale', [SaleController::class, 'store'])->name('sale.files.sale.store');
     Route::get('sale/records/create', [SaleController::class, 'create'])->name('sale.records.create');
-    Route::post('sale/records', [SaleController::class, 'store'])->name('sale.records.store');
     Route::get('sale/records/{sale}/land-cuttings', [SaleLandCuttingController::class, 'index'])->name('sale.records.land-cuttings.index');
     Route::post('sale/records/{sale}/land-cuttings', [SaleLandCuttingController::class, 'store'])->name('sale.records.land-cuttings.store');
     Route::delete('sale/records/{sale}/land-cuttings/{land_cutting}', [SaleLandCuttingController::class, 'destroy'])->name('sale.records.land-cuttings.destroy');
@@ -40,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/files/{purchase_file}/sellers', [PurchaseFileController::class, 'sellers'])->name('purchase.files.sellers');
     Route::post('purchase/files/{purchase_file}/sellers', [PurchaseFileController::class, 'storeSellers'])->name('purchase.files.sellers.store');
     Route::delete('purchase/files/{purchase_file}/sellers/{purchase_item}', [PurchaseFileController::class, 'destroySeller'])->name('purchase.files.sellers.destroy');
+    Route::post('purchase/files/{purchase_file}/sale-land', [PurchaseFileController::class, 'markSaleLand'])->name('purchase.files.sale-land');
     Route::get('purchase/files/{purchase_file}/edit', [PurchaseFileController::class, 'edit'])->name('purchase.files.edit');
     Route::put('purchase/files/{purchase_file}', [PurchaseFileController::class, 'update'])->name('purchase.files.update');
     Route::delete('purchase/files/{purchase_file}', [PurchaseFileController::class, 'destroy'])->name('purchase.files.destroy');
@@ -58,6 +68,9 @@ Route::middleware('auth')->group(function () {
     Route::post('party-sub-categories/quick-store', [PartySubCategoryController::class, 'quickStore'])->name('party-sub-categories.quick-store');
     Route::resource('parties', PartyController::class)->except(['show']);
     Route::get('projects/{project}/ledger-pdf', [ProjectController::class, 'ledgerPdf'])->name('projects.ledger.pdf');
+    Route::get('projects/{project}/purchase', [ProjectController::class, 'purchase'])->name('projects.purchase');
+    Route::get('projects/{project}/sale-land', [ProjectController::class, 'saleLand'])->name('projects.sale-land');
+    Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
     Route::resource('projects', ProjectController::class);
     Route::post('projects/{project}/files', [ProjectController::class, 'addFile'])->name('projects.files.store');
     Route::put('projects/{project}/files/{projectFile}/sell', [ProjectController::class, 'sellFile'])->name('projects.files.sell');

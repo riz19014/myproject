@@ -10,8 +10,18 @@ class Sale extends Model
 {
     protected $table = 'sales';
 
+    public const TYPE_DIRECT = 'direct';
+
+    public const TYPE_PERCENTAGE = 'percentage';
+
     protected $fillable = [
         'project_id',
+        'project_file_id',
+        'sale_type',
+        'component',
+        'plot_type',
+        'plot_quantity',
+        'customer_id',
         'area_acre',
         'area_kanal',
         'area_marla',
@@ -23,7 +33,7 @@ class Sale extends Model
     protected function casts(): array
     {
         return [
-            'land_area_marla' => 'decimal:4',
+            'land_area_marla' => 'decimal:12',
             'total_amount' => 'decimal:2',
         ];
     }
@@ -31,6 +41,26 @@ class Sale extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function projectFile(): BelongsTo
+    {
+        return $this->belongsTo(ProjectFile::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function isDirect(): bool
+    {
+        return $this->sale_type === self::TYPE_DIRECT;
+    }
+
+    public function isPercentage(): bool
+    {
+        return $this->sale_type === self::TYPE_PERCENTAGE;
     }
 
     public function participants(): HasMany

@@ -389,9 +389,20 @@ class PurchaseItemController extends Controller
             ->values()
             ->all();
 
-        if ($dealerIds !== []) {
-            $file->dealers()->sync($dealerIds);
+        if ($dealerIds === []) {
+            return;
         }
+
+        $existingCommissions = $file->dealers()
+            ->pluck('purchase_file_dealers.commission_rs', 'parties.id');
+
+        $sync = [];
+        foreach ($dealerIds as $partyId) {
+            $sync[$partyId] = [
+                'commission_rs' => $existingCommissions[$partyId] ?? null,
+            ];
+        }
+        $file->dealers()->sync($sync);
     }
 
     /**
