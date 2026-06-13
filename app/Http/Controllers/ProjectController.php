@@ -296,29 +296,103 @@ class ProjectController extends Controller
         return view('projects.show', array_merge(compact('project'), $ledger));
     }
 
-    public function saleLand(Project $project)
+    public function saleLand(Request $request, Project $project)
     {
         $project->load('landType');
         ProjectExemptionDefaults::ensureForProject($project);
 
         $exemptionConfig = SaleExemptionConfig::forProject($project);
-        $saleLandSheet = SaleLandMozaGroups::spreadsheetForProject($project);
+        $scopedPurchaseFiles = $this->scopedSaleLandPurchaseFiles($request, $project);
+        $saleLandSheet = SaleLandMozaGroups::spreadsheetForProject(
+            $project,
+            $scopedPurchaseFiles->isNotEmpty() ? $scopedPurchaseFiles->pluck('id')->all() : null,
+        );
         $marlaPerAcreLand = $exemptionConfig->marlaPerAcreLand();
 
-        $sales = Sale::query()
-            ->where('project_id', $project->id)
-            ->whereNull('project_file_id')
-            ->with(['participants.party', 'participants.customer', 'landCuttings'])
-            ->orderByDesc('id')
-            ->get();
-
         return view('projects.sale-land', compact(
+            'project',
+            'saleLandSheet',
+            'exemptionConfig',
+            'marlaPerAcreLand',
+            'scopedPurchaseFiles',
+        ));
+    }
+
+    public function saleLandPdf(Request $request, Project $project)
+    {
+        $project->load('landType');
+        ProjectExemptionDefaults::ensureForProject($project);
+
+        $exemptionConfig = SaleExemptionConfig::forProject($project);
+
+        $scopedPurchaseFiles = $this->scopedSaleLandPurchaseFiles($request, $project);
+
+        $saleLandSheet = SaleLandMozaGroups::spreadsheetForProject(
+            $project,
+            $scopedPurchaseFiles->isNotEmpty() ? $scopedPurchaseFiles->pluck('id')->all() : null,
+        );
+        $marlaPerAcreLand = $exemptionConfig->marlaPerAcreLand();
+
+        $sales = $scopedPurchaseFiles->isEmpty()
+            ? Sale::query()
+                ->where('project_id', $project->id)
+                ->whereNull('project_file_id')
+                ->with(['participants.party', 'participants.customer', 'landCuttings'])
+                ->orderByDesc('id')
+                ->get()
+            : collect();
+
+        $generatedAt = now();
+
+        $pdf = Pdf::loadView('projects.sale-land-pdf', compact(
             'project',
             'sales',
             'saleLandSheet',
             'exemptionConfig',
             'marlaPerAcreLand',
+            'generatedAt',
+            'scopedPurchaseFiles',
         ));
+        $pdf->setPaper('a4', 'portrait');
+
+        $safeName = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name);
+        $filename = match (true) {
+            $scopedPurchaseFiles->isEmpty() => 'sale-land-'.$safeName.'-'.$generatedAt->format('Y-m-d').'.pdf',
+            $scopedPurchaseFiles->count() === 1 => 'sale-land-'.$safeName.'-'.preg_replace('/[^a-zA-Z0-9_-]+/', '-', $scopedPurchaseFiles->first()->file_name).'-'.$generatedAt->format('Y-m-d').'.pdf',
+            default => 'sale-land-'.$safeName.'-'.$scopedPurchaseFiles->count().'-files-'.$generatedAt->format('Y-m-d').'.pdf',
+        };
+
+        return $pdf->download($filename);
+    }
+
+    private function scopedSaleLandPurchaseFiles(Request $request, Project $project)
+    {
+        $purchaseFileIds = $request->query('purchase_file');
+        if ($purchaseFileIds === null || $purchaseFileIds === '') {
+            return collect();
+        }
+
+        if (! is_array($purchaseFileIds)) {
+            $purchaseFileIds = [$purchaseFileIds];
+        }
+        $purchaseFileIds = array_values(array_unique(array_filter(array_map('intval', $purchaseFileIds))));
+
+        if ($purchaseFileIds === []) {
+            return collect();
+        }
+
+        $scopedPurchaseFiles = PurchaseFile::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('sale_land_at')
+            ->whereIn('id', $purchaseFileIds)
+            ->orderBy('file_name')
+            ->get();
+
+        if ($scopedPurchaseFiles->count() !== count($purchaseFileIds)) {
+            abort(404);
+        }
+
+        return $scopedPurchaseFiles;
     }
 
     public function updateSaleLandMozaRow(Request $request, Project $project)

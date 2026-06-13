@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DayBookEntry;
 use App\Models\Party;
 use App\Models\PartySubCategory;
 use App\Models\Project;
@@ -9,8 +10,10 @@ use App\Models\PurchaseFile;
 use App\Models\PurchaseFileDocument;
 use App\Models\PurchaseItem;
 use Illuminate\Support\Facades\Storage;
+use App\Support\LandMeasure;
 use App\Support\PartyPurchaseDefaults;
 use App\Support\PurchaseLineAttributes;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -41,7 +44,14 @@ class PurchaseFileController extends Controller
 
         $projects = Project::query()->orderBy('name')->get(['id', 'name']);
 
-        return view('purchases.files.index', compact('files', 'projects', 'projectId', 'search'));
+        $projectSaleLandFileCount = $projectId
+            ? PurchaseFile::query()
+                ->where('project_id', (int) $projectId)
+                ->whereNotNull('sale_land_at')
+                ->count()
+            : 0;
+
+        return view('purchases.files.index', compact('files', 'projects', 'projectId', 'search', 'projectSaleLandFileCount'));
     }
 
     public function create(Request $request)
@@ -244,7 +254,7 @@ class PurchaseFileController extends Controller
         $purchase_file->update(['sale_land_at' => now()]);
 
         return redirect()
-            ->route('projects.sale-land', $purchase_file->project_id)
+            ->route('projects.sale-land', ['project' => $purchase_file->project_id, 'purchase_file' => $purchase_file->id])
             ->with('success', 'Purchase file "'.$purchase_file->file_name.'" processed for sale land. Formula files generated from project exemption rules.');
     }
 
@@ -258,6 +268,116 @@ class PurchaseFileController extends Controller
         return redirect()
             ->route('purchase.files.index', ['project' => $projectId])
             ->with('success', 'Purchase file "'.$name.'" removed.');
+    }
+
+    public function paymentSheetPdf(PurchaseFile $purchase_file)
+    {
+        $purchase_file->load([
+            'project',
+            'dealers',
+            'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
+        ]);
+
+        $sheet = $this->buildPurchaseFilePaymentSheet($purchase_file);
+
+        $pdf = Pdf::loadView('purchases.files.payment-sheet-pdf', array_merge(
+            ['purchaseFile' => $purchase_file],
+            $sheet
+        ));
+        $pdf->setPaper('a4', 'portrait');
+
+        $safeFile = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $purchase_file->file_name) ?: 'file';
+        $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $purchase_file->project?->name ?? 'project') ?: 'project';
+
+        return $pdf->download('payment-sheet-'.$safeProject.'-'.$safeFile.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * @return array{
+     *     sellers: \Illuminate\Support\Collection<int, PurchaseItem>,
+     *     landTotalRs: float,
+     *     landAreaLabel: string,
+     *     paymentLines: list<array<string, mixed>>,
+     *     totalPaid: float,
+     *     balancePayable: float,
+     *     entryCount: int,
+     *     generatedAt: \Illuminate\Support\Carbon
+     * }
+     */
+    private function buildPurchaseFilePaymentSheet(PurchaseFile $file): array
+    {
+        $sellers = $file->purchaseItems;
+        $landTotalRs = (float) $sellers->sum('line_total_rs');
+        $landAreaMarla = (float) $sellers->sum('land_area_marla');
+        $landAreaLabel = $landAreaMarla > 0
+            ? LandMeasure::formatAkmsLabelFromMarla($landAreaMarla)
+            : '—';
+
+        $entries = DayBookEntry::query()
+            ->where('purchase_file_id', $file->id)
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
+        $parties = Party::query()->whereIn('id', $partyIds)->get()->keyBy('id');
+
+        $paidRunning = 0.0;
+        $paymentLines = [];
+        foreach ($entries as $entry) {
+            $amount = (float) $entry->amount;
+            if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
+                $paidRunning += $amount;
+            } else {
+                $paidRunning -= $amount;
+            }
+
+            $partyName = 'General';
+            if ($entry->link_type === DayBookEntry::LINK_PARTY && $entry->link_id) {
+                $partyName = $parties->get((int) $entry->link_id)?->name ?? ('Party #'.$entry->link_id);
+            }
+
+            $kind = $entry->type === DayBookEntry::TYPE_CASH_IN ? 'Payment in' : 'Payment out';
+            $settlement = $entry->getSettlementLabel();
+            $paymentText = $kind;
+            if ($settlement !== '' && $settlement !== '—') {
+                $paymentText .= ' · '.$settlement;
+            }
+
+            $descParts = [];
+            if ($entry->description && trim((string) $entry->description) !== '') {
+                $descParts[] = trim((string) $entry->description);
+            }
+            if ($entry->voucher_no) {
+                $descParts[] = 'Voucher '.$entry->getVoucherNumber();
+            }
+            $description = $descParts !== [] ? implode(' · ', $descParts) : '—';
+
+            $paymentLines[] = [
+                'date' => $entry->entry_date->format('d M Y'),
+                'party' => $partyName,
+                'description' => $description,
+                'payment' => $paymentText,
+                'amount_display' => 'Rs '.number_format($amount, 2),
+                'balance' => $landTotalRs - $paidRunning,
+            ];
+        }
+
+        $out = (float) $entries->where('type', DayBookEntry::TYPE_CASH_OUT)->sum('amount');
+        $in = (float) $entries->where('type', DayBookEntry::TYPE_CASH_IN)->sum('amount');
+        $totalPaid = $out - $in;
+        $balancePayable = $landTotalRs - $totalPaid;
+
+        return [
+            'sellers' => $sellers,
+            'landTotalRs' => $landTotalRs,
+            'landAreaLabel' => $landAreaLabel,
+            'paymentLines' => $paymentLines,
+            'totalPaid' => $totalPaid,
+            'balancePayable' => $balancePayable,
+            'entryCount' => $entries->count(),
+            'generatedAt' => now(),
+        ];
     }
 
     public function documents(PurchaseFile $purchase_file)

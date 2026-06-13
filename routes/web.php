@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/files', [PurchaseFileController::class, 'index'])->name('purchase.files.index');
     Route::get('purchase/files/create', [PurchaseFileController::class, 'create'])->name('purchase.files.create');
     Route::post('purchase/files', [PurchaseFileController::class, 'store'])->name('purchase.files.store');
+    Route::get('purchase/files/{purchase_file}/payment-sheet-pdf', [PurchaseFileController::class, 'paymentSheetPdf'])->name('purchase.files.payment-sheet-pdf');
     Route::get('purchase/files/{purchase_file}/documents', [PurchaseFileController::class, 'documents'])->name('purchase.files.documents');
     Route::get('purchase/files/{purchase_file}/sellers', [PurchaseFileController::class, 'sellers'])->name('purchase.files.sellers');
     Route::post('purchase/files/{purchase_file}/sellers', [PurchaseFileController::class, 'storeSellers'])->name('purchase.files.sellers.store');
@@ -70,6 +71,7 @@ Route::middleware('auth')->group(function () {
     Route::get('projects/{project}/ledger-pdf', [ProjectController::class, 'ledgerPdf'])->name('projects.ledger.pdf');
     Route::get('projects/{project}/purchase', [ProjectController::class, 'purchase'])->name('projects.purchase');
     Route::get('projects/{project}/sale-land', [ProjectController::class, 'saleLand'])->name('projects.sale-land');
+    Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
     Route::resource('projects', ProjectController::class);
     Route::post('projects/{project}/files', [ProjectController::class, 'addFile'])->name('projects.files.store');

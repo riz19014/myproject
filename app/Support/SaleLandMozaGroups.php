@@ -19,19 +19,24 @@ final class SaleLandMozaGroups
      *   formula_totals: array{total_land: string, formula_values: array<string, array{display: string, breakdown: string}>}
      * }
      */
-    public static function spreadsheetForProject(Project $project): array
+    public static function spreadsheetForProject(Project $project, ?array $purchaseFileIds = null): array
     {
         $config = SaleExemptionConfig::forProject($project);
         $formulaColumns = self::formulaColumnsFromConfig($config);
 
-        $files = $project->purchaseFiles()
+        $filesQuery = $project->purchaseFiles()
             ->whereNotNull('sale_land_at')
             ->orderBy('file_name')
             ->with([
                 'purchaseItems' => fn ($q) => $q->with('party'),
                 'saleLandMozaOverrides',
-            ])
-            ->get();
+            ]);
+
+        if ($purchaseFileIds !== null && $purchaseFileIds !== []) {
+            $filesQuery->whereIn('id', $purchaseFileIds);
+        }
+
+        $files = $filesQuery->get();
 
         $rows = [];
         $sr = 1;

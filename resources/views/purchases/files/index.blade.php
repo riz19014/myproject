@@ -10,6 +10,9 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('purchase.files.create', $projectId ? ['project' => $projectId] : []) }}" class="btn btn-pink">Add purchase file</a>
+        @if($projectId && ($projectSaleLandFileCount ?? 0) > 0)
+            <a href="{{ route('projects.sale-land', $projectId) }}" class="btn btn-outline-theme">View all sale land</a>
+        @endif
         @if($projectId)
             <a href="{{ route('projects.show', $projectId) }}" class="btn btn-outline-theme">Back to project</a>
         @endif
@@ -65,7 +68,7 @@
                             <th>Project</th>
                             <th class="text-center" style="width: 90px;">Sellers</th>
                             <th class="text-center" style="width: 110px;">Documents</th>
-                            <th style="width: 200px;">Actions</th>
+                            <th style="width: 260px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -115,8 +118,12 @@
                                     </a>
                                 </td>
                                 <td class="text-nowrap">
+                                    <a href="#"
+                                       class="btn btn-sm btn-outline-secondary purchase-payment-pdf-link"
+                                       data-pdf-url="{{ route('purchase.files.payment-sheet-pdf', $file) }}"
+                                       title="Download payment sheet PDF">Payment PDF</a>
                                     @if($file->isSaleLand())
-                                        <a href="{{ route('projects.sale-land', $file->project_id) }}" class="btn btn-sm btn-outline-secondary" title="Already marked on {{ $file->sale_land_at->format('d M Y') }}">View sale land</a>
+                                        <a href="{{ route('projects.sale-land', ['project' => $file->project_id, 'purchase_file' => $file->id]) }}" class="btn btn-sm btn-outline-secondary" title="Already marked on {{ $file->sale_land_at->format('d M Y') }}">View sale land</a>
                                     @else
                                         <button type="button"
                                             class="btn btn-sm btn-outline-theme btn-sale-land-confirm"
@@ -179,6 +186,10 @@
         font-size: 0.68rem;
         line-height: 1;
         opacity: 0.85;
+    }
+    .purchase-payment-pdf-link.is-loading {
+        pointer-events: none;
+        opacity: 0.65;
     }
     .swal-sale-land-popup {
         width: 52rem !important;
@@ -414,6 +425,77 @@
                     }
                 }
             });
+        });
+    });
+
+    function setPaymentPdfLinkLoading(link, loading) {
+        if (loading) {
+            if (!link.dataset.pdfOriginalHtml) {
+                link.dataset.pdfOriginalHtml = link.innerHTML;
+            }
+            link.classList.add('is-loading', 'disabled');
+            link.setAttribute('aria-disabled', 'true');
+            link.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        } else {
+            link.classList.remove('is-loading', 'disabled');
+            link.removeAttribute('aria-disabled');
+            if (link.dataset.pdfOriginalHtml) {
+                link.innerHTML = link.dataset.pdfOriginalHtml;
+            }
+        }
+    }
+
+    document.querySelectorAll('.purchase-payment-pdf-link').forEach(function(pdfLink) {
+        pdfLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (pdfLink.classList.contains('is-loading')) {
+                return;
+            }
+
+            var href = pdfLink.getAttribute('data-pdf-url');
+            if (!href) {
+                return;
+            }
+
+            setPaymentPdfLinkLoading(pdfLink, true);
+
+            fetch(href, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
+                .then(function(res) {
+                    if (!res.ok) {
+                        throw new Error('pdf');
+                    }
+                    var cd = res.headers.get('Content-Disposition');
+                    var fname = 'payment-sheet.pdf';
+                    if (cd) {
+                        var mStar = /filename\*\s*=\s*UTF-8''([^;\s]+)/i.exec(cd);
+                        var mQuot = /filename\s*=\s*"([^"]+)"/i.exec(cd);
+                        var mPlain = /filename\s*=\s*([^;\s]+)/i.exec(cd);
+                        if (mStar) fname = decodeURIComponent(mStar[1].replace(/"/g, ''));
+                        else if (mQuot) fname = mQuot[1];
+                        else if (mPlain) fname = mPlain[1].replace(/"/g, '');
+                    }
+                    return res.blob().then(function(blob) {
+                        return { blob: blob, fname: fname };
+                    });
+                })
+                .then(function(o) {
+                    var url = URL.createObjectURL(o.blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = o.fname;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(function() {
+                        URL.revokeObjectURL(url);
+                    }, 2000);
+                })
+                .catch(function() {
+                    alert('Could not download payment sheet PDF. Please try again.');
+                })
+                .finally(function() {
+                    setPaymentPdfLinkLoading(pdfLink, false);
+                });
         });
     });
 })();
