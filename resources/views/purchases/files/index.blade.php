@@ -10,6 +10,9 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('purchase.files.create', $projectId ? ['project' => $projectId] : []) }}" class="btn btn-pink">Add purchase file</a>
+        @if($projectId)
+            <a href="{{ route('sale.files.index', $projectId) }}" class="btn btn-outline-theme">Sale files</a>
+        @endif
         @if($projectId && ($projectSaleLandFileCount ?? 0) > 0)
             <a href="{{ route('projects.sale-land', $projectId) }}" class="btn btn-outline-theme">View all sale land</a>
         @endif
@@ -68,7 +71,7 @@
                             <th>Project</th>
                             <th class="text-center" style="width: 90px;">Sellers</th>
                             <th class="text-center" style="width: 110px;">Documents</th>
-                            <th style="width: 260px;">Actions</th>
+                            <th style="width: 300px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -95,7 +98,7 @@
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
                                 <td class="fw-semibold">
-                                    {{ $file->file_name }}
+                                    <a href="{{ route('purchase.files.show', $file) }}" class="text-decoration-none">{{ $file->file_name }}</a>
                                     @if($file->isSaleLand())
                                         <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1" title="Marked as sale land on {{ $file->sale_land_at->format('d M Y') }}">Sale land</span>
                                     @endif
@@ -118,6 +121,7 @@
                                     </a>
                                 </td>
                                 <td class="text-nowrap">
+                                    <a href="{{ route('purchase.files.show', $file) }}" class="btn btn-sm btn-outline-theme">View</a>
                                     <a href="#"
                                        class="btn btn-sm btn-outline-secondary purchase-payment-pdf-link"
                                        data-pdf-url="{{ route('purchase.files.payment-sheet-pdf', $file) }}"

@@ -35,6 +35,7 @@
             <a href="#" class="btn btn-outline-theme btn-sm sale-land-pdf-link" id="sale-land-pdf-btn" data-base-url="{{ route('projects.sale-land.pdf', $project) }}">Download PDF</a>
         @endif
         <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="btn btn-outline-theme btn-sm">Purchase files</a>
+        <a href="{{ route('sale.files.index', $project) }}" class="btn btn-outline-theme btn-sm">Sale files</a>
         <a href="{{ route('projects.show', $project) }}" class="btn btn-outline-theme btn-sm">Back to project</a>
     </div>
 </div>
@@ -95,6 +96,21 @@
                                                        aria-label="Include {{ $row['file_name'] }} in PDF"
                                                        @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
                                                 <label class="sale-land-sheet__file-name-text mb-0" for="sale-land-file-{{ $row['purchase_file_id'] }}">{{ $row['file_name'] }}</label>
+                                                <form method="post"
+                                                      action="{{ route('projects.sale-land.destroy', [$project, $row['purchase_file_id']]) }}"
+                                                      class="sale-land-sheet__file-delete-form">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger sale-land-sheet__file-delete-btn btn-delete-confirm"
+                                                            data-title="Delete sale land?"
+                                                            data-text="Remove &quot;{{ $row['file_name'] }}&quot; from sale land? The purchase file and sellers will stay; only this sale land record and its formula overrides will be removed."
+                                                            data-confirm="Yes, delete"
+                                                            title="Delete sale land"
+                                                            aria-label="Delete sale land for {{ $row['file_name'] }}">
+                                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                                    </button>
+                                                </form>
                                             </div>
                                         </td>
                                     @endif
@@ -228,7 +244,7 @@
     }
     .sale-land-sheet {
         --sale-land-sr-width: 48px;
-        --sale-land-file-width: 160px;
+        --sale-land-file-width: 190px;
         margin-bottom: 0;
     }
     .sale-land-sheet thead th {
@@ -285,6 +301,15 @@
     .sale-land-file-check {
         flex: 0 0 auto;
         margin-top: 0.2rem;
+    }
+    .sale-land-sheet__file-delete-form {
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
+    .sale-land-sheet__file-delete-btn {
+        padding: 0.15rem 0.35rem;
+        line-height: 1;
+        font-size: 0.75rem;
     }
     .sale-land-pdf-link.is-loading {
         pointer-events: none;

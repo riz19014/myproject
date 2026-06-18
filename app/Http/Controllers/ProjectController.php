@@ -438,6 +438,20 @@ class ProjectController extends Controller
         return back()->with('success', 'Sale land row updated.');
     }
 
+    public function destroySaleLand(Project $project, PurchaseFile $purchase_file)
+    {
+        abort_unless($purchase_file->project_id === $project->id, 404);
+        abort_unless($purchase_file->isSaleLand(), 404);
+
+        $name = $purchase_file->file_name;
+        $purchase_file->saleLandMozaOverrides()->delete();
+        $purchase_file->update(['sale_land_at' => null]);
+
+        return redirect()
+            ->route('projects.sale-land', $project)
+            ->with('success', 'Sale land record for "'.$name.'" removed. The purchase file is unchanged.');
+    }
+
     /**
      * All daybook lines tied to this project (direct project link or party + project context).
      */

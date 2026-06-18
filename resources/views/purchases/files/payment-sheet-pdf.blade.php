@@ -179,9 +179,9 @@
     @endif
 
     <div class="section-title">Payments</div>
-    <div class="section-sub">DayBook entries linked to this purchase file ({{ $entryCount }} {{ $entryCount === 1 ? 'entry' : 'entries' }}).</div>
+    <div class="section-sub">DayBook payment lines linked to this purchase file ({{ $paymentEntryCount }} {{ $paymentEntryCount === 1 ? 'entry' : 'entries' }}).</div>
 
-    @if($entryCount === 0)
+    @if($paymentEntryCount === 0)
         <p class="empty-note">No payments recorded for this file yet. Link daybook entries to this file when recording payments.</p>
     @else
         <table class="sheet">

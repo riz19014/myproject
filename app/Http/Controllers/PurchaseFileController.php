@@ -12,6 +12,7 @@ use App\Models\PurchaseItem;
 use Illuminate\Support\Facades\Storage;
 use App\Support\LandMeasure;
 use App\Support\PartyPurchaseDefaults;
+use App\Support\PurchaseFileSheetGrid;
 use App\Support\PurchaseLineAttributes;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -270,6 +271,24 @@ class PurchaseFileController extends Controller
             ->with('success', 'Purchase file "'.$name.'" removed.');
     }
 
+    public function show(PurchaseFile $purchase_file)
+    {
+        $purchase_file->load([
+            'project',
+            'dealers',
+            'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
+        ])->loadCount('documents');
+
+        $data = $this->buildPurchaseFileViewData($purchase_file);
+        $data['includePaymentOpening'] = true;
+        $sheetGrid = PurchaseFileSheetGrid::build($purchase_file, $data);
+
+        return view('purchases.files.show', array_merge(
+            ['purchaseFile' => $purchase_file, 'sheetGrid' => $sheetGrid],
+            $data
+        ));
+    }
+
     public function paymentSheetPdf(PurchaseFile $purchase_file)
     {
         $purchase_file->load([
@@ -278,7 +297,7 @@ class PurchaseFileController extends Controller
             'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
         ]);
 
-        $sheet = $this->buildPurchaseFilePaymentSheet($purchase_file);
+        $sheet = $this->buildPurchaseFileViewData($purchase_file);
 
         $pdf = Pdf::loadView('purchases.files.payment-sheet-pdf', array_merge(
             ['purchaseFile' => $purchase_file],
@@ -292,19 +311,185 @@ class PurchaseFileController extends Controller
         return $pdf->download('payment-sheet-'.$safeProject.'-'.$safeFile.'-'.now()->format('Y-m-d').'.pdf');
     }
 
+    public function viewPdf(Request $request, PurchaseFile $purchase_file)
+    {
+        $purchase_file->load([
+            'project',
+            'dealers',
+            'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
+        ]);
+
+        $data = $this->buildPurchaseFileViewData($purchase_file);
+        $data['includePaymentOpening'] = true;
+        $sheetGrid = PurchaseFileSheetGrid::build($purchase_file, $data);
+        $selection = $this->parseSheetSelection($request, $sheetGrid);
+        $sheetGrid = PurchaseFileSheetGrid::filter($sheetGrid, $selection['columns'], $selection['items']);
+
+        $pdf = Pdf::loadView('purchases.files.view-pdf', [
+            'purchaseFile' => $purchase_file,
+            'sheetGrid' => $sheetGrid,
+            'generatedAt' => now(),
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $safeFile = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $purchase_file->file_name) ?: 'file';
+        $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $purchase_file->project?->name ?? 'project') ?: 'project';
+
+        return $pdf->download('purchase-file-'.$safeProject.'-'.$safeFile.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * @param  array{columns: list<array<string, mixed>>, row_count: int}  $grid
+     * @return array{columns: list<string>, items: array<string, list<string>>}
+     */
+    private function parseSheetSelection(Request $request, array $grid): array
+    {
+        $allowedKeys = array_column($grid['columns'], 'key');
+        $columns = $request->query('columns', $allowedKeys);
+        if (! is_array($columns)) {
+            $columns = [$columns];
+        }
+        $columns = array_values(array_intersect($columns, $allowedKeys));
+        if ($columns === []) {
+            $columns = $allowedKeys;
+        }
+
+        $items = [];
+        $rawItems = $request->query('items', []);
+        if (is_array($rawItems)) {
+            foreach ($rawItems as $colKey => $ids) {
+                if (! in_array((string) $colKey, $allowedKeys, true) || ! is_array($ids)) {
+                    continue;
+                }
+                $items[(string) $colKey] = array_values(array_map('strval', $ids));
+            }
+        }
+
+        return [
+            'columns' => $columns,
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parsePurchaseFileViewSections(Request $request): array
+    {
+        $allowed = ['sellers', 'payments', 'expenses'];
+        $sections = $request->query('sections', $allowed);
+        if (! is_array($sections)) {
+            $sections = [$sections];
+        }
+        $sections = array_values(array_intersect($sections, $allowed));
+
+        return $sections !== [] ? $sections : $allowed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function filterPurchaseFileViewData(array $data, Request $request, array $selectedSections): array
+    {
+        if (in_array('sellers', $selectedSections, true) && $request->has('seller_ids')) {
+            $ids = collect($request->query('seller_ids', []))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values()
+                ->all();
+            $data['sellers'] = $data['sellers']->whereIn('id', $ids)->values();
+            $marla = (float) $data['sellers']->sum('land_area_marla');
+            $data['landTotalRs'] = (float) $data['sellers']->sum('line_total_rs');
+            $data['landAreaLabel'] = $marla > 0
+                ? LandMeasure::formatAkmsLabelFromMarla($marla)
+                : '—';
+        }
+
+        if (in_array('payments', $selectedSections, true) && $request->has('payment_ids')) {
+            $paymentIds = collect($request->query('payment_ids', []))
+                ->map(fn ($id) => (string) $id)
+                ->values()
+                ->all();
+            $includeOpening = in_array('opening', $paymentIds, true);
+            $entryIds = collect($paymentIds)
+                ->filter(fn ($id) => $id !== 'opening' && ctype_digit($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            $data['paymentRows'] = collect($data['paymentRows'])
+                ->filter(fn (array $row) => in_array((int) $row['entry']->id, $entryIds, true))
+                ->values()
+                ->all();
+
+            $paidRunning = 0.0;
+            $landTotal = $includeOpening ? (float) $data['landTotalRs'] : 0.0;
+            $filteredLines = [];
+            foreach ($data['paymentRows'] as $row) {
+                $entry = $row['entry'];
+                $amount = (float) $entry->amount;
+                if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
+                    $paidRunning += $amount;
+                } else {
+                    $paidRunning -= $amount;
+                }
+                $row['balance'] = $landTotal - $paidRunning;
+                $filteredLines[] = $row;
+            }
+            $data['paymentRows'] = $filteredLines;
+            $data['paymentLines'] = collect($filteredLines)->map(fn (array $row) => [
+                'date' => $row['date'],
+                'party' => $row['party'],
+                'description' => $row['description'],
+                'payment' => $row['payment'],
+                'amount_display' => $row['amount_display'],
+                'balance' => $row['balance'],
+            ])->all();
+
+            $data['totalPaid'] = $this->daybookEntriesNetPaid(collect($data['paymentRows'])->pluck('entry'));
+            $data['balancePayable'] = ($includeOpening ? (float) $data['landTotalRs'] : 0.0) - $data['totalPaid'];
+            $data['paymentEntryCount'] = count($data['paymentRows']);
+            $data['includePaymentOpening'] = $includeOpening;
+        } else {
+            $data['includePaymentOpening'] = true;
+        }
+
+        if (in_array('expenses', $selectedSections, true) && $request->has('expense_ids')) {
+            $ids = collect($request->query('expense_ids', []))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values()
+                ->all();
+            $data['expenseGroups'] = collect($data['expenseGroups'])
+                ->filter(fn (array $group) => in_array((int) $group['sub_category_id'], $ids, true))
+                ->values()
+                ->all();
+            $data['totalExpenses'] = (float) collect($data['expenseGroups'])->sum('total');
+            $data['expenseEntryCount'] = (int) collect($data['expenseGroups'])->sum(fn (array $g) => $g['entries']->count());
+        }
+
+        return $data;
+    }
+
     /**
      * @return array{
      *     sellers: \Illuminate\Support\Collection<int, PurchaseItem>,
      *     landTotalRs: float,
      *     landAreaLabel: string,
      *     paymentLines: list<array<string, mixed>>,
+     *     paymentRows: list<array<string, mixed>>,
+     *     expenseGroups: list<array<string, mixed>>,
      *     totalPaid: float,
+     *     totalExpenses: float,
      *     balancePayable: float,
+     *     paymentEntryCount: int,
+     *     expenseEntryCount: int,
      *     entryCount: int,
      *     generatedAt: \Illuminate\Support\Carbon
      * }
      */
-    private function buildPurchaseFilePaymentSheet(PurchaseFile $file): array
+    private function buildPurchaseFileViewData(PurchaseFile $file): array
     {
         $sellers = $file->purchaseItems;
         $landTotalRs = (float) $sellers->sum('line_total_rs');
@@ -313,18 +498,23 @@ class PurchaseFileController extends Controller
             ? LandMeasure::formatAkmsLabelFromMarla($landAreaMarla)
             : '—';
 
-        $entries = DayBookEntry::query()
+        $allEntries = DayBookEntry::query()
             ->where('purchase_file_id', $file->id)
+            ->with(['partySubCategory.category'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
 
-        $partyIds = $entries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
+        $partyIds = $allEntries->where('link_type', DayBookEntry::LINK_PARTY)->pluck('link_id')->unique()->filter()->values();
         $parties = Party::query()->whereIn('id', $partyIds)->get()->keyBy('id');
+
+        $paymentEntries = $allEntries->whereNull('party_sub_category_id')->values();
+        $expenseEntries = $allEntries->whereNotNull('party_sub_category_id')->values();
 
         $paidRunning = 0.0;
         $paymentLines = [];
-        foreach ($entries as $entry) {
+        $paymentRows = [];
+        foreach ($paymentEntries as $entry) {
             $amount = (float) $entry->amount;
             if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
                 $paidRunning += $amount;
@@ -332,40 +522,52 @@ class PurchaseFileController extends Controller
                 $paidRunning -= $amount;
             }
 
-            $partyName = 'General';
-            if ($entry->link_type === DayBookEntry::LINK_PARTY && $entry->link_id) {
-                $partyName = $parties->get((int) $entry->link_id)?->name ?? ('Party #'.$entry->link_id);
-            }
+            $partyName = $this->daybookEntryPartyName($entry, $parties);
+            $paymentText = $this->daybookEntryPaymentText($entry);
+            $description = $this->daybookEntryDescription($entry);
+            $balance = $landTotalRs - $paidRunning;
 
-            $kind = $entry->type === DayBookEntry::TYPE_CASH_IN ? 'Payment in' : 'Payment out';
-            $settlement = $entry->getSettlementLabel();
-            $paymentText = $kind;
-            if ($settlement !== '' && $settlement !== '—') {
-                $paymentText .= ' · '.$settlement;
-            }
-
-            $descParts = [];
-            if ($entry->description && trim((string) $entry->description) !== '') {
-                $descParts[] = trim((string) $entry->description);
-            }
-            if ($entry->voucher_no) {
-                $descParts[] = 'Voucher '.$entry->getVoucherNumber();
-            }
-            $description = $descParts !== [] ? implode(' · ', $descParts) : '—';
-
+            $paymentRows[] = [
+                'entry' => $entry,
+                'date' => $entry->entry_date->format('d M Y'),
+                'party' => $partyName,
+                'description' => $description,
+                'payment' => $paymentText,
+                'amount_display' => 'Rs '.number_format($amount, 2),
+                'balance' => $balance,
+            ];
             $paymentLines[] = [
                 'date' => $entry->entry_date->format('d M Y'),
                 'party' => $partyName,
                 'description' => $description,
                 'payment' => $paymentText,
                 'amount_display' => 'Rs '.number_format($amount, 2),
-                'balance' => $landTotalRs - $paidRunning,
+                'balance' => $balance,
             ];
         }
 
-        $out = (float) $entries->where('type', DayBookEntry::TYPE_CASH_OUT)->sum('amount');
-        $in = (float) $entries->where('type', DayBookEntry::TYPE_CASH_IN)->sum('amount');
-        $totalPaid = $out - $in;
+        $expenseGroups = [];
+        foreach ($expenseEntries->groupBy('party_sub_category_id') as $subCategoryId => $rows) {
+            $rows = $rows->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])->values();
+            $first = $rows->first();
+            $subCategory = $first->partySubCategory;
+            $categoryName = $subCategory?->category?->name ?? '—';
+            $subCategoryName = $subCategory?->name ?? '—';
+            $total = $this->daybookEntriesNetPaid($rows);
+
+            $expenseGroups[] = [
+                'sub_category_id' => (int) $subCategoryId,
+                'label' => $first->getPartySubCategoryLabel(),
+                'category' => $categoryName,
+                'sub_category' => $subCategoryName,
+                'entries' => $rows,
+                'total' => $total,
+            ];
+        }
+        usort($expenseGroups, fn ($a, $b) => strcasecmp($a['label'], $b['label']));
+
+        $totalPaid = $this->daybookEntriesNetPaid($paymentEntries);
+        $totalExpenses = $this->daybookEntriesNetPaid($expenseEntries);
         $balancePayable = $landTotalRs - $totalPaid;
 
         return [
@@ -373,11 +575,63 @@ class PurchaseFileController extends Controller
             'landTotalRs' => $landTotalRs,
             'landAreaLabel' => $landAreaLabel,
             'paymentLines' => $paymentLines,
+            'paymentRows' => $paymentRows,
+            'expenseGroups' => $expenseGroups,
             'totalPaid' => $totalPaid,
+            'totalExpenses' => $totalExpenses,
             'balancePayable' => $balancePayable,
-            'entryCount' => $entries->count(),
+            'paymentEntryCount' => $paymentEntries->count(),
+            'expenseEntryCount' => $expenseEntries->count(),
+            'entryCount' => $allEntries->count(),
             'generatedAt' => now(),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, DayBookEntry>  $entries
+     */
+    private function daybookEntriesNetPaid($entries): float
+    {
+        $out = (float) $entries->where('type', DayBookEntry::TYPE_CASH_OUT)->sum('amount');
+        $in = (float) $entries->where('type', DayBookEntry::TYPE_CASH_IN)->sum('amount');
+
+        return $out - $in;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int|string, Party>  $parties
+     */
+    private function daybookEntryPartyName(DayBookEntry $entry, $parties): string
+    {
+        if ($entry->link_type === DayBookEntry::LINK_PARTY && $entry->link_id) {
+            return $parties->get((int) $entry->link_id)?->name ?? ('Party #'.$entry->link_id);
+        }
+
+        return 'General';
+    }
+
+    private function daybookEntryPaymentText(DayBookEntry $entry): string
+    {
+        $kind = $entry->type === DayBookEntry::TYPE_CASH_IN ? 'Payment in' : 'Payment out';
+        $settlement = $entry->getSettlementLabel();
+        if ($settlement !== '' && $settlement !== '—') {
+            return $kind.' · '.$settlement;
+        }
+
+        return $kind;
+    }
+
+    private function daybookEntryDescription(DayBookEntry $entry): string
+    {
+        $descParts = [];
+        if ($entry->description && trim((string) $entry->description) !== '') {
+            $descParts[] = trim((string) $entry->description);
+        }
+        if ($entry->voucher_no) {
+            $descParts[] = 'Voucher '.$entry->getVoucherNumber();
+        }
+
+        return $descParts !== [] ? implode(' · ', $descParts) : '—';
     }
 
     public function documents(PurchaseFile $purchase_file)

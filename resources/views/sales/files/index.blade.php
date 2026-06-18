@@ -11,6 +11,8 @@
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('sale.projects.exemption.edit', $project) }}" class="btn btn-outline-theme">Exemption setup</a>
         <a href="{{ route('sale.files.create', $project) }}" class="btn btn-pink">Add file</a>
+        <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="btn btn-outline-theme">Purchase files</a>
+        <a href="{{ route('projects.sale-land', $project) }}" class="btn btn-outline-theme">Sale land</a>
         <a href="{{ route('projects.show', $project) }}" class="btn btn-outline-theme">Back to project</a>
         <a href="{{ route('sale.index') }}" class="btn btn-outline-theme">Sale menu</a>
     </div>

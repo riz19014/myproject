@@ -45,7 +45,9 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/files', [PurchaseFileController::class, 'index'])->name('purchase.files.index');
     Route::get('purchase/files/create', [PurchaseFileController::class, 'create'])->name('purchase.files.create');
     Route::post('purchase/files', [PurchaseFileController::class, 'store'])->name('purchase.files.store');
+    Route::get('purchase/files/{purchase_file}', [PurchaseFileController::class, 'show'])->name('purchase.files.show');
     Route::get('purchase/files/{purchase_file}/payment-sheet-pdf', [PurchaseFileController::class, 'paymentSheetPdf'])->name('purchase.files.payment-sheet-pdf');
+    Route::get('purchase/files/{purchase_file}/view-pdf', [PurchaseFileController::class, 'viewPdf'])->name('purchase.files.view-pdf');
     Route::get('purchase/files/{purchase_file}/documents', [PurchaseFileController::class, 'documents'])->name('purchase.files.documents');
     Route::get('purchase/files/{purchase_file}/sellers', [PurchaseFileController::class, 'sellers'])->name('purchase.files.sellers');
     Route::post('purchase/files/{purchase_file}/sellers', [PurchaseFileController::class, 'storeSellers'])->name('purchase.files.sellers.store');
@@ -73,6 +75,7 @@ Route::middleware('auth')->group(function () {
     Route::get('projects/{project}/sale-land', [ProjectController::class, 'saleLand'])->name('projects.sale-land');
     Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
+    Route::delete('projects/{project}/sale-land/{purchase_file}', [ProjectController::class, 'destroySaleLand'])->name('projects.sale-land.destroy');
     Route::resource('projects', ProjectController::class);
     Route::post('projects/{project}/files', [ProjectController::class, 'addFile'])->name('projects.files.store');
     Route::put('projects/{project}/files/{projectFile}/sell', [ProjectController::class, 'sellFile'])->name('projects.files.sell');
