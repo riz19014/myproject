@@ -40,12 +40,9 @@
                 </div>
                 @include('purchases.files.partials.dealers-multi-select', [
                     'parties' => $parties,
-                    'selectedDealerIds' => old('dealer_party_ids', $file->dealers->pluck('id')->all()),
+                    'selectedDealerIds' => old('dealer_party_ids', $selectedDealerIds),
                     'showDealerCommissions' => true,
-                    'dealerCommissions' => old(
-                        'dealer_commissions',
-                        $file->dealers->mapWithKeys(fn ($d) => [$d->id => $d->pivot->commission_rs])->all()
-                    ),
+                    'dealerCommissions' => old('dealer_commissions', $dealerCommissions),
                 ])
                 @error('dealer_party_ids')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
             </div>

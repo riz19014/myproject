@@ -76,6 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
     Route::delete('projects/{project}/sale-land/{purchase_file}', [ProjectController::class, 'destroySaleLand'])->name('projects.sale-land.destroy');
+    Route::post('projects/{project}/sale-land/{purchase_file}/sale', [ProjectController::class, 'storeSaleLandSale'])->name('projects.sale-land.sale.store');
     Route::resource('projects', ProjectController::class);
     Route::post('projects/{project}/files', [ProjectController::class, 'addFile'])->name('projects.files.store');
     Route::put('projects/{project}/files/{projectFile}/sell', [ProjectController::class, 'sellFile'])->name('projects.files.sell');

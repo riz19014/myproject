@@ -14,9 +14,13 @@ class Sale extends Model
 
     public const TYPE_PERCENTAGE = 'percentage';
 
+    public const TYPE_SALE_LAND = 'sale_land';
+
     protected $fillable = [
         'project_id',
         'project_file_id',
+        'purchase_file_id',
+        'sale_land_moza_keys',
         'sale_type',
         'component',
         'plot_type',
@@ -35,6 +39,7 @@ class Sale extends Model
         return [
             'land_area_marla' => 'decimal:12',
             'total_amount' => 'decimal:2',
+            'sale_land_moza_keys' => 'array',
         ];
     }
 
@@ -46,6 +51,11 @@ class Sale extends Model
     public function projectFile(): BelongsTo
     {
         return $this->belongsTo(ProjectFile::class);
+    }
+
+    public function purchaseFile(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseFile::class);
     }
 
     public function customer(): BelongsTo
@@ -61,6 +71,11 @@ class Sale extends Model
     public function isPercentage(): bool
     {
         return $this->sale_type === self::TYPE_PERCENTAGE;
+    }
+
+    public function isSaleLand(): bool
+    {
+        return $this->sale_type === self::TYPE_SALE_LAND;
     }
 
     public function participants(): HasMany

@@ -3,7 +3,7 @@
 @section('title', $purchaseFile->file_name.' — Purchase file')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4 pf-no-print">
     <div>
         <h1 class="mb-1">{{ $purchaseFile->file_name }}</h1>
         <p class="text-muted small mb-1">
@@ -42,7 +42,7 @@
     </div>
 </div>
 
-<div class="row g-2 mb-3">
+<div class="row g-2 mb-3 pf-no-print">
     <div class="col-sm-6 col-lg-3">
         <div class="border rounded p-2 small bg-light h-100">
             <span class="text-muted d-block">Land total</span>
@@ -76,491 +76,273 @@
     </div>
 </div>
 
-<div class="card card-theme mb-3">
-    <div class="card-body py-3">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <p class="text-muted small mb-0">Select columns and rows below. View opens a spreadsheet layout; PDF and print match the same grid.</p>
-            <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="pf-section-check-all">Select all</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="pf-section-check-none">Clear</button>
-                <button type="button" class="btn btn-sm btn-pink" id="pf-section-view-btn">View selection</button>
-                <button type="button" class="btn btn-sm btn-outline-theme" id="pf-section-print-btn">Print</button>
-                <button type="button" class="btn btn-sm btn-outline-theme" id="pf-section-pdf-btn">Download PDF</button>
+<div class="row g-3 pf-ledger-layout">
+    <div class="col-lg-4 col-xl-3 pf-no-print">
+        <div class="card card-theme pf-ledger-nav-card h-100">
+            <div class="card-header py-2">
+                <h2 class="h6 mb-0">Ledger items</h2>
+            </div>
+            <div class="card-body p-0 pf-ledger-nav">
+                @forelse($ledgerNavGrouped as $group => $items)
+                    <div class="pf-ledger-nav-group">
+                        <div class="pf-ledger-nav-group__title">{{ $group }}</div>
+                        @foreach($items as $item)
+                            <button type="button"
+                                    class="pf-ledger-nav-item"
+                                    data-ledger-key="{{ $item['key'] }}">
+                                <span class="pf-ledger-nav-item__label">{{ $item['label'] }}</span>
+                                @if(!empty($item['meta']))
+                                    <span class="pf-ledger-nav-item__meta">{{ $item['meta'] }}</span>
+                                @endif
+                            </button>
+                        @endforeach
+                    </div>
+                @empty
+                    <p class="text-muted small mb-0 p-3">No parties, categories, or subcategories linked to this file yet.</p>
+                @endforelse
             </div>
         </div>
     </div>
-</div>
 
-<div class="pf-sheet-select-columns" id="pf-sheet-select-columns">
-    @foreach($sheetGrid['columns'] as $column)
-        @include('purchases.files.partials.show-sheet-column', ['column' => $column])
-    @endforeach
-</div>
-
-<script type="application/json" id="pf-sheet-grid-json">@json($sheetGrid, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE)</script>
-@endsection
-
-@push('modals')
-<div class="modal fade" id="pfSectionViewModal" tabindex="-1" aria-labelledby="pfSectionViewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-lg-down" style="max-width: 96vw;">
-        <div class="modal-content card-theme">
-            <div class="modal-header">
-                <h2 class="modal-title h5 mb-0" id="pfSectionViewModalLabel">{{ $purchaseFile->file_name }} — Sheet view</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="pf-section-print-area">
-                <p class="text-muted small mb-3">
-                    Project: <strong>{{ $purchaseFile->project?->name ?? '—' }}</strong>
-                    · File date: <strong>{{ $purchaseFile->file_date?->format('d M Y') ?? '—' }}</strong>
+    <div class="col-lg-8 col-xl-9">
+        <div class="card card-theme pf-ledger-panel h-100">
+            <div class="card-body" id="pf-ledger-print-area">
+                <p class="text-muted small mb-0 pf-ledger-empty" id="pf-ledger-empty">
+                    Select a party, category, or subcategory on the left to view its ledger.
                 </p>
-                <div id="pf-section-modal-sheet"></div>
+                <div class="d-none" id="pf-ledger-content">
+                    <div class="pf-ledger-print-header d-none d-print-block mb-3">
+                        <h1 class="h5 mb-1">{{ $purchaseFile->file_name }}</h1>
+                        <p class="text-muted small mb-0">
+                            Project: {{ $purchaseFile->project?->name ?? '—' }}
+                            · File date: {{ $purchaseFile->file_date?->format('d M Y') ?? '—' }}
+                        </p>
+                    </div>
+                    <div class="mb-3">
+                        <h2 class="h5 mb-1" id="pf-ledger-title"></h2>
+                        <p class="text-muted small mb-0" id="pf-ledger-subtitle"></p>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered table-theme mb-0 pf-ledger-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Details</th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-end">Paid</th>
+                                    <th class="text-end">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pf-ledger-rows"></tbody>
+                            <tfoot class="table-light">
+                                <tr class="fw-semibold">
+                                    <td class="text-end">Total</td>
+                                    <td class="text-end font-monospace" id="pf-ledger-total-amount"></td>
+                                    <td class="text-end font-monospace" id="pf-ledger-total-paid"></td>
+                                    <td class="text-end font-monospace" id="pf-ledger-total-balance"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer flex-wrap gap-2">
-                <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-theme" id="pf-section-modal-print-btn">Print</button>
-                <button type="button" class="btn btn-pink" id="pf-section-modal-pdf-btn">Download PDF</button>
+            <div class="card-footer pf-no-print">
+                <button type="button" class="btn btn-outline-theme" id="pf-ledger-print-btn" disabled>Print</button>
             </div>
         </div>
     </div>
 </div>
-@endpush
+
+<script type="application/json" id="pf-ledger-json">@json(['sections' => $ledgerSections], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE)</script>
+@endsection
 
 @push('head')
 <style>
-    .pf-sheet-select-columns {
-        display: flex;
-        gap: 0.75rem;
-        overflow-x: auto;
-        padding-bottom: 0.5rem;
-        align-items: stretch;
-    }
-    .pf-sheet-select-col {
-        flex: 0 0 200px;
-        min-width: 200px;
-        transition: box-shadow 0.15s ease, opacity 0.15s ease;
-    }
-    .pf-sheet-select-col.is-selected {
-        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.35);
-    }
-    .pf-sheet-select-col:not(.is-selected) {
-        opacity: 0.72;
-    }
-    .pf-sheet-select-col__head {
-        background: #f8f9fa;
-        padding: 0.65rem 0.75rem;
-        border-bottom: 1px solid var(--border-dark, #dee2e6);
-    }
-    .pf-sheet-select-col__label {
-        display: flex;
-        align-items: center;
-        gap: 0.45rem;
-        font-weight: 600;
-        font-size: 0.88rem;
-        cursor: pointer;
-        user-select: none;
-    }
-    .pf-sheet-select-col__body {
-        max-height: 480px;
-        overflow-y: auto;
-        padding: 0.75rem;
-    }
-    .pf-section-stack {
+    .pf-ledger-nav-card {
+        max-height: calc(100vh - 12rem);
         display: flex;
         flex-direction: column;
-        gap: 0.55rem;
     }
-    .pf-section-item {
-        border: 1px solid #e9ecef;
-        border-radius: 0.35rem;
-        padding: 0.5rem 0.55rem;
-        background: #fff;
-        transition: opacity 0.15s ease;
-    }
-    .pf-section-item:not(.is-item-selected) {
-        opacity: 0.45;
-    }
-    .pf-section-item__label {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.4rem;
-        margin: 0;
-        cursor: pointer;
-        user-select: none;
-    }
-    .pf-section-item__label .form-check-input {
-        flex: 0 0 auto;
-        margin-top: 0.15rem;
-    }
-    .pf-section-item__content {
+    .pf-ledger-nav {
+        overflow-y: auto;
         flex: 1 1 auto;
-        min-width: 0;
     }
-    .pf-section-item__amount {
+    .pf-ledger-nav-group + .pf-ledger-nav-group {
+        border-top: 1px solid var(--border-dark, #dee2e6);
+    }
+    .pf-ledger-nav-group__title {
+        padding: 0.55rem 0.85rem 0.35rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6c757d;
+        background: #f8f9fa;
+    }
+    .pf-ledger-nav-item {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid #f1f3f5;
+        background: #fff;
+        text-align: left;
+        padding: 0.65rem 0.85rem;
+        transition: background 0.12s ease;
+    }
+    .pf-ledger-nav-item:hover,
+    .pf-ledger-nav-item:focus {
+        background: #fff7ed;
+        outline: none;
+    }
+    .pf-ledger-nav-item.is-active {
+        background: #fff7ed;
+        box-shadow: inset 3px 0 0 #f97316;
+    }
+    .pf-ledger-nav-item__label {
+        display: block;
         font-weight: 600;
         font-size: 0.88rem;
+        color: #212529;
     }
-    .pf-section-total {
-        border-top: 2px solid #adb5bd;
-        padding-top: 0.5rem;
+    .pf-ledger-nav-item__meta {
+        display: block;
+        font-size: 0.78rem;
+        color: #6c757d;
+        margin-top: 0.1rem;
     }
-    .pf-sheet-table th,
-    .pf-sheet-table td {
-        min-width: 72px;
+    .pf-ledger-table th,
+    .pf-ledger-table td {
+        vertical-align: top;
+    }
+    .pf-ledger-table tbody tr.is-opening td {
+        background: #f8f9fa;
     }
     @media print {
-        body * { visibility: hidden; }
-        #pf-section-print-area, #pf-section-print-area * { visibility: visible; }
-        #pf-section-print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 0.5rem;
+        .pf-no-print,
+        .app-sidebar,
+        .app-topbar { display: none !important; }
+        .app-main,
+        .pf-ledger-layout,
+        .pf-ledger-panel,
+        .pf-ledger-panel .card-body {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            box-shadow: none !important;
         }
-        .modal-backdrop { display: none !important; }
-        .modal { position: static !important; display: block !important; overflow: visible !important; }
-        .modal-dialog { max-width: 100% !important; margin: 0 !important; }
-        .modal-header, .modal-footer { display: none !important; }
+        .pf-ledger-print-header { display: block !important; }
     }
-    .is-loading { pointer-events: none; opacity: 0.65; }
 </style>
 @endpush
 
 @push('scripts')
 <script>
 (function() {
-    var pdfBaseUrl = @json(route('purchase.files.view-pdf', $purchaseFile));
-    function readBaseGrid() {
-        var el = document.getElementById('pf-sheet-grid-json');
-        var raw = (el && el.textContent) ? el.textContent.trim() : '';
-        if (!raw) {
-            return { columns: [], row_count: 0 };
-        }
+    var jsonEl = document.getElementById('pf-ledger-json');
+    var sections = {};
+    if (jsonEl && jsonEl.textContent) {
         try {
-            var parsed = JSON.parse(raw);
-            return parsed && Array.isArray(parsed.columns) ? parsed : { columns: [], row_count: 0 };
+            var parsed = JSON.parse(jsonEl.textContent);
+            sections = parsed.sections || {};
         } catch (e) {
-            return { columns: [], row_count: 0 };
+            sections = {};
         }
     }
-    var baseGrid = readBaseGrid();
-    var modalEl = document.getElementById('pfSectionViewModal');
-    var modalSheet = document.getElementById('pf-section-modal-sheet');
-    var modal = modalEl && typeof bootstrap !== 'undefined' ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
 
-    function formatMoney(n) {
-        var v = Math.abs(Number(n) || 0);
-        var s = v.toLocaleString('en-PK', { maximumFractionDigits: 0 });
-        return (Number(n) < 0 ? '-' : '') + s;
-    }
+    var emptyEl = document.getElementById('pf-ledger-empty');
+    var contentEl = document.getElementById('pf-ledger-content');
+    var titleEl = document.getElementById('pf-ledger-title');
+    var subtitleEl = document.getElementById('pf-ledger-subtitle');
+    var rowsEl = document.getElementById('pf-ledger-rows');
+    var totalAmountEl = document.getElementById('pf-ledger-total-amount');
+    var totalPaidEl = document.getElementById('pf-ledger-total-paid');
+    var totalBalanceEl = document.getElementById('pf-ledger-total-balance');
+    var printBtn = document.getElementById('pf-ledger-print-btn');
+    var navItems = document.querySelectorAll('.pf-ledger-nav-item[data-ledger-key]');
+    var activeKey = null;
 
-    function getSelection() {
-        var result = { columns: [], items: {} };
-        document.querySelectorAll('.pf-sheet-select-col[data-column]').forEach(function(col) {
-            var key = col.dataset.column;
-            var parent = col.querySelector('.pf-column-check');
-            if (!parent || !parent.checked) {
-                return;
-            }
-            var itemIds = Array.from(col.querySelectorAll('.pf-item-check:checked')).map(function(cb) {
-                return cb.value;
-            });
-            if (!itemIds.length && col.querySelectorAll('.pf-item-check').length > 0) {
-                return;
-            }
-            result.columns.push(key);
-            if (itemIds.length) {
-                result.items[key] = itemIds;
-            }
-        });
-        return result;
-    }
-
-    function requireSelection() {
-        var selection = getSelection();
-        if (!selection.columns.length) {
-            alert('Select at least one column and one row.');
-            return null;
+    function formatMoney(value) {
+        if (value === null || value === undefined || value === '') {
+            return '—';
         }
-        return selection;
+        var n = Number(value);
+        if (!isFinite(n)) {
+            return '—';
+        }
+        if (n < 0) {
+            return 'Overpaid Rs ' + Math.abs(n).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        return 'Rs ' + n.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function filterGrid(grid, selection) {
-        var columns = [];
-        grid.columns.forEach(function(col) {
-            if (selection.columns.indexOf(col.key) === -1) {
-                return;
-            }
-            var rows = col.rows || [];
-            if (selection.items[col.key]) {
-                rows = rows.filter(function(row) {
-                    return selection.items[col.key].indexOf(row.id) !== -1;
-                });
-            }
-            var total = col.key === 'grand_total_exp'
-                ? 0
-                : rows.reduce(function(sum, row) { return sum + Number(row.amount || 0); }, 0);
-            if (col.key === 'grand_total_exp') {
-                selection.columns.forEach(function(key) {
-                    if (key.indexOf('expense_') === 0) {
-                        var src = grid.columns.find(function(c) { return c.key === key; });
-                        if (!src) return;
-                        var srcRows = src.rows || [];
-                        if (selection.items[key]) {
-                            srcRows = srcRows.filter(function(row) {
-                                return selection.items[key].indexOf(row.id) !== -1;
-                            });
-                        }
-                        total += srcRows.reduce(function(s, r) { return s + Number(r.amount || 0); }, 0);
-                    }
-                });
-            }
-            if (col.key === 'balance_payable' && rows.length) {
-                total = Number(rows[rows.length - 1].amount || 0);
-            }
-            columns.push({
-                key: col.key,
-                label: col.label,
-                full_label: col.full_label,
-                rows: rows,
-                total: total,
-                total_display: formatMoney(total)
-            });
-        });
-        var rowCount = 0;
-        columns.forEach(function(col) {
-            rowCount = Math.max(rowCount, col.rows.length);
-        });
-        return { columns: columns, row_count: rowCount };
-    }
-
-    function renderSheetTable(grid, target) {
-        if (!target) return;
-        if (!grid.columns.length) {
-            target.innerHTML = '<p class="text-muted small mb-0">Nothing selected.</p>';
+    function renderSection(key) {
+        var section = sections[key];
+        if (!section) {
             return;
         }
-        var html = '<div class="table-responsive"><table class="table table-bordered table-sm table-theme pf-sheet-table mb-0"><thead><tr>';
-        grid.columns.forEach(function(col) {
-            html += '<th class="text-center text-nowrap" title="' + (col.full_label || col.label) + '">' + col.label + '</th>';
-        });
-        html += '</tr></thead><tbody>';
-        for (var r = 0; r < grid.row_count; r++) {
-            html += '<tr>';
-            grid.columns.forEach(function(col) {
-                var row = col.rows[r];
-                html += '<td class="text-end font-monospace small">' + (row ? row.display : '') + '</td>';
-            });
-            html += '</tr>';
-        }
-        html += '</tbody><tfoot class="table-light"><tr class="fw-semibold">';
-        grid.columns.forEach(function(col) {
-            html += '<td class="text-end font-monospace">' + col.total_display + '</td>';
-        });
-        html += '</tr></tfoot></table></div>';
-        target.innerHTML = html;
-    }
 
-    function buildPdfUrl(selection) {
-        var params = [];
-        selection.columns.forEach(function(key) {
-            params.push('columns[]=' + encodeURIComponent(key));
-            if (selection.items[key]) {
-                selection.items[key].forEach(function(id) {
-                    params.push('items[' + encodeURIComponent(key) + '][]=' + encodeURIComponent(id));
-                });
-            }
+        activeKey = key;
+        navItems.forEach(function(btn) {
+            btn.classList.toggle('is-active', btn.dataset.ledgerKey === key);
         });
-        return pdfBaseUrl + '?' + params.join('&');
-    }
 
-    function downloadPdf(selection, triggerBtn) {
-        var href = buildPdfUrl(selection);
-        if (triggerBtn) {
-            triggerBtn.classList.add('is-loading');
-            if (!triggerBtn.dataset.originalHtml) {
-                triggerBtn.dataset.originalHtml = triggerBtn.innerHTML;
-            }
-            triggerBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        }
-        fetch(href, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
-            .then(function(res) {
-                if (!res.ok) throw new Error('pdf');
-                var cd = res.headers.get('Content-Disposition');
-                var fname = 'purchase-file.pdf';
-                if (cd) {
-                    var m = /filename="([^"]+)"/i.exec(cd) || /filename=([^;\s]+)/i.exec(cd);
-                    if (m) fname = m[1].replace(/"/g, '');
-                }
-                return res.blob().then(function(blob) { return { blob: blob, fname: fname }; });
-            })
-            .then(function(o) {
-                var url = URL.createObjectURL(o.blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = o.fname;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
-            })
-            .catch(function() { alert('Could not download PDF.'); })
-            .finally(function() {
-                if (triggerBtn) {
-                    triggerBtn.classList.remove('is-loading');
-                    if (triggerBtn.dataset.originalHtml) {
-                        triggerBtn.innerHTML = triggerBtn.dataset.originalHtml;
-                    }
-                }
-            });
-    }
+        emptyEl.classList.add('d-none');
+        contentEl.classList.remove('d-none');
+        printBtn.disabled = false;
 
-    function syncParentState(col) {
-        var parent = col.querySelector('.pf-column-check');
-        var items = col.querySelectorAll('.pf-item-check');
-        var checked = col.querySelectorAll('.pf-item-check:checked');
-        if (!parent || !items.length) return;
-        if (!checked.length) {
-            parent.checked = false;
-            parent.indeterminate = false;
-        } else if (checked.length === items.length) {
-            parent.checked = true;
-            parent.indeterminate = false;
+        titleEl.textContent = section.title || '';
+        if (section.subtitle) {
+            subtitleEl.textContent = section.subtitle;
+            subtitleEl.classList.remove('d-none');
         } else {
-            parent.checked = true;
-            parent.indeterminate = true;
+            subtitleEl.textContent = '';
+            subtitleEl.classList.add('d-none');
         }
-    }
 
-    function syncItemVisualState(col) {
-        col.querySelectorAll('.pf-section-item[data-item-id]').forEach(function(item) {
-            var cb = item.querySelector('.pf-item-check');
-            item.classList.toggle('is-item-selected', !!(cb && cb.checked));
+        rowsEl.innerHTML = '';
+        (section.rows || []).forEach(function(row) {
+            var tr = document.createElement('tr');
+            if (row.is_opening) {
+                tr.classList.add('is-opening');
+            }
+            tr.innerHTML =
+                '<td>' + (row.details || '—') + '</td>' +
+                '<td class="text-end font-monospace">' + formatMoney(row.amount) + '</td>' +
+                '<td class="text-end font-monospace">' + formatMoney(row.paid) + '</td>' +
+                '<td class="text-end font-monospace">' + formatMoney(row.balance) + '</td>';
+            rowsEl.appendChild(tr);
         });
+
+        if (!section.rows || !section.rows.length) {
+            var emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = '<td colspan="4" class="text-muted small">No ledger entries yet.</td>';
+            rowsEl.appendChild(emptyRow);
+        }
+
+        var totals = section.totals || {};
+        totalAmountEl.textContent = formatMoney(totals.amount);
+        totalPaidEl.textContent = formatMoney(totals.paid);
+        totalBalanceEl.textContent = formatMoney(totals.balance);
     }
 
-    function recalculateColumnTotal(col) {
-        var key = col.dataset.column;
-        var totalEl = col.querySelector('.pf-column-total-display');
-        if (!totalEl) return;
-        if (key === 'grand_total_exp') {
-            var expenseSum = 0;
-            document.querySelectorAll('.pf-sheet-select-col[data-column^="expense_"]').forEach(function(expCol) {
-                var p = expCol.querySelector('.pf-column-check');
-                if (!p || !p.checked) return;
-                expCol.querySelectorAll('.pf-item-check:checked').forEach(function(cb) {
-                    var item = cb.closest('.pf-section-item');
-                    expenseSum += parseFloat(item?.dataset.amount || '0');
-                });
-            });
-            totalEl.textContent = formatMoney(expenseSum);
+    navItems.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            renderSection(btn.dataset.ledgerKey);
+        });
+    });
+
+    printBtn?.addEventListener('click', function() {
+        if (!activeKey) {
             return;
         }
-        var sum = 0;
-        col.querySelectorAll('.pf-item-check:checked').forEach(function(cb) {
-            var item = cb.closest('.pf-section-item');
-            sum += parseFloat(item?.dataset.amount || '0');
-        });
-        if (key === 'balance_payable') {
-            var checked = col.querySelectorAll('.pf-item-check:checked');
-            if (checked.length) {
-                var last = checked[checked.length - 1].closest('.pf-section-item');
-                sum = parseFloat(last?.dataset.amount || '0');
-            }
-        }
-        totalEl.textContent = formatMoney(sum);
-    }
-
-    function updateColumnSelectionState() {
-        document.querySelectorAll('.pf-sheet-select-col[data-column]').forEach(function(col) {
-            var parent = col.querySelector('.pf-column-check');
-            var hasChecked = col.querySelectorAll('.pf-item-check').length === 0
-                || col.querySelectorAll('.pf-item-check:checked').length > 0;
-            col.classList.toggle('is-selected', !!(parent && parent.checked && hasChecked));
-        });
-    }
-
-    function setAllChecks(checked) {
-        document.querySelectorAll('.pf-column-check, .pf-item-check').forEach(function(cb) {
-            cb.checked = checked;
-            cb.indeterminate = false;
-        });
-        document.querySelectorAll('.pf-sheet-select-col[data-column]').forEach(function(col) {
-            syncItemVisualState(col);
-            recalculateColumnTotal(col);
-        });
-        updateColumnSelectionState();
-    }
-
-    document.querySelectorAll('.pf-column-check').forEach(function(parentCb) {
-        parentCb.addEventListener('change', function() {
-            var col = parentCb.closest('.pf-sheet-select-col');
-            col.querySelectorAll('.pf-item-check').forEach(function(itemCb) {
-                itemCb.checked = parentCb.checked;
-            });
-            parentCb.indeterminate = false;
-            syncItemVisualState(col);
-            recalculateColumnTotal(col);
-            updateColumnSelectionState();
-        });
-    });
-
-    document.querySelectorAll('.pf-item-check').forEach(function(itemCb) {
-        itemCb.addEventListener('change', function() {
-            var col = itemCb.closest('.pf-sheet-select-col');
-            syncParentState(col);
-            syncItemVisualState(col);
-            recalculateColumnTotal(col);
-            if (col.dataset.column && col.dataset.column.indexOf('expense_') === 0) {
-                var grandCol = document.querySelector('.pf-sheet-select-col[data-column="grand_total_exp"]');
-                if (grandCol) recalculateColumnTotal(grandCol);
-            }
-            updateColumnSelectionState();
-        });
-    });
-
-    document.getElementById('pf-section-check-all')?.addEventListener('click', function() { setAllChecks(true); });
-    document.getElementById('pf-section-check-none')?.addEventListener('click', function() { setAllChecks(false); });
-
-    document.getElementById('pf-section-view-btn')?.addEventListener('click', function() {
-        var selection = requireSelection();
-        if (!selection) return;
-        renderSheetTable(filterGrid(baseGrid, selection), modalSheet);
-        modal?.show();
-    });
-
-    document.getElementById('pf-section-print-btn')?.addEventListener('click', function() {
-        var selection = requireSelection();
-        if (!selection) return;
-        renderSheetTable(filterGrid(baseGrid, selection), modalSheet);
-        modal?.show();
-        setTimeout(function() { window.print(); }, 350);
-    });
-
-    document.getElementById('pf-section-pdf-btn')?.addEventListener('click', function() {
-        var selection = requireSelection();
-        if (!selection) return;
-        downloadPdf(selection, this);
-    });
-
-    document.getElementById('pf-section-modal-print-btn')?.addEventListener('click', function() {
         window.print();
     });
 
-    document.getElementById('pf-section-modal-pdf-btn')?.addEventListener('click', function() {
-        var selection = getSelection();
-        if (!selection.columns.length) {
-            alert('Select at least one column and one row.');
-            return;
-        }
-        downloadPdf(selection, this);
-    });
-
-    document.querySelectorAll('.pf-sheet-select-col[data-column]').forEach(function(col) {
-        syncItemVisualState(col);
-        recalculateColumnTotal(col);
-    });
-    updateColumnSelectionState();
+    if (navItems.length) {
+        renderSection(navItems[0].dataset.ledgerKey);
+    }
 })();
 </script>
 @endpush

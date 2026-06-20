@@ -21,6 +21,8 @@ use Illuminate\Validation\Rule;
 
 class PurchaseFileController extends Controller
 {
+    private const DEALER_SUB_CATEGORY_ID = 3;
+
     public function index(Request $request)
     {
         $projectId = $request->query('project');
@@ -58,11 +60,13 @@ class PurchaseFileController extends Controller
     public function create(Request $request)
     {
         $projects = Project::query()->with('landType')->orderBy('name')->get();
-        $parties = Party::query()->orderBy('name')->get();
+        $parties = Party::query()
+            ->where('sub_category_id', self::DEALER_SUB_CATEGORY_ID)
+            ->orderBy('name')
+            ->get();
         $partySubCategories = PartySubCategory::query()
             ->with('category')
-            ->orderBy('category_id')
-            ->orderBy('name')
+            ->where('id', self::DEALER_SUB_CATEGORY_ID)
             ->get();
         $projectId = $request->query('project');
 
@@ -81,7 +85,11 @@ class PurchaseFileController extends Controller
             ],
             'file_date' => ['required', 'date'],
             'dealer_party_ids' => ['nullable', 'array'],
-            'dealer_party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
+            'dealer_party_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('parties', 'id')->where('sub_category_id', self::DEALER_SUB_CATEGORY_ID),
+            ],
             'dealer_commissions' => ['nullable', 'array'],
             'dealer_commissions.*' => ['nullable', 'integer', 'min:0'],
         ]);
@@ -140,7 +148,6 @@ class PurchaseFileController extends Controller
             'lines.*.amount_per_acre' => ['required', 'integer', 'min:0'],
         ]);
 
-        $partyIds = [];
         $items = [];
         foreach ($validated['lines'] as $idx => $line) {
             $attrs = PurchaseLineAttributes::fromInput(
@@ -148,19 +155,15 @@ class PurchaseFileController extends Controller
                 "lines.{$idx}.area_acre",
                 'Seller '.($idx + 1).': enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.'
             );
-            $partyIds[] = $attrs['party_id'];
             $items[] = array_merge($attrs, [
                 'project_id' => $purchase_file->project_id,
                 'purchase_file_id' => $purchase_file->id,
             ]);
         }
 
-        DB::transaction(function () use ($items, $purchase_file, $partyIds) {
+        DB::transaction(function () use ($items) {
             foreach ($items as $row) {
                 PurchaseItem::create($row);
-            }
-            if ($partyIds !== []) {
-                $purchase_file->dealers()->syncWithoutDetaching(array_unique($partyIds));
             }
         });
 
@@ -184,17 +187,38 @@ class PurchaseFileController extends Controller
     public function edit(PurchaseFile $purchase_file)
     {
         $purchase_file->load(['project', 'dealers']);
-        $parties = Party::query()->orderBy('name')->get();
-        $partySubCategories = PartySubCategory::query()
-            ->with('category')
-            ->orderBy('category_id')
+
+        $incorrectDealerIds = $purchase_file->dealers
+            ->filter(fn (Party $party) => (int) $party->sub_category_id !== self::DEALER_SUB_CATEGORY_ID)
+            ->pluck('id')
+            ->all();
+
+        if ($incorrectDealerIds !== []) {
+            $purchase_file->dealers()->detach($incorrectDealerIds);
+            $purchase_file->load('dealers');
+        }
+
+        $parties = Party::query()
+            ->where('sub_category_id', self::DEALER_SUB_CATEGORY_ID)
             ->orderBy('name')
             ->get();
+
+        $partySubCategories = PartySubCategory::query()
+            ->with('category')
+            ->where('id', self::DEALER_SUB_CATEGORY_ID)
+            ->get();
+
+        $selectedDealerIds = $purchase_file->dealers->pluck('id')->all();
+        $dealerCommissions = $purchase_file->dealers
+            ->mapWithKeys(fn ($dealer) => [$dealer->id => $dealer->pivot->commission_rs])
+            ->all();
 
         return view('purchases.files.edit', [
             'file' => $purchase_file,
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
+            'selectedDealerIds' => $selectedDealerIds,
+            'dealerCommissions' => $dealerCommissions,
         ]);
     }
 
@@ -211,7 +235,11 @@ class PurchaseFileController extends Controller
             ],
             'file_date' => ['required', 'date'],
             'dealer_party_ids' => ['nullable', 'array'],
-            'dealer_party_ids.*' => ['integer', 'distinct', 'exists:parties,id'],
+            'dealer_party_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('parties', 'id')->where('sub_category_id', self::DEALER_SUB_CATEGORY_ID),
+            ],
             'dealer_commissions' => ['nullable', 'array'],
             'dealer_commissions.*' => ['nullable', 'integer', 'min:0'],
         ]);
@@ -280,12 +308,12 @@ class PurchaseFileController extends Controller
         ])->loadCount('documents');
 
         $data = $this->buildPurchaseFileViewData($purchase_file);
-        $data['includePaymentOpening'] = true;
-        $sheetGrid = PurchaseFileSheetGrid::build($purchase_file, $data);
+        $ledger = $this->buildPurchaseFileLedger($purchase_file, $data);
 
         return view('purchases.files.show', array_merge(
-            ['purchaseFile' => $purchase_file, 'sheetGrid' => $sheetGrid],
-            $data
+            ['purchaseFile' => $purchase_file],
+            $data,
+            $ledger
         ));
     }
 
@@ -585,6 +613,327 @@ class PurchaseFileController extends Controller
             'entryCount' => $allEntries->count(),
             'generatedAt' => now(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{ledgerNav: list<array<string, mixed>>, ledgerNavGrouped: array<string, list<array<string, mixed>>>, ledgerSections: array<string, array<string, mixed>>}
+     */
+    private function buildPurchaseFileLedger(PurchaseFile $file, array $data): array
+    {
+        $allEntries = DayBookEntry::query()
+            ->where('purchase_file_id', $file->id)
+            ->with(['partySubCategory.category'])
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        $partyIds = collect();
+        foreach ($data['sellers'] as $seller) {
+            if ($seller->party_id) {
+                $partyIds->push((int) $seller->party_id);
+            }
+        }
+        foreach ($file->dealers as $dealer) {
+            $partyIds->push((int) $dealer->id);
+        }
+        foreach ($allEntries->whereNull('party_sub_category_id') as $entry) {
+            if ($entry->link_type === DayBookEntry::LINK_PARTY && $entry->link_id) {
+                $partyIds->push((int) $entry->link_id);
+            }
+        }
+        $partyIds = $partyIds->unique()->sort()->values();
+
+        $parties = Party::query()
+            ->with(['subCategory.category', 'category'])
+            ->whereIn('id', $partyIds)
+            ->get()
+            ->keyBy('id');
+
+        $nav = [];
+        $sections = [];
+
+        foreach ($partyIds as $partyId) {
+            $party = $parties->get($partyId);
+            $landTotal = (float) $data['sellers']->where('party_id', $partyId)->sum('line_total_rs');
+            $dealer = $file->dealers->firstWhere('id', $partyId);
+            $commission = $dealer ? (float) ($dealer->pivot->commission_rs ?? 0) : 0.0;
+            $openingAmount = $landTotal + $commission;
+
+            $paymentEntries = $allEntries
+                ->whereNull('party_sub_category_id')
+                ->where('link_type', DayBookEntry::LINK_PARTY)
+                ->where('link_id', $partyId)
+                ->values();
+
+            if ($openingAmount <= 0 && $paymentEntries->isEmpty()) {
+                continue;
+            }
+
+            $key = 'party_'.$partyId;
+            $sections[$key] = $this->buildFileLedgerPaymentSection(
+                $party?->name ?? ('Party #'.$partyId),
+                $this->fileLedgerPartySubtitle($party, $landTotal, $commission),
+                $openingAmount,
+                $this->fileLedgerOpeningDetails($landTotal, $commission),
+                $paymentEntries,
+                $parties
+            );
+            $nav[] = [
+                'key' => $key,
+                'group' => 'Parties',
+                'label' => $party?->name ?? ('Party #'.$partyId),
+                'meta' => $this->fileLedgerPartyMeta($party, $landTotal, $commission),
+            ];
+        }
+
+        $generalPayments = $allEntries
+            ->whereNull('party_sub_category_id')
+            ->filter(fn (DayBookEntry $e) => $e->link_type !== DayBookEntry::LINK_PARTY || ! $e->link_id)
+            ->values();
+        if ($generalPayments->isNotEmpty()) {
+            $key = 'general';
+            $sections[$key] = $this->buildFileLedgerPaymentSection(
+                'General',
+                'Payments without a party on this file',
+                0.0,
+                null,
+                $generalPayments,
+                collect()
+            );
+            $nav[] = [
+                'key' => $key,
+                'group' => 'Parties',
+                'label' => 'General',
+                'meta' => 'Unlinked payments',
+            ];
+        }
+
+        $categoryBuckets = [];
+        foreach ($data['expenseGroups'] as $group) {
+            $subKey = 'subcategory_'.$group['sub_category_id'];
+            $sections[$subKey] = $this->buildFileLedgerExpenseSection(
+                $group['sub_category'],
+                $group['category'],
+                $group['entries']
+            );
+            $nav[] = [
+                'key' => $subKey,
+                'group' => 'Subcategories',
+                'label' => $group['sub_category'],
+                'meta' => $group['category'],
+            ];
+
+            $first = $group['entries']->first();
+            $categoryId = (int) ($first?->partySubCategory?->category_id ?? 0);
+            $categoryName = $group['category'];
+            if ($categoryId > 0) {
+                $categoryBuckets[$categoryId] ??= [
+                    'name' => $categoryName,
+                    'entries' => collect(),
+                ];
+                $categoryBuckets[$categoryId]['entries'] = $categoryBuckets[$categoryId]['entries']->merge($group['entries']);
+            }
+        }
+
+        foreach ($categoryBuckets as $categoryId => $bucket) {
+            $entries = $bucket['entries']->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])->values();
+            $key = 'category_'.$categoryId;
+            $sections[$key] = $this->buildFileLedgerExpenseSection(
+                $bucket['name'],
+                'All subcategories in this category',
+                $entries
+            );
+            $nav[] = [
+                'key' => $key,
+                'group' => 'Categories',
+                'label' => $bucket['name'],
+                'meta' => $entries->count().' '.($entries->count() === 1 ? 'entry' : 'entries'),
+            ];
+        }
+
+        usort($nav, function (array $a, array $b) {
+            $groupOrder = ['Parties' => 0, 'Categories' => 1, 'Subcategories' => 2];
+            $ga = $groupOrder[$a['group']] ?? 99;
+            $gb = $groupOrder[$b['group']] ?? 99;
+            if ($ga !== $gb) {
+                return $ga <=> $gb;
+            }
+
+            return strcasecmp($a['label'], $b['label']);
+        });
+
+        $grouped = [];
+        foreach ($nav as $item) {
+            $grouped[$item['group']][] = $item;
+        }
+
+        return [
+            'ledgerNav' => $nav,
+            'ledgerNavGrouped' => $grouped,
+            'ledgerSections' => $sections,
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int|string, Party>  $parties
+     * @param  \Illuminate\Support\Collection<int, DayBookEntry>  $entries
+     * @return array<string, mixed>
+     */
+    private function buildFileLedgerPaymentSection(
+        string $title,
+        ?string $subtitle,
+        float $openingAmount,
+        ?string $openingDetails,
+        $entries,
+        $parties
+    ): array {
+        $rows = [];
+        if ($openingAmount > 0) {
+            $rows[] = [
+                'details' => $openingDetails ?? 'Opening balance',
+                'amount' => $openingAmount,
+                'paid' => 0.0,
+                'balance' => $openingAmount,
+                'is_opening' => true,
+            ];
+        }
+
+        $paidRunning = 0.0;
+        foreach ($entries as $entry) {
+            $amount = (float) $entry->amount;
+            if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
+                $paidRunning += $amount;
+            } else {
+                $paidRunning -= $amount;
+            }
+            $rows[] = [
+                'details' => $this->fileLedgerEntryDetails($entry, $parties),
+                'amount' => $amount,
+                'paid' => $paidRunning,
+                'balance' => $openingAmount > 0 ? $openingAmount - $paidRunning : null,
+            ];
+        }
+
+        return [
+            'title' => $title,
+            'subtitle' => $subtitle,
+            'rows' => $rows,
+            'totals' => [
+                'amount' => $openingAmount > 0 ? $openingAmount : $paidRunning,
+                'paid' => $paidRunning,
+                'balance' => $openingAmount > 0 ? $openingAmount - $paidRunning : null,
+            ],
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, DayBookEntry>  $entries
+     * @return array<string, mixed>
+     */
+    private function buildFileLedgerExpenseSection(string $title, ?string $subtitle, $entries): array
+    {
+        $entries = $entries->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])->values();
+        $totalAmount = $this->daybookEntriesNetPaid($entries);
+        $paidRunning = 0.0;
+        $rows = [];
+
+        foreach ($entries as $entry) {
+            $amount = (float) $entry->amount;
+            if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
+                $paidRunning += $amount;
+            } else {
+                $paidRunning -= $amount;
+            }
+            $rows[] = [
+                'details' => $this->fileLedgerEntryDetails($entry, collect()),
+                'amount' => $amount,
+                'paid' => $paidRunning,
+                'balance' => max(0.0, $totalAmount - $paidRunning),
+            ];
+        }
+
+        return [
+            'title' => $title,
+            'subtitle' => $subtitle,
+            'rows' => $rows,
+            'totals' => [
+                'amount' => $totalAmount,
+                'paid' => $paidRunning,
+                'balance' => max(0.0, $totalAmount - $paidRunning),
+            ],
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int|string, Party>  $parties
+     */
+    private function fileLedgerEntryDetails(DayBookEntry $entry, $parties): string
+    {
+        $parts = [$entry->entry_date->format('d M Y')];
+        $description = $this->daybookEntryDescription($entry);
+        if ($description !== '—') {
+            $parts[] = $description;
+        }
+        $parts[] = $this->daybookEntryPaymentText($entry);
+
+        if ($entry->link_type === DayBookEntry::LINK_PARTY && $entry->link_id && $parties->isNotEmpty()) {
+            $partyName = $parties->get((int) $entry->link_id)?->name;
+            if ($partyName) {
+                $parts[] = $partyName;
+            }
+        }
+
+        return implode(' · ', $parts);
+    }
+
+    private function fileLedgerOpeningDetails(float $landTotal, float $commission): string
+    {
+        $parts = [];
+        if ($landTotal > 0) {
+            $parts[] = 'Land total (file)';
+        }
+        if ($commission > 0) {
+            $parts[] = 'Commission';
+        }
+
+        return $parts !== [] ? implode(' · ', $parts) : 'Opening balance';
+    }
+
+    private function fileLedgerPartySubtitle(?Party $party, float $landTotal, float $commission): ?string
+    {
+        $roles = [];
+        if ($landTotal > 0) {
+            $roles[] = 'Seller';
+        }
+        if ($commission > 0) {
+            $roles[] = 'Dealer';
+        }
+        if ($party && $party->relationLoaded('subCategory') && $party->subCategory) {
+            $cat = $party->subCategory->relationLoaded('category') && $party->subCategory->category
+                ? $party->subCategory->category->name
+                : null;
+            $sub = $party->subCategory->name;
+            $roles[] = $cat ? ($cat.' — '.$sub) : $sub;
+        }
+
+        return $roles !== [] ? implode(' · ', $roles) : null;
+    }
+
+    private function fileLedgerPartyMeta(?Party $party, float $landTotal, float $commission): string
+    {
+        $parts = [];
+        if ($landTotal > 0) {
+            $parts[] = 'Seller';
+        }
+        if ($commission > 0) {
+            $parts[] = 'Dealer';
+        }
+        if ($parts === [] && $party && $party->relationLoaded('category') && $party->category) {
+            $parts[] = $party->category->name;
+        }
+
+        return $parts !== [] ? implode(' · ', $parts) : 'Party';
     }
 
     /**

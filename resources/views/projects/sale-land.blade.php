@@ -89,28 +89,39 @@
                                     @if($row['show_file_name'])
                                         <td class="sale-land-sheet__file-name-cell" rowspan="{{ $row['file_name_rowspan'] }}">
                                             <div class="sale-land-sheet__file-name-wrap">
-                                                <input type="checkbox"
-                                                       class="form-check-input sale-land-file-check"
-                                                       value="{{ $row['purchase_file_id'] }}"
-                                                       id="sale-land-file-{{ $row['purchase_file_id'] }}"
-                                                       aria-label="Include {{ $row['file_name'] }} in PDF"
-                                                       @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
-                                                <label class="sale-land-sheet__file-name-text mb-0" for="sale-land-file-{{ $row['purchase_file_id'] }}">{{ $row['file_name'] }}</label>
-                                                <form method="post"
-                                                      action="{{ route('projects.sale-land.destroy', [$project, $row['purchase_file_id']]) }}"
-                                                      class="sale-land-sheet__file-delete-form">
-                                                    @csrf
-                                                    @method('DELETE')
+                                                <div class="sale-land-sheet__file-name-main">
+                                                    <input type="checkbox"
+                                                           class="form-check-input sale-land-file-check"
+                                                           value="{{ $row['purchase_file_id'] }}"
+                                                           id="sale-land-file-{{ $row['purchase_file_id'] }}"
+                                                           aria-label="Include {{ $row['file_name'] }} in PDF"
+                                                           @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
+                                                    <label class="sale-land-sheet__file-name-text mb-0" for="sale-land-file-{{ $row['purchase_file_id'] }}">{{ $row['file_name'] }}</label>
+                                                </div>
+                                                <div class="sale-land-sheet__file-actions">
+                                                    <form method="post"
+                                                          action="{{ route('projects.sale-land.destroy', [$project, $row['purchase_file_id']]) }}"
+                                                          class="sale-land-sheet__file-delete-form">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger sale-land-sheet__file-delete-btn btn-delete-confirm"
+                                                                data-title="Delete sale land?"
+                                                                data-text="Remove &quot;{{ $row['file_name'] }}&quot; from sale land? The purchase file and sellers will stay; only this sale land record and its formula overrides will be removed."
+                                                                data-confirm="Yes, delete"
+                                                                title="Delete sale land"
+                                                                aria-label="Delete sale land for {{ $row['file_name'] }}">
+                                                            <i class="bi bi-trash" aria-hidden="true"></i>
+                                                        </button>
+                                                    </form>
                                                     <button type="button"
-                                                            class="btn btn-sm btn-outline-danger sale-land-sheet__file-delete-btn btn-delete-confirm"
-                                                            data-title="Delete sale land?"
-                                                            data-text="Remove &quot;{{ $row['file_name'] }}&quot; from sale land? The purchase file and sellers will stay; only this sale land record and its formula overrides will be removed."
-                                                            data-confirm="Yes, delete"
-                                                            title="Delete sale land"
-                                                            aria-label="Delete sale land for {{ $row['file_name'] }}">
-                                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                                            class="sale-land-sheet__file-sale-link sale-land-open-sale-modal"
+                                                            data-purchase-file-id="{{ $row['purchase_file_id'] }}"
+                                                            title="Sell to customer"
+                                                            aria-label="Sell {{ $row['file_name'] }} to customer">
+                                                        <i class="bi bi-files" aria-hidden="true"></i>
                                                     </button>
-                                                </form>
+                                                </div>
                                             </div>
                                         </td>
                                     @endif
@@ -223,6 +234,133 @@
 @endif
 @endsection
 
+@if($sheetRows !== [])
+@push('modals')
+    <div class="modal fade" id="sale-land-sale-modal" tabindex="-1" aria-labelledby="sale-land-sale-modal-title" aria-hidden="true" data-bs-focus="false">
+        <div class="modal-dialog modal-fullscreen-lg-down sale-land-sale-modal-dialog" style="max-width: 96vw;">
+            <div class="modal-content card-theme sale-land-sale-modal-content">
+                <div class="modal-header flex-shrink-0">
+                    <h2 class="modal-title h5 mb-0" id="sale-land-sale-modal-title">Sell to customer</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="#" id="sale-land-sale-form" class="sale-land-sale-modal-form">
+                    @csrf
+                    <div class="modal-body sale-land-sale-modal__scroll">
+                        @if($errors->any())
+                            <div class="alert alert-danger small">
+                                <ul class="mb-0 ps-3">
+                                    @foreach($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                        <p class="text-muted small mb-3" id="sale-land-sale-modal-meta">
+                            Project: <strong>{{ $project->name }}</strong>
+                            · Total land: <strong id="sale-land-sale-total-land">—</strong>
+                        </p>
+
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <h3 class="h6 mb-0">Select mouza</h3>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-sale-mouza-all">Select all</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-sale-mouza-none">Clear</button>
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-2">Choose one or more mouza rows to sell from. Plot file availability below updates from your selection.</p>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-bordered table-striped table-theme mb-0 align-middle sale-land-sale-sheet-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center" style="width: 52px;">Pick</th>
+                                        <th>Mouza</th>
+                                        <th>Khasra</th>
+                                        <th>LP</th>
+                                        <th>Owner</th>
+                                        <th>Transfer to</th>
+                                        <th class="text-end">Land</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sale-land-sale-mouza-body"></tbody>
+                            </table>
+                        </div>
+                        <p class="small text-muted mb-3" id="sale-land-sale-mouza-count"></p>
+
+                        <h3 class="h6 mb-2">Choose plot file type to sell</h3>
+                        <p class="text-muted small mb-3">Select which exempt plot file you are selling to the customer (e.g. 2K Residential, 1K Residential).</p>
+                        <div class="table-responsive mb-0">
+                            <table class="table table-sm table-bordered table-striped table-theme mb-0 align-middle sale-land-sale-sheet-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center" style="width: 52px;">Pick</th>
+                                        <th style="width: 72px;">Code</th>
+                                        <th>Plot file</th>
+                                        <th class="text-end" style="width: 110px;">Total</th>
+                                        <th class="text-end" style="width: 110px;">Left</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sale-land-sale-plot-options"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="sale-land-sale-modal__fields flex-shrink-0">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-5">
+                                <label for="sale_land_customer_id" class="form-label">Customer <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-theme @error('customer_id') is-invalid @enderror"
+                                        id="sale_land_customer_id"
+                                        name="customer_id"
+                                        required>
+                                    <option value="">Select customer</option>
+                                    @foreach($customers as $customer)
+                                        <option value="{{ $customer->id }}" @selected((int) old('customer_id') === (int) $customer->id)>{{ $customer->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('customer_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                @if($customers->isEmpty())
+                                    <div class="form-text">No customers yet. <a href="{{ route('customers.create') }}">Add a customer</a> first.</div>
+                                @endif
+                            </div>
+                            <div class="col-md-3">
+                                <label for="sale_land_plot_quantity" class="form-label">Plot quantity <span class="text-danger">*</span></label>
+                                <input type="number"
+                                       class="form-control form-control-theme @error('plot_quantity') is-invalid @enderror"
+                                       id="sale_land_plot_quantity"
+                                       name="plot_quantity"
+                                       value="{{ old('plot_quantity', 1) }}"
+                                       min="1"
+                                       max="999"
+                                       required>
+                                @error('plot_quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text" id="sale-land-sale-qty-hint"></div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sale_land_total_amount" class="form-label">Amount (Rs) <span class="text-danger">*</span></label>
+                                <input type="number"
+                                       class="form-control form-control-theme @error('total_amount') is-invalid @enderror"
+                                       id="sale_land_total_amount"
+                                       name="total_amount"
+                                       value="{{ old('total_amount') }}"
+                                       min="0"
+                                       step="0.01"
+                                       required>
+                                @error('total_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer flex-wrap gap-2 flex-shrink-0">
+                        <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-pink" id="sale-land-sale-submit">Save sale</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endpush
+@endif
+
 @push('head')
 <style>
     .sale-land-sheet-split {
@@ -291,6 +429,13 @@
         align-items: flex-start;
         gap: 0.4rem;
     }
+    .sale-land-sheet__file-name-main {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
     .sale-land-sheet__file-name-text {
         flex: 1 1 auto;
         min-width: 0;
@@ -302,14 +447,114 @@
         flex: 0 0 auto;
         margin-top: 0.2rem;
     }
+    .sale-land-sheet__file-actions {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+    }
     .sale-land-sheet__file-delete-form {
         flex: 0 0 auto;
-        margin-left: auto;
     }
     .sale-land-sheet__file-delete-btn {
         padding: 0.15rem 0.35rem;
         line-height: 1;
         font-size: 0.75rem;
+    }
+    .sale-land-sheet__file-sale-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.65rem;
+        height: 1.65rem;
+        font-size: 0.75rem;
+        color: var(--accent-orange, #f97316);
+        background: rgba(249, 115, 22, 0.08);
+        border: 1px solid rgba(249, 115, 22, 0.22);
+        border-radius: 0.25rem;
+        text-decoration: none;
+        line-height: 1;
+        padding: 0;
+        transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .sale-land-sheet__file-sale-link:hover {
+        background: rgba(249, 115, 22, 0.14);
+        border-color: rgba(249, 115, 22, 0.35);
+        color: var(--accent-orange, #f97316);
+    }
+    .sale-land-sale-sheet-table th,
+    .sale-land-sale-sheet-table td {
+        min-width: 72px;
+        font-size: 0.88rem;
+        vertical-align: middle;
+    }
+    #sale-land-sale-modal .sale-land-sale-modal-dialog {
+        margin: 0.75rem auto;
+        height: calc(100vh - 1.5rem);
+        max-height: calc(100vh - 1.5rem);
+    }
+    #sale-land-sale-modal .sale-land-sale-modal-content {
+        height: 100%;
+        max-height: calc(100vh - 1.5rem);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    #sale-land-sale-modal .sale-land-sale-modal-form {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+    #sale-land-sale-modal .sale-land-sale-modal__scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+    #sale-land-sale-modal .sale-land-sale-modal__fields {
+        flex: 0 0 auto;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border-top: 1px solid rgba(15, 23, 42, 0.12);
+        box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+    }
+    #sale-land-sale-modal .modal-footer {
+        background: #fff;
+    }
+    @media (max-width: 991.98px) {
+        #sale-land-sale-modal .sale-land-sale-modal-dialog {
+            margin: 0;
+            height: 100vh;
+            max-height: 100vh;
+        }
+        #sale-land-sale-modal .sale-land-sale-modal-content {
+            max-height: 100vh;
+            border-radius: 0;
+        }
+    }
+    .sale-land-sale-mouza-row.is-selected td {
+        background: rgba(249, 115, 22, 0.08) !important;
+    }
+    .sale-land-sale-mouza-row {
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .sale-land-sale-plot-row {
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .sale-land-sale-plot-row:hover:not(.is-disabled) {
+        background: rgba(249, 115, 22, 0.05) !important;
+    }
+    .sale-land-sale-plot-row.is-selected td {
+        background: rgba(249, 115, 22, 0.1) !important;
+    }
+    .sale-land-sale-plot-row.is-disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
     }
     .sale-land-pdf-link.is-loading {
         pointer-events: none;
@@ -629,6 +874,355 @@
             document.querySelectorAll('.sale-land-file-check').forEach(function(cb) {
                 cb.checked = false;
             });
+        });
+    }
+
+    var saleLandModalData = @json($saleLandModalData ?? []);
+    var saleLandSaleUrlTemplate = @json(route('projects.sale-land.sale.store', [$project, '__FILE__']));
+    var saleLandModalEl = document.getElementById('sale-land-sale-modal');
+    var saleLandSaleForm = document.getElementById('sale-land-sale-form');
+    var saleLandModalInstance = saleLandModalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(saleLandModalEl) : null;
+    var saleLandPlotOptionsEl = document.getElementById('sale-land-sale-plot-options');
+    var saleLandMouzaBodyEl = document.getElementById('sale-land-sale-mouza-body');
+    var saleLandQtyInput = document.getElementById('sale_land_plot_quantity');
+    var saleLandQtyHint = document.getElementById('sale-land-sale-qty-hint');
+    var saleLandSubmitBtn = document.getElementById('sale-land-sale-submit');
+    var activeSaleLandFile = null;
+    var activeSaleLandPlot = null;
+
+    function escapeSaleLandHtml(value) {
+        return String(value || '—')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatPlotFileCount(value) {
+        var n = parseFloat(value);
+        if (isNaN(n) || n <= 0) {
+            return '0';
+        }
+        if (Math.abs(n - Math.round(n)) < 0.0001) {
+            return String(Math.round(n));
+        }
+        return String(parseFloat(n.toFixed(4)));
+    }
+
+    function getSelectedMouzaKeys() {
+        if (!saleLandMouzaBodyEl) {
+            return [];
+        }
+        return Array.from(saleLandMouzaBodyEl.querySelectorAll('.sale-land-sale-mouza-check:checked'))
+            .map(function(cb) { return cb.value; });
+    }
+
+    function buildPlotOptionsFromSelection(file) {
+        var selectedKeys = getSelectedMouzaKeys();
+        var selectedRows = (file.mouza_rows || []).filter(function(row) {
+            return selectedKeys.indexOf(String(row.moza_key)) !== -1;
+        });
+
+        return (file.plot_options || []).map(function(option) {
+            var available = selectedRows.reduce(function(sum, row) {
+                var formula = (row.formula_values || {})[option.plot_key];
+                return sum + parseFloat(formula ? formula.file_count : 0);
+            }, 0);
+            var usedQty = parseFloat(option.used_quantity || 0);
+            var remaining = Math.max(0, available - usedQty);
+
+            return Object.assign({}, option, {
+                available_files: available,
+                available_display: formatPlotFileCount(available),
+                remaining_files: remaining,
+                remaining_display: formatPlotFileCount(remaining),
+            });
+        });
+    }
+
+    function updateMouzaRowStates() {
+        if (!saleLandMouzaBodyEl) {
+            return;
+        }
+        saleLandMouzaBodyEl.querySelectorAll('.sale-land-sale-mouza-row').forEach(function(row) {
+            var cb = row.querySelector('.sale-land-sale-mouza-check');
+            row.classList.toggle('is-selected', !!(cb && cb.checked));
+        });
+        var countEl = document.getElementById('sale-land-sale-mouza-count');
+        var selected = getSelectedMouzaKeys().length;
+        var total = (activeSaleLandFile && activeSaleLandFile.mouza_rows) ? activeSaleLandFile.mouza_rows.length : 0;
+        if (countEl) {
+            if (selected === 0) {
+                countEl.textContent = 'No mouza selected — pick at least one row above.';
+            } else {
+                countEl.textContent = selected + ' of ' + total + ' mouza ' + (total === 1 ? 'row' : 'rows') + ' selected';
+            }
+        }
+    }
+
+    function onMouzaSelectionChange() {
+        updateMouzaRowStates();
+        if (activeSaleLandFile) {
+            renderSaleLandPlotOptions(activeSaleLandFile);
+        }
+    }
+
+    function renderSaleLandMouzaRows(file) {
+        if (!saleLandMouzaBodyEl) {
+            return;
+        }
+        saleLandMouzaBodyEl.innerHTML = (file.mouza_rows || []).map(function(row, index) {
+            var inputId = 'sale_land_moza_' + file.purchase_file_id + '_' + index;
+            return '<tr class="sale-land-sale-mouza-row is-selected" data-moza-key="' + escapeSaleLandHtml(row.moza_key) + '">' +
+                '<td class="text-center">' +
+                    '<input type="checkbox" class="form-check-input sale-land-sale-mouza-check" id="' + inputId + '" value="' + escapeSaleLandHtml(row.moza_key) + '" checked aria-label="Select mouza ' + escapeSaleLandHtml(row.moza) + '">' +
+                '</td>' +
+                '<td><label class="mb-0" for="' + inputId + '">' + escapeSaleLandHtml(row.moza) + '</label></td>' +
+                '<td>' + escapeSaleLandHtml(row.khasra) + '</td>' +
+                '<td>' + escapeSaleLandHtml(row.land_provider) + '</td>' +
+                '<td>' + escapeSaleLandHtml(row.land_owner) + '</td>' +
+                '<td>' + escapeSaleLandHtml(row.transfer_to) + '</td>' +
+                '<td class="text-end text-nowrap">' + escapeSaleLandHtml(row.total_land) + '</td>' +
+            '</tr>';
+        }).join('');
+
+        saleLandMouzaBodyEl.querySelectorAll('.sale-land-sale-mouza-row').forEach(function(row) {
+            row.addEventListener('click', function(e) {
+                if (e.target && (e.target.type === 'checkbox' || e.target.tagName === 'LABEL')) {
+                    return;
+                }
+                var cb = row.querySelector('.sale-land-sale-mouza-check');
+                if (cb) {
+                    cb.checked = !cb.checked;
+                    onMouzaSelectionChange();
+                }
+            });
+        });
+        saleLandMouzaBodyEl.querySelectorAll('.sale-land-sale-mouza-check').forEach(function(cb) {
+            cb.addEventListener('change', onMouzaSelectionChange);
+        });
+        onMouzaSelectionChange();
+    }
+
+    var saleLandMouzaAllBtn = document.getElementById('sale-land-sale-mouza-all');
+    var saleLandMouzaNoneBtn = document.getElementById('sale-land-sale-mouza-none');
+    if (saleLandMouzaAllBtn) {
+        saleLandMouzaAllBtn.addEventListener('click', function() {
+            saleLandMouzaBodyEl.querySelectorAll('.sale-land-sale-mouza-check').forEach(function(cb) {
+                cb.checked = true;
+            });
+            onMouzaSelectionChange();
+        });
+    }
+    if (saleLandMouzaNoneBtn) {
+        saleLandMouzaNoneBtn.addEventListener('click', function() {
+            saleLandMouzaBodyEl.querySelectorAll('.sale-land-sale-mouza-check').forEach(function(cb) {
+                cb.checked = false;
+            });
+            onMouzaSelectionChange();
+        });
+    }
+
+    function findSaleLandFile(fileId) {
+        return saleLandModalData.find(function(file) {
+            return String(file.purchase_file_id) === String(fileId);
+        }) || null;
+    }
+
+    function updateSaleLandPlotSelection(rowEl) {
+        if (!saleLandPlotOptionsEl) {
+            return;
+        }
+        saleLandPlotOptionsEl.querySelectorAll('.sale-land-sale-plot-row').forEach(function(el) {
+            el.classList.remove('is-selected');
+            var radio = el.querySelector('input[type="radio"]');
+            if (radio) {
+                radio.checked = false;
+            }
+        });
+        if (!rowEl) {
+            activeSaleLandPlot = null;
+            if (saleLandQtyHint) {
+                saleLandQtyHint.textContent = '';
+            }
+            if (saleLandSubmitBtn) {
+                saleLandSubmitBtn.disabled = true;
+            }
+            return;
+        }
+        rowEl.classList.add('is-selected');
+        var radio = rowEl.querySelector('input[type="radio"]');
+        if (radio) {
+            radio.checked = true;
+            activeSaleLandPlot = {
+                component: radio.dataset.component,
+                plotType: radio.dataset.plotType,
+                remaining: parseFloat(radio.dataset.remaining || '0')
+            };
+        }
+        if (saleLandQtyInput && activeSaleLandPlot) {
+            var maxQty = Math.max(1, Math.floor(activeSaleLandPlot.remaining));
+            saleLandQtyInput.max = String(maxQty);
+            if (parseInt(saleLandQtyInput.value || '1', 10) > maxQty) {
+                saleLandQtyInput.value = String(maxQty);
+            }
+        }
+        if (saleLandQtyHint && activeSaleLandPlot && radio) {
+            saleLandQtyHint.textContent = 'Available: ' + radio.dataset.remainingDisplay + ' plot file(s)';
+        }
+        if (saleLandSubmitBtn && activeSaleLandPlot) {
+            saleLandSubmitBtn.disabled = getSelectedMouzaKeys().length === 0;
+        }
+    }
+
+    function renderSaleLandPlotOptions(file) {
+        if (!saleLandPlotOptionsEl) {
+            return;
+        }
+        saleLandPlotOptionsEl.innerHTML = '';
+        activeSaleLandPlot = null;
+
+        if (getSelectedMouzaKeys().length === 0) {
+            saleLandPlotOptionsEl.innerHTML =
+                '<tr><td colspan="5" class="text-muted small text-center py-3">Select at least one mouza to see plot file options.</td></tr>';
+            if (saleLandSubmitBtn) {
+                saleLandSubmitBtn.disabled = true;
+            }
+            return;
+        }
+
+        var plotOptions = buildPlotOptionsFromSelection(file);
+        var hasSelectable = false;
+        plotOptions.forEach(function(option, index) {
+            var remaining = parseFloat(option.remaining_files || 0);
+            var disabled = remaining < 0.9999;
+            if (!disabled) {
+                hasSelectable = true;
+            }
+            var optionId = 'sale_land_plot_' + file.purchase_file_id + '_' + index;
+            var row = document.createElement('tr');
+            row.className = 'sale-land-sale-plot-row' + (disabled ? ' is-disabled' : '');
+            row.innerHTML =
+                '<td class="text-center">' +
+                    '<input type="radio" class="form-check-input" id="' + optionId + '" name="plot_choice"' +
+                    ' data-component="' + escapeSaleLandHtml(option.component_slug) + '"' +
+                    ' data-plot-type="' + escapeSaleLandHtml(option.plot_slug) + '"' +
+                    ' data-remaining="' + remaining + '"' +
+                    ' data-remaining-display="' + escapeSaleLandHtml(option.remaining_display) + '"' +
+                    (disabled ? ' disabled' : '') + ' aria-label="' + escapeSaleLandHtml(option.label) + '">' +
+                '</td>' +
+                '<td class="fw-semibold">' + escapeSaleLandHtml(option.code) + '</td>' +
+                '<td>' + escapeSaleLandHtml(option.label) + '</td>' +
+                '<td class="text-end">' + escapeSaleLandHtml(option.available_display) + '</td>' +
+                '<td class="text-end fw-semibold">' + escapeSaleLandHtml(option.remaining_display) + '</td>';
+
+            if (!disabled) {
+                row.addEventListener('click', function(e) {
+                    if (e.target && e.target.type === 'radio') {
+                        updateSaleLandPlotSelection(row);
+                        return;
+                    }
+                    var radio = row.querySelector('input[type="radio"]');
+                    if (radio) {
+                        radio.checked = true;
+                        updateSaleLandPlotSelection(row);
+                    }
+                });
+                var radio = row.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.addEventListener('change', function() {
+                        updateSaleLandPlotSelection(row);
+                    });
+                }
+            }
+            saleLandPlotOptionsEl.appendChild(row);
+        });
+
+        if (!hasSelectable) {
+            saleLandPlotOptionsEl.innerHTML =
+                '<tr><td colspan="5" class="text-muted small text-center py-3">No plot files available for the selected mouza(s).</td></tr>';
+            if (saleLandSubmitBtn) {
+                saleLandSubmitBtn.disabled = true;
+            }
+            return;
+        }
+
+        var firstEnabled = saleLandPlotOptionsEl.querySelector('.sale-land-sale-plot-row:not(.is-disabled)');
+        if (firstEnabled) {
+            updateSaleLandPlotSelection(firstEnabled);
+        } else if (saleLandSubmitBtn) {
+            saleLandSubmitBtn.disabled = true;
+        }
+    }
+
+    function openSaleLandSaleModal(fileId) {
+        var file = findSaleLandFile(fileId);
+        if (!file || !saleLandModalInstance || !saleLandSaleForm) {
+            return;
+        }
+        activeSaleLandFile = file;
+
+        var titleEl = document.getElementById('sale-land-sale-modal-title');
+        if (titleEl) {
+            titleEl.textContent = file.file_name + ' — Sell to customer';
+        }
+        var totalLandEl = document.getElementById('sale-land-sale-total-land');
+        if (totalLandEl) {
+            totalLandEl.textContent = file.total_land;
+        }
+
+        renderSaleLandMouzaRows(file);
+        saleLandSaleForm.action = saleLandSaleUrlTemplate.replace('__FILE__', String(file.purchase_file_id));
+        saleLandModalInstance.show();
+    }
+
+    document.querySelectorAll('.sale-land-open-sale-modal').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            openSaleLandSaleModal(this.dataset.purchaseFileId);
+        });
+    });
+
+    if (saleLandSaleForm) {
+        saleLandSaleForm.addEventListener('submit', function(e) {
+            var selectedMouzas = getSelectedMouzaKeys();
+            if (selectedMouzas.length === 0) {
+                e.preventDefault();
+                alert('Select at least one mouza to sell from.');
+                return;
+            }
+            if (!activeSaleLandPlot) {
+                e.preventDefault();
+                alert('Choose a plot file type to sell from.');
+                return;
+            }
+            saleLandSaleForm.querySelectorAll('input[name="moza_keys[]"]').forEach(function(el) {
+                el.remove();
+            });
+            selectedMouzas.forEach(function(key) {
+                var mozaInput = document.createElement('input');
+                mozaInput.type = 'hidden';
+                mozaInput.name = 'moza_keys[]';
+                mozaInput.value = key;
+                saleLandSaleForm.appendChild(mozaInput);
+            });
+            var existingComponent = saleLandSaleForm.querySelector('input[name="component"]');
+            var existingPlotType = saleLandSaleForm.querySelector('input[name="plot_type"]');
+            if (existingComponent) {
+                existingComponent.remove();
+            }
+            if (existingPlotType) {
+                existingPlotType.remove();
+            }
+            var componentInput = document.createElement('input');
+            componentInput.type = 'hidden';
+            componentInput.name = 'component';
+            componentInput.value = activeSaleLandPlot.component;
+            var plotTypeInput = document.createElement('input');
+            plotTypeInput.type = 'hidden';
+            plotTypeInput.name = 'plot_type';
+            plotTypeInput.value = activeSaleLandPlot.plotType;
+            saleLandSaleForm.appendChild(componentInput);
+            saleLandSaleForm.appendChild(plotTypeInput);
         });
     }
 })();

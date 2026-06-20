@@ -16,6 +16,7 @@ use App\Support\LandMeasure;
 use App\Support\LandPrecision;
 use App\Support\ProjectExemptionDefaults;
 use App\Support\SaleExemptionConfig;
+use App\Support\SaleExemptionFileCalculator;
 use App\Support\SaleLandMozaGroups;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -308,6 +309,8 @@ class ProjectController extends Controller
             $scopedPurchaseFiles->isNotEmpty() ? $scopedPurchaseFiles->pluck('id')->all() : null,
         );
         $marlaPerAcreLand = $exemptionConfig->marlaPerAcreLand();
+        $customers = Customer::query()->orderBy('name')->get();
+        $saleLandModalData = $this->buildSaleLandModalData($project, $saleLandSheet);
 
         return view('projects.sale-land', compact(
             'project',
@@ -315,6 +318,8 @@ class ProjectController extends Controller
             'exemptionConfig',
             'marlaPerAcreLand',
             'scopedPurchaseFiles',
+            'customers',
+            'saleLandModalData',
         ));
     }
 
@@ -450,6 +455,221 @@ class ProjectController extends Controller
         return redirect()
             ->route('projects.sale-land', $project)
             ->with('success', 'Sale land record for "'.$name.'" removed. The purchase file is unchanged.');
+    }
+
+    public function storeSaleLandSale(Request $request, Project $project, PurchaseFile $purchase_file)
+    {
+        abort_unless($purchase_file->project_id === $project->id, 404);
+        abort_unless($purchase_file->isSaleLand(), 404);
+
+        ProjectExemptionDefaults::ensureForProject($project);
+        $config = SaleExemptionConfig::forProject($project);
+        $componentSlugs = $config->componentSlugs();
+
+        $validated = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'moza_keys' => ['required', 'array', 'min:1'],
+            'moza_keys.*' => ['string', 'max:255'],
+            'component' => ['required', 'string', 'max:40', Rule::in($componentSlugs)],
+            'plot_type' => ['required', 'string', 'max:40'],
+            'plot_quantity' => ['required', 'integer', 'min:1', 'max:999'],
+            'total_amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $component = $validated['component'];
+        $plotType = $validated['plot_type'];
+        $options = $config->plotOptionsForComponent($component);
+        if (! array_key_exists($plotType, $options)) {
+            throw ValidationException::withMessages([
+                'plot_type' => ['Invalid plot type for this component.'],
+            ]);
+        }
+
+        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, [$purchase_file->id]);
+        $selectedMozaKeys = array_values(array_unique($validated['moza_keys']));
+        $sheetRows = collect($sheet['rows'] ?? []);
+        $validMozaKeys = $sheetRows->pluck('moza_key')->unique()->values()->all();
+
+        foreach ($selectedMozaKeys as $mozaKey) {
+            if (! in_array($mozaKey, $validMozaKeys, true)) {
+                throw ValidationException::withMessages([
+                    'moza_keys' => ['One or more selected mouzas are invalid for this file.'],
+                ]);
+            }
+        }
+
+        $selectedRows = $sheetRows->whereIn('moza_key', $selectedMozaKeys);
+        $availableFiles = $this->availableSaleLandPlotFilesForRows($sheet, $selectedRows->all(), $component, $plotType);
+
+        $qty = (int) $validated['plot_quantity'];
+        $usedQty = (int) Sale::query()
+            ->where('purchase_file_id', $purchase_file->id)
+            ->where('sale_type', Sale::TYPE_SALE_LAND)
+            ->where('component', $component)
+            ->where('plot_type', $plotType)
+            ->sum('plot_quantity');
+
+        $remainingFiles = max(0, $availableFiles - $usedQty);
+        if ($qty > $remainingFiles + 0.0001) {
+            throw ValidationException::withMessages([
+                'plot_quantity' => [
+                    'Only '.SaleExemptionFileCalculator::formatFileCount($remainingFiles)
+                    .' plot file(s) available for '.$options[$plotType]
+                    .' on the selected mouza(s).',
+                ],
+            ]);
+        }
+
+        $marlaPerPlot = $config->plotMarla($component, $plotType);
+        $totalMarla = round($marlaPerPlot * $qty, 4);
+
+        Sale::create([
+            'project_id' => $project->id,
+            'purchase_file_id' => $purchase_file->id,
+            'sale_land_moza_keys' => $selectedMozaKeys,
+            'sale_type' => Sale::TYPE_SALE_LAND,
+            'component' => $component,
+            'plot_type' => $plotType,
+            'plot_quantity' => $qty,
+            'customer_id' => $validated['customer_id'],
+            'area_acre' => 0,
+            'area_kanal' => 0,
+            'area_marla' => 0,
+            'area_sqft' => 0,
+            'land_area_marla' => $totalMarla,
+            'total_amount' => $validated['total_amount'],
+        ]);
+
+        return redirect()
+            ->route('projects.sale-land', ['project' => $project, 'purchase_file' => $purchase_file->id])
+            ->with('success', 'Sale recorded for "'.$purchase_file->file_name.'" — '.$options[$plotType].'.');
+    }
+
+    /**
+     * @param  array{formula_columns: list<array<string, mixed>>, rows: list<array<string, mixed>>}  $saleLandSheet
+     * @return list<array<string, mixed>>
+     */
+    private function buildSaleLandModalData(Project $project, array $saleLandSheet): array
+    {
+        $formulaColumns = $saleLandSheet['formula_columns'] ?? [];
+        $rows = collect($saleLandSheet['rows'] ?? []);
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $usedSales = Sale::query()
+            ->where('project_id', $project->id)
+            ->where('sale_type', Sale::TYPE_SALE_LAND)
+            ->whereNotNull('purchase_file_id')
+            ->get()
+            ->groupBy('purchase_file_id');
+
+        return $rows
+            ->groupBy('purchase_file_id')
+            ->map(function ($fileRows, $fileId) use ($formulaColumns, $usedSales) {
+                $first = $fileRows->first();
+                $totalMarla = (float) $fileRows->sum('total_land_marla');
+                $fileUsed = $usedSales->get($fileId, collect());
+
+                $plotOptions = $this->plotOptionsForSaleLandRows($formulaColumns, $fileRows, $fileUsed);
+
+                return [
+                    'purchase_file_id' => (int) $fileId,
+                    'file_name' => $first['file_name'],
+                    'total_land' => LandMeasure::formatAkmsLabelFromMarla($totalMarla),
+                    'total_land_marla' => $totalMarla,
+                    'formula_columns' => $formulaColumns,
+                    'mouza_rows' => $fileRows->map(fn (array $row) => [
+                        'moza_key' => $row['moza_key'],
+                        'moza' => $row['moza'],
+                        'khasra' => $row['khasra'],
+                        'land_owner' => $row['land_owner'],
+                        'land_provider' => $row['land_provider'],
+                        'transfer_to' => $row['transfer_to'],
+                        'total_land' => $row['total_land'],
+                        'formula_values' => $row['formula_values'] ?? [],
+                    ])->values()->all(),
+                    'plot_options' => $plotOptions,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $formulaColumns
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $fileRows
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Sale>  $fileUsed
+     * @return list<array<string, mixed>>
+     */
+    private function plotOptionsForSaleLandRows(array $formulaColumns, $fileRows, $fileUsed): array
+    {
+        $plotOptions = [];
+        foreach ($formulaColumns as $column) {
+            $plotKey = $column['plot_key'];
+            $available = (float) $fileRows->sum(
+                fn (array $row) => (float) ($row['formula_values'][$plotKey]['file_count'] ?? 0)
+            );
+            $usedQty = (int) $fileUsed
+                ->where('component', $column['component_slug'])
+                ->where('plot_type', $column['plot_slug'])
+                ->sum('plot_quantity');
+            $remaining = max(0, $available - $usedQty);
+
+            $plotOptions[] = [
+                'plot_key' => $plotKey,
+                'code' => $column['code'],
+                'label' => $column['short_label'],
+                'plot_label' => $column['plot_label'],
+                'component_label' => $column['component_label'],
+                'component_slug' => $column['component_slug'],
+                'plot_slug' => $column['plot_slug'],
+                'available_files' => round($available, 4),
+                'available_display' => SaleExemptionFileCalculator::formatFileCount($available),
+                'remaining_files' => round($remaining, 4),
+                'remaining_display' => SaleExemptionFileCalculator::formatFileCount($remaining),
+                'used_quantity' => $usedQty,
+            ];
+        }
+
+        return $plotOptions;
+    }
+
+    /**
+     * @param  array{formula_columns: list<array<string, mixed>>, rows: list<array<string, mixed>>}  $sheet
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function availableSaleLandPlotFilesForRows(array $sheet, array $rows, string $component, string $plotType): float
+    {
+        $plotKey = null;
+        foreach ($sheet['formula_columns'] ?? [] as $column) {
+            if ($column['component_slug'] === $component && $column['plot_slug'] === $plotType) {
+                $plotKey = $column['plot_key'];
+                break;
+            }
+        }
+
+        if ($plotKey === null) {
+            return 0.0;
+        }
+
+        return (float) collect($rows)->sum(
+            fn (array $row) => (float) ($row['formula_values'][$plotKey]['file_count'] ?? 0)
+        );
+    }
+
+    /**
+     * @param  array{formula_columns: list<array<string, mixed>>, rows: list<array<string, mixed>>}  $sheet
+     */
+    private function availableSaleLandPlotFiles(array $sheet, string $component, string $plotType): float
+    {
+        return $this->availableSaleLandPlotFilesForRows(
+            $sheet,
+            $sheet['rows'] ?? [],
+            $component,
+            $plotType,
+        );
     }
 
     /**
