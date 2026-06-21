@@ -170,6 +170,42 @@ final class SaleExemptionFileCalculator
         return number_format($amount, 0);
     }
 
+    public static function formatRsWithWords(?float $amount): string
+    {
+        if ($amount === null) {
+            return '—';
+        }
+
+        $words = self::formatRsWords($amount);
+
+        return 'Rs '.number_format($amount, 0).($words !== '' ? ' ('.$words.')' : '');
+    }
+
+    public static function formatRsWords(?float $amount): string
+    {
+        if ($amount === null || $amount <= 0) {
+            return '';
+        }
+
+        $intPart = (int) round($amount);
+        if ($intPart >= 10000000) {
+            return self::scaleAmountWords($intPart / 10000000).' crore';
+        }
+        if ($intPart >= 100000) {
+            return self::scaleAmountWords($intPart / 100000).' lac';
+        }
+        if ($intPart >= 1000) {
+            return self::scaleAmountWords($intPart / 1000).' thousand';
+        }
+
+        return '';
+    }
+
+    private static function scaleAmountWords(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+    }
+
     private static function componentCodePrefix(ProjectSaleExemptionComponent $component): string
     {
         return strtoupper(substr($component->slug, 0, 1));

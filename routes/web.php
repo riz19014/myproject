@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
     Route::get('sale/projects/{project}/files/create', [SaleProjectFileController::class, 'create'])->name('sale.files.create');
     Route::post('sale/projects/{project}/files', [SaleProjectFileController::class, 'store'])->name('sale.files.store');
     Route::get('sale/files/{projectFile}/sale', [SaleProjectFileController::class, 'saleCreate'])->name('sale.files.sale.create');
+    Route::get('sale/files/{projectFile}/estimation-pdf', [SaleProjectFileController::class, 'estimationPdf'])->name('sale.files.estimation.pdf');
     Route::put('sale/files/{projectFile}/area', [SaleProjectFileController::class, 'updateArea'])->name('sale.files.area.update');
     Route::post('sale/files/{projectFile}/sale', [SaleController::class, 'store'])->name('sale.files.sale.store');
     Route::get('sale/records/create', [SaleController::class, 'create'])->name('sale.records.create');

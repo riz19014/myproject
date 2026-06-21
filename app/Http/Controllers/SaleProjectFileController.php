@@ -12,6 +12,7 @@ use App\Support\ProjectExemptionDefaults;
 use App\Support\SaleExemptionConfig;
 use App\Support\SaleExemptionFileCalculator;
 use App\Support\SaleExemptionRules;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -92,6 +93,10 @@ class SaleProjectFileController extends Controller
         $remainingDirect = $projectFile->remainingMarla();
         $plotRates = $projectFile->plot_sale_rates_per_acre ?? [];
         $fileCalculator = SaleExemptionFileCalculator::calculate($fileMarla, $config, $plotRates);
+        $saleAmountPerAcre = old('sale_amount_per_acre', $projectFile->sale_amount_per_acre);
+        $landValueEstimate = ($saleAmountPerAcre !== null && $saleAmountPerAcre !== '' && (float) $saleAmountPerAcre > 0)
+            ? round((float) $fileCalculator['acres'] * (float) $saleAmountPerAcre, 2)
+            : null;
 
         return view('sales.create', [
             'projectFile' => $projectFile,
@@ -105,6 +110,8 @@ class SaleProjectFileController extends Controller
             'remainingDirect' => $remainingDirect,
             'fileCalculator' => $fileCalculator,
             'plotRatesPerFile' => $plotRates,
+            'saleAmountPerAcre' => $saleAmountPerAcre,
+            'landValueEstimate' => $landValueEstimate,
             'recentSales' => $projectFile->sales->sortByDesc('id')->take(20),
         ]);
     }
@@ -122,6 +129,7 @@ class SaleProjectFileController extends Controller
             'pool_percent' => ['required', 'array'],
             'plot_rate_per_file' => ['nullable', 'array'],
             'plot_rate_per_file.*' => ['nullable', 'numeric', 'min:0'],
+            'sale_amount_per_acre' => ['nullable', 'numeric', 'min:0'],
         ];
         foreach ($config->components() as $component) {
             $rules['pool_percent.'.$component->id] = ['required', 'numeric', 'min:0', 'max:100', 'regex:/^\d+(\.\d{1,4})?$/'];
@@ -174,9 +182,50 @@ class SaleProjectFileController extends Controller
         }
         $projectFile->update(['plot_sale_rates_per_acre' => $plotRates !== [] ? $plotRates : null]);
 
+        $saleAmountPerAcre = $validated['sale_amount_per_acre'] ?? null;
+        $projectFile->update([
+            'sale_amount_per_acre' => ($saleAmountPerAcre !== null && $saleAmountPerAcre !== '')
+                ? round((float) $saleAmountPerAcre, 2)
+                : null,
+        ]);
+
         return redirect()->route('sale.files.sale.create', [
             'projectFile' => $projectFile,
             'type' => Sale::TYPE_PERCENTAGE,
-        ])->with('success', 'File area and pool percentages saved.');
+        ])->with('success', 'File settings saved.');
+    }
+
+    public function estimationPdf(ProjectFile $projectFile)
+    {
+        $projectFile->load(['project.landType', 'exemptionOverrides']);
+        $project = $projectFile->project;
+        $config = SaleExemptionConfig::forFile($projectFile);
+        $fileMarla = (float) $projectFile->land_area_marla;
+        $plotRates = $projectFile->plot_sale_rates_per_acre ?? [];
+        $fileCalculator = SaleExemptionFileCalculator::calculate($fileMarla, $config, $plotRates);
+        $poolsSummary = $config->poolsSummary($fileMarla);
+        $saleAmountPerAcre = $projectFile->sale_amount_per_acre;
+        $landValueEstimate = ($saleAmountPerAcre !== null && (float) $saleAmountPerAcre > 0)
+            ? round((float) $fileCalculator['acres'] * (float) $saleAmountPerAcre, 2)
+            : null;
+
+        $pdf = Pdf::loadView('sales.estimation-pdf', [
+            'projectFile' => $projectFile,
+            'project' => $project,
+            'config' => $config,
+            'fileMarla' => $fileMarla,
+            'marlaPerAcreLand' => $config->marlaPerAcreLand(),
+            'fileCalculator' => $fileCalculator,
+            'poolsByComponent' => $poolsSummary['pools'],
+            'saleAmountPerAcre' => $saleAmountPerAcre,
+            'landValueEstimate' => $landValueEstimate,
+            'generatedAt' => now(),
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name) ?: 'project';
+        $safeFile = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $projectFile->file_number) ?: 'file';
+
+        return $pdf->download('sale-estimation-'.$safeProject.'-'.$safeFile.'-'.now()->format('Y-m-d').'.pdf');
     }
 }

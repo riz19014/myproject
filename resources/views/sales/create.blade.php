@@ -18,7 +18,7 @@
 @endphp
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 sale-pct-no-print">
     <div>
         <h1 class="mb-1">Sale</h1>
         <p class="text-muted small mb-0">
@@ -49,10 +49,9 @@
 @endif
 
 {{-- Step 1: choose sale type --}}
-<div class="card card-theme mb-4">
-    <div class="card-body">
+<div class="card card-theme mb-3 sale-pct-no-print">
+    <div class="card-body py-3">
         <h2 class="h6 mb-2">Sale type</h2>
-        <p class="text-muted small mb-3">Choose how you are selling from this file, then fill in the details below.</p>
         <div class="row g-2" role="tablist" aria-label="Sale type">
             <div class="col-md-6">
                 <button type="button"
@@ -83,60 +82,91 @@
 </div>
 
 {{-- Percentage: file area + pools (only for type 2) --}}
-<div class="card card-theme mb-4 {{ $activeType === Sale::TYPE_PERCENTAGE ? '' : 'd-none' }}" id="percentage_pools_card">
-    <div class="card-body">
-        <h2 class="h6 mb-2">Define file land area</h2>
-        <p class="text-muted small mb-3">Set the total land in this file (e.g. 30 kanal). Residential and commercial exemption pools for making plot files are calculated from this area.</p>
-        <form method="post" action="{{ route('sale.files.area.update', $projectFile) }}" id="file-area-form" class="mb-4">
-            @csrf
-            @method('PUT')
-            <h3 class="h6 text-muted mb-2">Exemption pool % <span class="fw-normal">(this file — override project defaults)</span></h3>
-            <div class="row g-2 mb-3">
-                @foreach($config->components() as $component)
-                    <div class="col-md-6">
-                        <label for="pool_percent_{{ $component->id }}" class="form-label">{{ $component->label }} pool %</label>
-                        <input type="number" class="form-control form-control-theme pool-percent-input @error('pool_percent.'.$component->id) is-invalid @enderror" id="pool_percent_{{ $component->id }}" name="pool_percent[{{ $component->id }}]" value="{{ old('pool_percent.'.$component->id, $config->poolPercent($component->slug)) }}" min="0" max="100" step="0.0001" data-component-slug="{{ $component->slug }}" required>
-                        @error('pool_percent.'.$component->id)<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        <div class="form-text">Project default: {{ rtrim(rtrim(number_format((float) $component->pool_percent, 4, '.', ''), '0'), '.') }}%</div>
-                    </div>
-                @endforeach
-            </div>
+<div class="{{ $activeType === Sale::TYPE_PERCENTAGE ? '' : 'd-none' }}" id="percentage_pools_card">
+    <form method="post" action="{{ route('sale.files.area.update', $projectFile) }}" id="file-area-form">
+        @csrf
+        @method('PUT')
 
-            <h3 class="h6 text-muted mb-2">File land (acre, kanal, marla, sq ft)</h3>
-            <div class="row g-2 mb-3">
-                <div class="col-6 col-md-3">
-                    <label for="file_area_acre" class="form-label">Acre</label>
-                    <input type="number" class="form-control form-control-theme @error('file_area_acre') is-invalid @enderror" id="file_area_acre" name="file_area_acre" value="{{ old('file_area_acre', $projectFile->area_acre ?? 0) }}" min="0" step="1" required>
-                    @error('file_area_acre')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-                <div class="col-6 col-md-3">
-                    <label for="file_area_kanal" class="form-label">Kanal</label>
-                    <input type="number" class="form-control form-control-theme @error('file_area_kanal') is-invalid @enderror" id="file_area_kanal" name="file_area_kanal" value="{{ old('file_area_kanal', $projectFile->area_kanal ?? 0) }}" min="0" step="1" required>
-                    @error('file_area_kanal')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-                <div class="col-6 col-md-3">
-                    <label for="file_area_marla" class="form-label">Marla</label>
-                    <input type="number" class="form-control form-control-theme @error('file_area_marla') is-invalid @enderror" id="file_area_marla" name="file_area_marla" value="{{ old('file_area_marla', $projectFile->area_marla ?? 0) }}" min="0" step="1" required>
-                    @error('file_area_marla')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-                <div class="col-6 col-md-3">
-                    <label for="file_area_sqft" class="form-label">Sq ft</label>
-                    <input type="number" class="form-control form-control-theme @error('file_area_sqft') is-invalid @enderror" id="file_area_sqft" name="file_area_sqft" value="{{ old('file_area_sqft', $projectFile->area_sqft ?? 0) }}" min="0" step="1" required>
-                    @error('file_area_sqft')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        {{-- Section 1: Area & land rate --}}
+        <div class="sale-pct-section card card-theme mb-3">
+            <div class="sale-pct-section__head">
+                <div class="sale-pct-section__title-wrap">
+                    <span class="sale-pct-section__badge">1</span>
+                    <div>
+                        <h2 class="sale-pct-section__title">Land area &amp; rate</h2>
+                        <p class="sale-pct-section__subtitle mb-0">File area and Rs/acre for land value estimate.</p>
+                    </div>
                 </div>
             </div>
-            @php
-                $plotRates = old('plot_rate_per_file', $plotRatesPerFile ?? []);
-                $residentialPlotIndex = 0;
-            @endphp
-            <div class="plot-rates-panel mt-3 mb-3">
-                <div class="plot-rates-panel__header">
-                    <div>
-                        <h3 class="plot-rates-panel__title">Sale amount per file</h3>
-                        <p class="plot-rates-panel__subtitle mb-0">Set Rs per file for each plot type (2 Kanal, 1 Kanal, etc.). Line total = files × rate in the calculator below.</p>
+            <div class="card-body sale-pct-section__body pt-0">
+                <div class="row g-2 align-items-end">
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="file_area_acre" class="form-label sale-pct-label">Acre</label>
+                        <input type="number" class="form-control form-control-sm form-control-theme file-area-input @error('file_area_acre') is-invalid @enderror" id="file_area_acre" name="file_area_acre" value="{{ old('file_area_acre', $projectFile->area_acre ?? 0) }}" min="0" step="1" required>
+                        @error('file_area_acre')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
-                    <span class="plot-rates-panel__badge">Rs / file</span>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="file_area_kanal" class="form-label sale-pct-label">Kanal</label>
+                        <input type="number" class="form-control form-control-sm form-control-theme file-area-input @error('file_area_kanal') is-invalid @enderror" id="file_area_kanal" name="file_area_kanal" value="{{ old('file_area_kanal', $projectFile->area_kanal ?? 0) }}" min="0" step="1" required>
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="file_area_marla" class="form-label sale-pct-label">Marla</label>
+                        <input type="number" class="form-control form-control-sm form-control-theme file-area-input @error('file_area_marla') is-invalid @enderror" id="file_area_marla" name="file_area_marla" value="{{ old('file_area_marla', $projectFile->area_marla ?? 0) }}" min="0" step="1" required>
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="file_area_sqft" class="form-label sale-pct-label">Sq ft</label>
+                        <input type="number" class="form-control form-control-sm form-control-theme file-area-input @error('file_area_sqft') is-invalid @enderror" id="file_area_sqft" name="file_area_sqft" value="{{ old('file_area_sqft', $projectFile->area_sqft ?? 0) }}" min="0" step="1" required>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <label for="sale_amount_per_acre" class="form-label sale-pct-label">Rs per acre</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">Rs</span>
+                            <input type="number"
+                                   class="form-control form-control-theme @error('sale_amount_per_acre') is-invalid @enderror"
+                                   id="sale_amount_per_acre"
+                                   name="sale_amount_per_acre"
+                                   value="{{ old('sale_amount_per_acre', $saleAmountPerAcre ?? '') }}"
+                                   min="0"
+                                   step="0.01"
+                                   placeholder="0"
+                                   inputmode="decimal">
+                        </div>
+                        @error('sale_amount_per_acre')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                        <div class="plot-rate-card__words-hint {{ ($saleAmountPerAcre ?? '') !== '' && ($saleAmountPerAcre ?? null) !== null ? '' : 'd-none' }}" id="sale_amount_per_acre_words"></div>
+                    </div>
                 </div>
+                <div class="sale-pct-meta mt-2" id="file_area_preview_label">
+                    Total: <strong>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</strong>
+                    · Acres: <strong id="file_acres_preview">{{ SaleExemptionFileCalculator::formatFileCount($fileCalculator['acres'] ?? 0) }}</strong>
+                </div>
+            </div>
+        </div>
+
+        {{-- Section 2: Pool % & per-file rates --}}
+        <div class="sale-pct-section card card-theme mb-3">
+            <div class="sale-pct-section__head">
+                <div class="sale-pct-section__title-wrap">
+                    <span class="sale-pct-section__badge">2</span>
+                    <div>
+                        <h2 class="sale-pct-section__title">Pools &amp; file rates</h2>
+                        <p class="sale-pct-section__subtitle mb-0">Pool % for this file and Rs per plot file type.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body sale-pct-section__body pt-0">
+                <div class="row g-2 mb-2">
+                    @foreach($config->components() as $component)
+                        <div class="col-6 col-md-3">
+                            <label for="pool_percent_{{ $component->id }}" class="form-label sale-pct-label">{{ $component->label }} %</label>
+                            <input type="number" class="form-control form-control-sm form-control-theme pool-percent-input @error('pool_percent.'.$component->id) is-invalid @enderror" id="pool_percent_{{ $component->id }}" name="pool_percent[{{ $component->id }}]" value="{{ old('pool_percent.'.$component->id, $config->poolPercent($component->slug)) }}" min="0" max="100" step="0.0001" data-component-slug="{{ $component->slug }}" required>
+                            @error('pool_percent.'.$component->id)<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    @endforeach
+                </div>
+                @php
+                    $plotRates = old('plot_rate_per_file', $plotRatesPerFile ?? []);
+                    $residentialPlotIndex = 0;
+                @endphp
                 <div class="row g-2 plot-rates-grid">
                     @foreach($config->components() as $component)
                         @foreach($component->plotTypes as $plot)
@@ -153,12 +183,11 @@
                                 $savedRate = old('plot_rate_per_file.'.$plot->slug, $plotRates[$plot->slug] ?? '');
                             @endphp
                             <div class="col-6 col-lg-3">
-                                <div class="plot-rate-card">
+                                <div class="plot-rate-card plot-rate-card--compact">
                                     <div class="plot-rate-card__top">
                                         <span class="plot-rate-card__code {{ $badgeClass }}">{{ $saleLabel }}</span>
                                         <span class="plot-rate-card__nominal">{{ SaleExemptionFileCalculator::formatMarlaWithUnit($nominalMarla) }}</span>
                                     </div>
-                                    <div class="plot-rate-card__label">{{ $plot->label }}</div>
                                     <div class="input-group input-group-sm plot-rate-card__input-group">
                                         <span class="input-group-text">Rs</span>
                                         <input type="number"
@@ -168,11 +197,10 @@
                                                value="{{ $savedRate }}"
                                                min="0"
                                                step="0.01"
-                                               placeholder="0"
+                                               placeholder="Per file"
                                                inputmode="decimal"
                                                data-plot-slug="{{ $plot->slug }}"
                                                data-sale-label="{{ $saleLabel }}"
-                                               data-nominal-marla="{{ $nominalMarla }}"
                                                aria-label="{{ $saleLabel }} rate per file">
                                     </div>
                                     @error('plot_rate_per_file.'.$plot->slug)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
@@ -182,121 +210,154 @@
                         @endforeach
                     @endforeach
                 </div>
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <button type="submit" class="btn btn-outline-theme btn-sm">Save area, rates &amp; pool %</button>
-                <span class="text-muted small" id="file_area_preview_label">
-                    Total: <strong>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</strong>
-                </span>
-            </div>
-        </form>
-
-        <h2 class="h6 mb-3">Exemption pools (from file area)</h2>
-        <p class="text-muted small mb-3" id="pool_summary_text">Configured per project (1 acre = {{ rtrim(rtrim(number_format($marlaPerAcreLand, 4, '.', ''), '0'), '.') }} marla). <a href="{{ route('sale.projects.exemption.edit', $project) }}">Edit ratios &amp; categories</a>.</p>
-        @if($fileMarla <= 0)
-            <div class="alert alert-warning small mb-3">Enter and save file land area above to calculate pools before recording percentage sales.</div>
-        @endif
-        <div class="row g-2" id="pool_cards_row">
-            @foreach($config->components() as $component)
-                @php
-                    $slug = $component->slug;
-                    $poolMarla = $poolsByComponent[$slug] ?? 0;
-                    $used = $usedByComponent[$slug] ?? 0;
-                    $left = max(0, $poolMarla - $used);
-                @endphp
-                <div class="col-md-6 pool-card" data-component-slug="{{ $slug }}">
-                    <div class="border rounded p-2 small">
-                        <div class="text-muted">{{ $component->label }} pool</div>
-                        <div class="fw-semibold pool-total">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($poolMarla) }}</div>
-                        <div class="text-muted mt-1 pool-pct-line"><span class="pool-pct-val">{{ rtrim(rtrim(number_format($config->poolPercent($slug), 4, '.', ''), '0'), '.') }}</span>% of file</div>
-                        <div class="text-muted mt-1">Used: <span class="pool-used">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($used) }}</span> · Left: <span class="pool-left">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($left) }}</span></div>
-                    </div>
+                <div class="mt-2">
+                    <button type="submit" class="btn btn-pink btn-sm">Save settings</button>
                 </div>
-            @endforeach
-        </div>
-
-        <hr class="my-4">
-
-        <h2 class="h6 mb-2">Plot files calculator</h2>
-        <p class="text-muted small mb-3">Enter any land area — get how many exempt plot files can be made. Formula: <strong>(marla per plot × acres) ÷ nominal marla</strong>. After the decimal: <strong>fraction × nominal marla</strong> (e.g. 0.4 × 40M = 16M). Acres = total marla ÷ {{ rtrim(rtrim(number_format($marlaPerAcreLand, 4, '.', ''), '0'), '.') }}.</p>
-        <div class="row g-2 mb-3">
-            <div class="col-6 col-md-3">
-                <label for="calc_area_acre" class="form-label">Acre</label>
-                <input type="number" class="form-control form-control-theme calc-area-input" id="calc_area_acre" value="{{ old('calc_area_acre', $projectFile->area_acre ?? 0) }}" min="0" step="1">
-            </div>
-            <div class="col-6 col-md-3">
-                <label for="calc_area_kanal" class="form-label">Kanal</label>
-                <input type="number" class="form-control form-control-theme calc-area-input" id="calc_area_kanal" value="{{ old('calc_area_kanal', $projectFile->area_kanal ?? 0) }}" min="0" step="1">
-            </div>
-            <div class="col-6 col-md-3">
-                <label for="calc_area_marla" class="form-label">Marla</label>
-                <input type="number" class="form-control form-control-theme calc-area-input" id="calc_area_marla" value="{{ old('calc_area_marla', $projectFile->area_marla ?? 0) }}" min="0" step="1">
-            </div>
-            <div class="col-6 col-md-3">
-                <label for="calc_area_sqft" class="form-label">Sq ft</label>
-                <input type="number" class="form-control form-control-theme calc-area-input" id="calc_area_sqft" value="{{ old('calc_area_sqft', $projectFile->area_sqft ?? 0) }}" min="0" step="1">
             </div>
         </div>
-        <p class="small mb-2">
-            Total: <strong id="calc_total_label">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</strong>
-            · Acres: <strong id="calc_acres_label">{{ SaleExemptionFileCalculator::formatFileCount($fileCalculator['acres'] ?? 0) }}</strong>
-            · Total sale: <strong id="calc_total_sale_label">{{ ($fileCalculator['total_sale_amount'] ?? null) !== null ? 'Rs '.SaleExemptionFileCalculator::formatRs($fileCalculator['total_sale_amount']) : '—' }}</strong>
-        </p>
-        <div class="table-responsive">
-            <table class="table table-sm table-striped table-theme mb-0" id="file_calculator_table">
-                <thead>
-                    <tr>
-                        <th>Code</th>
-                        <th>Plot file</th>
-                        <th>Share %</th>
-                        <th>Calculation</th>
-                        <th class="text-end">Files</th>
-                        <th class="text-end">Full</th>
-                        <th class="text-end">After decimal</th>
-                        <th class="text-end">Decimal in marla</th>
-                        <th class="text-end">Pool line marla</th>
-                        <th class="text-end">Rs / file</th>
-                        <th class="text-end">Line total Rs</th>
-                    </tr>
-                </thead>
-                <tbody id="file_calculator_body">
-                    @foreach($fileCalculator['rows'] ?? [] as $row)
+    </form>
+
+    {{-- Section 3: Exemption pools --}}
+    <div class="sale-pct-section card card-theme mb-3">
+        <div class="sale-pct-section__head">
+            <div class="sale-pct-section__title-wrap">
+                <span class="sale-pct-section__badge">3</span>
+                <div>
+                    <h2 class="sale-pct-section__title">Exemption pools</h2>
+                    <p class="sale-pct-section__subtitle mb-0">1 acre = {{ rtrim(rtrim(number_format($marlaPerAcreLand, 4, '.', ''), '0'), '.') }} marla · <a href="{{ route('sale.projects.exemption.edit', $project) }}">Edit project rules</a></p>
+                </div>
+            </div>
+        </div>
+        <div class="card-body sale-pct-section__body pt-0">
+            @if($fileMarla <= 0)
+                <div class="alert alert-warning small py-2 mb-2">Save land area above to calculate pools.</div>
+            @endif
+            <div class="row g-2" id="pool_cards_row">
+                @foreach($config->components() as $component)
+                    @php
+                        $slug = $component->slug;
+                        $poolMarla = $poolsByComponent[$slug] ?? 0;
+                        $used = $usedByComponent[$slug] ?? 0;
+                        $left = max(0, $poolMarla - $used);
+                    @endphp
+                    <div class="col-6 col-md-3 pool-card" data-component-slug="{{ $slug }}">
+                        <div class="sale-pool-chip">
+                            <div class="sale-pool-chip__label">{{ $component->label }}</div>
+                            <div class="sale-pool-chip__value pool-total">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($poolMarla) }}</div>
+                            <div class="sale-pool-chip__meta"><span class="pool-pct-val">{{ rtrim(rtrim(number_format($config->poolPercent($slug), 4, '.', ''), '0'), '.') }}</span>% · Left <span class="pool-left">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($left) }}</span></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    {{-- Section 4: Estimation (printable) --}}
+    <div class="sale-pct-section card card-theme mb-3" id="sale_estimation_section">
+        <div class="sale-pct-section__head sale-pct-section__head--actions">
+            <div class="sale-pct-section__title-wrap">
+                <span class="sale-pct-section__badge">4</span>
+                <div>
+                    <h2 class="sale-pct-section__title">Sale estimation</h2>
+                    <p class="sale-pct-section__subtitle mb-0">Plot files × rate · Land = acres × Rs/acre</p>
+                </div>
+            </div>
+            <div class="sale-pct-section__actions">
+                <a href="{{ route('sale.files.estimation.pdf', $projectFile) }}" class="btn btn-outline-theme btn-sm" target="_blank" rel="noopener">
+                    <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download PDF
+                </a>
+                <span class="small text-muted">Save settings first for latest values.</span>
+            </div>
+        </div>
+        <div class="card-body sale-pct-section__body pt-0" id="sale_estimation_print_area">
+            <div class="sale-est-summary mb-2">
+                <div class="sale-est-summary__item">
+                    <span class="sale-est-summary__label">Area</span>
+                    <span class="sale-est-summary__value" id="calc_total_label">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</span>
+                </div>
+                <div class="sale-est-summary__item">
+                    <span class="sale-est-summary__label">Acres</span>
+                    <span class="sale-est-summary__value" id="calc_acres_label">{{ SaleExemptionFileCalculator::formatFileCount($fileCalculator['acres'] ?? 0) }}</span>
+                </div>
+                <div class="sale-est-summary__item">
+                    <span class="sale-est-summary__label">Land value</span>
+                    <span class="sale-est-summary__value" id="calc_land_value_label">
+                        @if($landValueEstimate !== null)
+                            Rs {{ SaleExemptionFileCalculator::formatRs($landValueEstimate) }}
+                        @else
+                            —
+                        @endif
+                    </span>
+                </div>
+                <div class="sale-est-summary__item sale-est-summary__item--accent">
+                    <span class="sale-est-summary__label">Plot files total</span>
+                    <span class="sale-est-summary__value" id="calc_total_sale_label">
+                        @if(($fileCalculator['total_sale_amount'] ?? null) !== null)
+                            Rs {{ SaleExemptionFileCalculator::formatRs($fileCalculator['total_sale_amount']) }}
+                        @else
+                            —
+                        @endif
+                    </span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-theme mb-0 sale-est-table" id="file_calculator_table">
+                    <thead>
                         <tr>
-                            <td class="fw-semibold">{{ $row['sale_code'] ?? $row['code'] }}</td>
-                            <td>{{ $row['plot_label'] }}</td>
-                            <td>{{ SaleExemptionFileCalculator::formatFileCount($row['share_percent']) }}%</td>
-                            <td class="small font-monospace">
-                                {{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['marla_per_plot']) }}
-                                × <span class="calc-acres-inline">{{ SaleExemptionFileCalculator::formatFileCount($fileCalculator['acres']) }}</span>
-                                = {{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['product_marla']) }}
-                                :{{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['nominal_marla']) }}
+                            <th>Code</th>
+                            <th>Plot file</th>
+                            <th>Share %</th>
+                            <th>Calculation</th>
+                            <th class="text-end">Files</th>
+                            <th class="text-end">Full</th>
+                            <th class="text-end">After decimal</th>
+                            <th class="text-end">Decimal in marla</th>
+                            <th class="text-end">Pool line marla</th>
+                            <th class="text-end">Rs/file</th>
+                            <th class="text-end">Line total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="file_calculator_body">
+                        @foreach($fileCalculator['rows'] ?? [] as $row)
+                            <tr>
+                                <td class="fw-semibold">{{ $row['sale_code'] ?? $row['code'] }}</td>
+                                <td class="small">{{ $row['plot_label'] }}</td>
+                                <td class="small">{{ SaleExemptionFileCalculator::formatFileCount($row['share_percent']) }}%</td>
+                                <td class="small font-monospace">
+                                    {{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['marla_per_plot']) }}
+                                    × <span class="calc-acres-inline">{{ SaleExemptionFileCalculator::formatFileCount($fileCalculator['acres']) }}</span>
+                                    = {{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['product_marla']) }}
+                                    :{{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['nominal_marla']) }}
+                                </td>
+                                <td class="text-end fw-semibold">{{ SaleExemptionFileCalculator::formatFileCount($row['file_count']) }}</td>
+                                <td class="text-end">{{ $row['full_files'] }}</td>
+                                <td class="text-end small">{{ $row['fraction_files'] > 0 ? SaleExemptionFileCalculator::formatFileCount($row['fraction_files']) : '—' }}</td>
+                                <td class="text-end small">{{ $row['fraction_marla'] > 0 ? SaleExemptionFileCalculator::formatMarlaWithUnit($row['fraction_marla']) : '—' }}</td>
+                                <td class="text-end small text-muted">{{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['product_marla']) }}</td>
+                                <td class="text-end small">{{ SaleExemptionFileCalculator::formatRs($row['amount_per_file'] ?? null) }}</td>
+                                <td class="text-end fw-semibold">{{ SaleExemptionFileCalculator::formatRs($row['line_sale_amount'] ?? null) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot id="calc_total_sale_foot_wrap" class="{{ ($fileCalculator['total_sale_amount'] ?? null) !== null || $landValueEstimate !== null ? '' : 'd-none' }}">
+                        <tr class="table-light fw-semibold">
+                            <td colspan="10" class="text-end">Plot files total</td>
+                            <td class="text-end" id="calc_total_sale_footer">{{ SaleExemptionFileCalculator::formatRs($fileCalculator['total_sale_amount'] ?? null) }}</td>
+                        </tr>
+                        <tr class="table-light fw-semibold {{ $landValueEstimate !== null ? '' : 'd-none' }}" id="calc_land_value_foot_row">
+                            <td colspan="10" class="text-end">Land value (acres × Rs/acre)</td>
+                            <td class="text-end" id="calc_land_value_footer">
+                                @if($landValueEstimate !== null)
+                                    {{ SaleExemptionFileCalculator::formatRs($landValueEstimate) }}
+                                @else
+                                    —
+                                @endif
                             </td>
-                            <td class="text-end fw-semibold">{{ SaleExemptionFileCalculator::formatFileCount($row['file_count']) }}</td>
-                            <td class="text-end">{{ $row['full_files'] }}</td>
-                            <td class="text-end small">{{ $row['fraction_files'] > 0 ? SaleExemptionFileCalculator::formatFileCount($row['fraction_files']) : '—' }}</td>
-                            <td class="text-end small">{{ $row['fraction_marla'] > 0 ? SaleExemptionFileCalculator::formatMarlaWithUnit($row['fraction_marla']) : '—' }}</td>
-                            <td class="text-end small text-muted">{{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['product_marla']) }}</td>
-                            <td class="text-end small">{{ SaleExemptionFileCalculator::formatRs($row['amount_per_file'] ?? null) }}</td>
-                            <td class="text-end fw-semibold">{{ SaleExemptionFileCalculator::formatRs($row['line_sale_amount'] ?? null) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-                @if(($fileCalculator['total_sale_amount'] ?? null) !== null)
-                    <tfoot>
-                        <tr class="table-light fw-semibold">
-                            <td colspan="10" class="text-end">Total sale amount</td>
-                            <td class="text-end" id="calc_total_sale_footer">{{ SaleExemptionFileCalculator::formatRs($fileCalculator['total_sale_amount']) }}</td>
                         </tr>
                     </tfoot>
-                @else
-                    <tfoot class="d-none" id="calc_total_sale_foot_wrap">
-                        <tr class="table-light fw-semibold">
-                            <td colspan="10" class="text-end">Total sale amount</td>
-                            <td class="text-end" id="calc_total_sale_footer">—</td>
-                        </tr>
-                    </tfoot>
-                @endif
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -410,7 +471,7 @@
 </div>--}}
 
 @if($recentSales->isNotEmpty())
-<div class="card card-theme">
+<div class="card card-theme sale-pct-no-print">
     <div class="card-body">
         <h2 class="h6 mb-3">Sales on this file</h2>
         <div class="table-responsive">
@@ -453,72 +514,153 @@
 
 @push('head')
 <style>
-    .plot-rates-panel {
-        background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
-        border: 1px solid #e9ecef;
-        border-radius: 0.625rem;
-        padding: 0.85rem 1rem 1rem;
-    }
-    .plot-rates-panel__header {
+    .sale-pct-section__head {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.65rem;
+        padding: 0.65rem 1rem;
         border-bottom: 1px solid #eef0f2;
+        background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
     }
-    .plot-rates-panel__title {
+    .sale-pct-section__head--actions {
+        flex-wrap: wrap;
+    }
+    .sale-pct-section__title-wrap {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        min-width: 0;
+    }
+    .sale-pct-section__badge {
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 1.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #fff;
+        background: #f97316;
+        border-radius: 0.35rem;
+    }
+    .sale-pct-section__title {
         font-size: 0.875rem;
         font-weight: 600;
+        margin: 0;
         color: #1a1a1a;
-        margin: 0 0 0.2rem;
     }
-    .plot-rates-panel__subtitle {
-        font-size: 0.75rem;
+    .sale-pct-section__subtitle {
+        font-size: 0.72rem;
         color: #6c757d;
-        line-height: 1.35;
-        max-width: 36rem;
+        line-height: 1.3;
     }
-    .plot-rates-panel__badge {
-        flex-shrink: 0;
+    .sale-pct-section__body {
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+    .sale-pct-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.2rem;
+    }
+    .sale-pct-meta {
+        font-size: 0.72rem;
+        color: #6c757d;
+    }
+    .sale-pool-chip {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 0.45rem;
+        padding: 0.45rem 0.55rem;
+        height: 100%;
+    }
+    .sale-pool-chip__label {
         font-size: 0.68rem;
         font-weight: 600;
-        letter-spacing: 0.04em;
+        color: #868e96;
         text-transform: uppercase;
-        color: #f97316;
+        letter-spacing: 0.03em;
+    }
+    .sale-pool-chip__value {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #212529;
+        line-height: 1.25;
+    }
+    .sale-pool-chip__meta {
+        font-size: 0.68rem;
+        color: #868e96;
+        margin-top: 0.1rem;
+    }
+    .sale-est-summary {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.45rem;
+    }
+    @media (min-width: 768px) {
+        .sale-est-summary {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    .sale-est-summary__item {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 0.45rem;
+        padding: 0.45rem 0.55rem;
+    }
+    .sale-est-summary__item--accent {
         background: #fff7ed;
-        border: 1px solid #fed7aa;
-        border-radius: 999px;
-        padding: 0.25rem 0.55rem;
+        border-color: #fed7aa;
+    }
+    .sale-est-summary__label {
+        display: block;
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #868e96;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .sale-est-summary__value {
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #212529;
+        line-height: 1.25;
+    }
+    .sale-est-table thead th {
+        font-size: 0.72rem;
         white-space: nowrap;
     }
     .plot-rate-card {
         background: #fff;
         border: 1px solid #e9ecef;
-        border-radius: 0.5rem;
-        padding: 0.65rem 0.7rem 0.55rem;
+        border-radius: 0.45rem;
+        padding: 0.45rem 0.5rem;
         height: 100%;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .plot-rate-card--compact {
+        padding: 0.4rem 0.45rem;
     }
     .plot-rate-card:focus-within {
         border-color: #fdba74;
-        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.12);
+        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.1);
     }
     .plot-rate-card__top {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 0.35rem;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.3rem;
     }
     .plot-rate-card__code {
         display: inline-block;
-        font-size: 0.68rem;
+        font-size: 0.65rem;
         font-weight: 700;
-        letter-spacing: 0.03em;
         border-radius: 0.25rem;
-        padding: 0.12rem 0.4rem;
+        padding: 0.1rem 0.35rem;
         line-height: 1.2;
     }
     .plot-rate-card__code--residential {
@@ -532,48 +674,39 @@
         border: 1px solid #ddd6fe;
     }
     .plot-rate-card__nominal {
-        font-size: 0.68rem;
+        font-size: 0.65rem;
         color: #868e96;
-        white-space: nowrap;
-    }
-    .plot-rate-card__label {
-        font-size: 0.78rem;
-        font-weight: 500;
-        color: #343a40;
-        margin-bottom: 0.45rem;
-        line-height: 1.25;
-        min-height: 1.95em;
     }
     .plot-rate-card__input-group .input-group-text {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: #495057;
-        background: #f8f9fa;
-        border-color: #dee2e6;
-        padding-left: 0.55rem;
-        padding-right: 0.55rem;
+        font-size: 0.72rem;
+        padding: 0.2rem 0.45rem;
     }
     .plot-rate-card__input-group .form-control {
-        font-size: 0.85rem;
-        font-weight: 500;
+        font-size: 0.78rem;
     }
     .plot-rate-card__words-hint {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         font-weight: 600;
         color: #f97316;
         line-height: 1.2;
-        margin-top: 0.15rem;
+        margin-top: 0.1rem;
     }
     .calc-rs-words {
-        font-size: 0.68rem;
+        font-size: 0.65rem;
         font-weight: 500;
         color: #868e96;
         line-height: 1.15;
-        margin-top: 0.1rem;
     }
     .calc-total-words {
         font-weight: 500;
         color: #868e96;
+        font-size: 0.75em;
+    }
+    .sale-pct-section__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
     }
 </style>
 @endpush
@@ -703,9 +836,12 @@
     function refreshFileAreaPreview() {
         if (!fileAreaAcre) return;
         var total = marlaFromAkms(fileAreaAcre.value, fileAreaKanal.value, fileAreaMarla.value, fileAreaSqft.value);
+        var acres = marlaPerAcreLand > 0 ? total / marlaPerAcreLand : 0;
         if (fileAreaPreview) {
-            fileAreaPreview.innerHTML = 'Total: <strong>' + formatAkmsLabel(total) + '</strong>';
+            fileAreaPreview.innerHTML = 'Total: <strong>' + formatAkmsLabel(total) + '</strong> · Acres: <strong>' + formatNum(acres) + '</strong>';
         }
+        var acresPreview = document.getElementById('file_acres_preview');
+        if (acresPreview) acresPreview.textContent = formatNum(acres);
         function poolPctForSlug(slug) {
             var inp = document.querySelector('.pool-percent-input[data-component-slug="' + slug + '"]');
             if (inp) {
@@ -728,14 +864,38 @@
             if (totalEl) totalEl.textContent = formatAkmsLabel(pool);
             if (leftEl) leftEl.textContent = formatAkmsLabel(Math.max(0, pool - used));
         });
+        buildCalculatorRows(total);
+    }
+
+    function readPerAcreRate() {
+        var el = document.getElementById('sale_amount_per_acre');
+        if (!el) return 0;
+        var rate = parseFloat(el.value);
+        return !isNaN(rate) && rate > 0 ? rate : 0;
+    }
+
+    function updatePerAcreWords() {
+        var wordsEl = document.getElementById('sale_amount_per_acre_words');
+        var rate = readPerAcreRate();
+        var words = rate > 0 ? formatRsWords(rate) : '';
+        if (wordsEl) {
+            wordsEl.textContent = words ? ('≈ ' + words) : '';
+            wordsEl.classList.toggle('d-none', !words);
+        }
     }
 
     var refreshInputs = [fileAreaAcre, fileAreaKanal, fileAreaMarla, fileAreaSqft];
     poolPercentInputs.forEach(function (el) { refreshInputs.push(el); });
+    var saleAmountPerAcreEl = document.getElementById('sale_amount_per_acre');
+    if (saleAmountPerAcreEl) refreshInputs.push(saleAmountPerAcreEl);
     refreshInputs.forEach(function (el) {
         if (el) el.addEventListener('input', refreshFileAreaPreview);
     });
+    if (saleAmountPerAcreEl) {
+        saleAmountPerAcreEl.addEventListener('input', updatePerAcreWords);
+    }
     refreshFileAreaPreview();
+    updatePerAcreWords();
 
     function formatMarlaVal(n) {
         var rounded = Math.round(n * 10000) / 10000;
@@ -826,19 +986,62 @@
         });
     }
 
+    function updateEstimationSummary(acres, totalMarla, totalSale, hasSale, landValue, hasLandValue) {
+        var totalLabel = document.getElementById('calc_total_label');
+        var acresLabel = document.getElementById('calc_acres_label');
+        var landValueLabel = document.getElementById('calc_land_value_label');
+        var totalSaleLabel = document.getElementById('calc_total_sale_label');
+        var totalSaleFooter = document.getElementById('calc_total_sale_footer');
+        var landValueFooter = document.getElementById('calc_land_value_footer');
+        var totalSaleFootWrap = document.getElementById('calc_total_sale_foot_wrap');
+        var landValueFootRow = document.getElementById('calc_land_value_foot_row');
+
+        if (totalLabel) totalLabel.textContent = formatAkmsLabel(totalMarla);
+        if (acresLabel) acresLabel.textContent = formatNum(acres);
+
+        if (landValueLabel) {
+            if (hasLandValue) {
+                var landWords = formatRsWords(landValue);
+                landValueLabel.innerHTML = 'Rs ' + formatRs(landValue) + (landWords ? ' <span class="calc-total-words">(' + landWords + ')</span>' : '');
+            } else {
+                landValueLabel.textContent = '—';
+            }
+        }
+        if (landValueFooter) {
+            landValueFooter.innerHTML = hasLandValue ? formatRsCellHtml(landValue) : '—';
+        }
+        if (landValueFootRow) {
+            landValueFootRow.classList.toggle('d-none', !hasLandValue);
+        }
+
+        if (totalSaleLabel) {
+            if (hasSale) {
+                var totalWords = formatRsWords(totalSale);
+                totalSaleLabel.innerHTML = 'Rs ' + formatRs(totalSale) + (totalWords ? ' <span class="calc-total-words">(' + totalWords + ')</span>' : '');
+            } else {
+                totalSaleLabel.textContent = '—';
+            }
+        }
+        if (totalSaleFooter) {
+            totalSaleFooter.innerHTML = hasSale ? formatRsCellHtml(totalSale) : '—';
+        }
+        if (totalSaleFootWrap) {
+            totalSaleFootWrap.classList.toggle('d-none', !hasSale && !hasLandValue);
+        }
+    }
+
     function buildCalculatorRows(totalMarla) {
         var mpa = marlaPerAcreLand;
         var acres = mpa > 0 ? totalMarla / mpa : 0;
         var tbody = document.getElementById('file_calculator_body');
-        var acresLabel = document.getElementById('calc_acres_label');
-        var totalLabel = document.getElementById('calc_total_label');
-        var totalSaleLabel = document.getElementById('calc_total_sale_label');
-        var totalSaleFooter = document.getElementById('calc_total_sale_footer');
-        var totalSaleFootWrap = document.getElementById('calc_total_sale_foot_wrap');
         var rates = readPlotRates();
-        if (acresLabel) acresLabel.textContent = formatNum(acres);
-        if (totalLabel) totalLabel.textContent = formatAkmsLabel(totalMarla);
-        if (!tbody) return;
+        var perAcreRate = readPerAcreRate();
+        var landValue = perAcreRate > 0 ? Math.round(acres * perAcreRate * 100) / 100 : null;
+        var hasLandValue = landValue !== null && landValue > 0;
+        if (!tbody) {
+            updateEstimationSummary(acres, totalMarla, 0, false, landValue, hasLandValue);
+            return;
+        }
 
         var html = '';
         var globalIndex = 0;
@@ -846,7 +1049,6 @@
         var totalSale = 0;
         var hasSale = false;
         exemptionConfig.forEach(function (comp) {
-            var prefix = (comp.slug || 'x').charAt(0).toUpperCase();
             (comp.plot_types || []).forEach(function (plot) {
                 globalIndex++;
                 if (comp.slug === 'residential') {
@@ -869,8 +1071,8 @@
                 }
                 html += '<tr>' +
                     '<td class="fw-semibold">' + saleCode + '</td>' +
-                    '<td>' + plot.label + '</td>' +
-                    '<td>' + formatNum(plot.share_percent) + '%</td>' +
+                    '<td class="small">' + plot.label + '</td>' +
+                    '<td class="small">' + formatNum(plot.share_percent) + '%</td>' +
                     '<td class="small font-monospace">' +
                         formatMarlaM(marla) + ' × ' + formatNum(acres) +
                         ' = ' + formatMarlaM(product) + ':' + formatMarlaM(nominal) +
@@ -885,67 +1087,24 @@
                 '</tr>';
             });
         });
-        tbody.innerHTML = html || '<tr><td colspan="11" class="text-muted">Configure plot types in project exemption setup.</td></tr>';
-        if (totalSaleLabel) {
-            if (hasSale) {
-                var totalWords = formatRsWords(totalSale);
-                totalSaleLabel.innerHTML = 'Rs ' + formatRs(totalSale) + (totalWords ? ' <span class="calc-total-words">(' + totalWords + ')</span>' : '');
-            } else {
-                totalSaleLabel.textContent = '—';
-            }
-        }
-        if (totalSaleFooter) {
-            totalSaleFooter.innerHTML = hasSale ? formatRsCellHtml(totalSale) : '—';
-        }
-        if (totalSaleFootWrap) {
-            totalSaleFootWrap.classList.toggle('d-none', !hasSale);
-        }
+        tbody.innerHTML = html || '<tr><td colspan="11" class="text-muted small">Configure plot types in project exemption setup.</td></tr>';
+        updateEstimationSummary(acres, totalMarla, totalSale, hasSale, landValue, hasLandValue);
     }
 
-    function readCalcMarla() {
-        var a = document.getElementById('calc_area_acre');
-        var k = document.getElementById('calc_area_kanal');
-        var m = document.getElementById('calc_area_marla');
-        var s = document.getElementById('calc_area_sqft');
-        if (!a) return 0;
-        return marlaFromAkms(a.value, k ? k.value : 0, m ? m.value : 0, s ? s.value : 0);
+    function readFileMarla() {
+        if (!fileAreaAcre) return 0;
+        return marlaFromAkms(fileAreaAcre.value, fileAreaKanal ? fileAreaKanal.value : 0, fileAreaMarla ? fileAreaMarla.value : 0, fileAreaSqft ? fileAreaSqft.value : 0);
     }
-
-    function syncCalcFromFileAreaForm() {
-        var pairs = [
-            ['file_area_acre', 'calc_area_acre'],
-            ['file_area_kanal', 'calc_area_kanal'],
-            ['file_area_marla', 'calc_area_marla'],
-            ['file_area_sqft', 'calc_area_sqft']
-        ];
-        pairs.forEach(function (p) {
-            var src = document.getElementById(p[0]);
-            var dst = document.getElementById(p[1]);
-            if (src && dst) dst.value = src.value;
-        });
-        buildCalculatorRows(readCalcMarla());
-    }
-
-    document.querySelectorAll('.calc-area-input').forEach(function (el) {
-        el.addEventListener('input', function () {
-            buildCalculatorRows(readCalcMarla());
-        });
-    });
 
     document.querySelectorAll('.plot-rate-input').forEach(function (el) {
         el.addEventListener('input', function () {
             updatePlotRatePreviews();
-            buildCalculatorRows(readCalcMarla());
+            buildCalculatorRows(readFileMarla());
         });
     });
 
     updatePlotRatePreviews();
-
-    [fileAreaAcre, fileAreaKanal, fileAreaMarla, fileAreaSqft].forEach(function (el) {
-        if (el) el.addEventListener('input', syncCalcFromFileAreaForm);
-    });
-
-    buildCalculatorRows(readCalcMarla());
+    buildCalculatorRows(readFileMarla());
 })();
 </script>
 @endpush
