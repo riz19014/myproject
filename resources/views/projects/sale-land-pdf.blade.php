@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Sale land — {{ $project->name }}</title>
     <style>
-        @page { margin: 6mm 8mm 10mm 8mm; }
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -123,9 +123,11 @@
             color: #666;
             margin-bottom: 3mm;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     @php
         $formulaColumns = $saleLandSheet['formula_columns'] ?? [];
         $sheetRows = $saleLandSheet['rows'] ?? [];

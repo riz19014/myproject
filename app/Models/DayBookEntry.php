@@ -174,4 +174,46 @@ class DayBookEntry extends Model
             default => (string) $method,
         };
     }
+
+    /**
+     * Compact payment settlement lines for purchase file ledger (PDF / UI).
+     *
+     * @return list<array{kind: string, text: string}>
+     */
+    public function ledgerPaymentDetailLines(): array
+    {
+        $method = $this->payment_method;
+        $lines = [];
+
+        $methodLabel = match ($method) {
+            self::PAYMENT_CASH => 'Cash',
+            self::PAYMENT_ONLINE => 'Online',
+            self::PAYMENT_CHEQUE => 'Cheque',
+            self::PAYMENT_PAYORDER => 'Pay Order',
+            null, '' => $this->type === self::TYPE_CASH_IN ? null : 'Cash',
+            default => ucfirst(str_replace('_', ' ', (string) $method)),
+        };
+
+        if ($methodLabel !== null && $methodLabel !== '') {
+            $lines[] = ['kind' => 'method', 'text' => $methodLabel];
+        }
+
+        $bank = trim((string) $this->payment_bank);
+        if ($bank !== '' && in_array($method, [self::PAYMENT_CHEQUE, self::PAYMENT_PAYORDER, self::PAYMENT_ONLINE], true)) {
+            $lines[] = ['kind' => 'meta', 'text' => $bank];
+        }
+
+        $reference = trim((string) $this->payment_reference);
+        if ($reference !== '' && in_array($method, [self::PAYMENT_CHEQUE, self::PAYMENT_PAYORDER], true)) {
+            $prefix = $method === self::PAYMENT_PAYORDER ? 'PO#' : 'Chq#';
+            $lines[] = ['kind' => 'meta', 'text' => $prefix.' '.$reference];
+        }
+
+        $description = trim((string) $this->description);
+        if ($description !== '') {
+            $lines[] = ['kind' => 'desc', 'text' => $description];
+        }
+
+        return $lines;
+    }
 }

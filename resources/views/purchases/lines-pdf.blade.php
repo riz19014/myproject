@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <title>Purchase Land — {{ config('app.name') }}</title>
     <style>
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 8.5px;
             color: #0f172a;
-            margin: 18px 22px 24px;
+            margin: 0;
             line-height: 1.35;
         }
         .doc-header {
@@ -78,9 +79,11 @@
             border-radius: 6px;
             margin-top: 8px;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <header class="doc-header">
         <h1 class="doc-title">Purchase Land</h1>
         <p class="meta">

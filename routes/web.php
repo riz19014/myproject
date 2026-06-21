@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DayBookController;
 use App\Http\Controllers\FactoryController;
@@ -46,6 +47,7 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/files/create', [PurchaseFileController::class, 'create'])->name('purchase.files.create');
     Route::post('purchase/files', [PurchaseFileController::class, 'store'])->name('purchase.files.store');
     Route::get('purchase/files/{purchase_file}', [PurchaseFileController::class, 'show'])->name('purchase.files.show');
+    Route::get('purchase/files/{purchase_file}/ledger-pdf', [PurchaseFileController::class, 'ledgerPdf'])->name('purchase.files.ledger-pdf');
     Route::get('purchase/files/{purchase_file}/payment-sheet-pdf', [PurchaseFileController::class, 'paymentSheetPdf'])->name('purchase.files.payment-sheet-pdf');
     Route::get('purchase/files/{purchase_file}/view-pdf', [PurchaseFileController::class, 'viewPdf'])->name('purchase.files.view-pdf');
     Route::get('purchase/files/{purchase_file}/documents', [PurchaseFileController::class, 'documents'])->name('purchase.files.documents');
@@ -107,6 +109,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('land-types', LandTypeController::class)->except(['show']);
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::get('companies/{company}/logo', [CompanyController::class, 'showLogo'])->name('companies.logo.show');
+    Route::post('companies/{company}/logo', [CompanyController::class, 'storeLogo'])->name('companies.logo.store');
+    Route::delete('companies/{company}/logo', [CompanyController::class, 'destroyLogo'])->name('companies.logo.destroy');
+    Route::resource('companies', CompanyController::class)->except(['show']);
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 

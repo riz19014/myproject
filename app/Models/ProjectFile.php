@@ -20,6 +20,7 @@ class ProjectFile extends Model
         'land_area_marla',
         'residential_pool_percent',
         'commercial_pool_percent',
+        'plot_sale_rates_per_acre',
         'status',
         'sale_amount',
         'customer_id',
@@ -33,6 +34,7 @@ class ProjectFile extends Model
             'land_area_marla' => 'decimal:4',
             'residential_pool_percent' => 'decimal:4',
             'commercial_pool_percent' => 'decimal:4',
+            'plot_sale_rates_per_acre' => 'array',
             'sale_date' => 'date',
             'sale_amount' => 'decimal:2',
         ];

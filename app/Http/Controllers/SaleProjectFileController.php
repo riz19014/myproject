@@ -90,7 +90,8 @@ class SaleProjectFileController extends Controller
                 ->sum('land_area_marla');
         }
         $remainingDirect = $projectFile->remainingMarla();
-        $fileCalculator = SaleExemptionFileCalculator::calculate($fileMarla, $config);
+        $plotRates = $projectFile->plot_sale_rates_per_acre ?? [];
+        $fileCalculator = SaleExemptionFileCalculator::calculate($fileMarla, $config, $plotRates);
 
         return view('sales.create', [
             'projectFile' => $projectFile,
@@ -103,6 +104,7 @@ class SaleProjectFileController extends Controller
             'poolsSummary' => $poolsSummary,
             'remainingDirect' => $remainingDirect,
             'fileCalculator' => $fileCalculator,
+            'plotRatesPerAcre' => $plotRates,
             'recentSales' => $projectFile->sales->sortByDesc('id')->take(20),
         ]);
     }
@@ -118,6 +120,8 @@ class SaleProjectFileController extends Controller
             'file_area_marla' => ['required', 'integer', 'min:0'],
             'file_area_sqft' => ['required', 'integer', 'min:0'],
             'pool_percent' => ['required', 'array'],
+            'plot_rate_per_acre' => ['nullable', 'array'],
+            'plot_rate_per_acre.*' => ['nullable', 'numeric', 'min:0'],
         ];
         foreach ($config->components() as $component) {
             $rules['pool_percent.'.$component->id] = ['required', 'numeric', 'min:0', 'max:100', 'regex:/^\d+(\.\d{1,4})?$/'];
@@ -160,6 +164,15 @@ class SaleProjectFileController extends Controller
                 $projectFile->update(['commercial_pool_percent' => $pct]);
             }
         }
+
+        $plotRates = [];
+        foreach ($validated['plot_rate_per_acre'] ?? [] as $slug => $rate) {
+            if ($rate === null || $rate === '') {
+                continue;
+            }
+            $plotRates[(string) $slug] = round((float) $rate, 2);
+        }
+        $projectFile->update(['plot_sale_rates_per_acre' => $plotRates !== [] ? $plotRates : null]);
 
         return redirect()->route('sale.files.sale.create', [
             'projectFile' => $projectFile,

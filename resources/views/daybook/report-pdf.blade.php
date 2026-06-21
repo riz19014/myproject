@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <title>Daybook Report — {{ $day->format('j M Y') }}</title>
     <style>
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 11px;
             color: #0f172a;
-            margin: 24px 32px;
+            margin: 0;
         }
         h1 {
             font-size: 22px;
@@ -94,9 +95,11 @@
             color: #15803d;
             font-weight: bold;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <h1>Daybook Report</h1>
     <div class="generated">Generated on {{ $generatedAt->format('j M Y, g:i A') }}</div>
     <div class="generated" style="margin-bottom: 14px;">Previous day ({{ $prevDay->format('l, j M Y') }}) closing: <strong>Rs {{ number_format($previousDayClosing, 0) }}</strong></div>

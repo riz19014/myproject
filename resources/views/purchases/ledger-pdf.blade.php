@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <title>Purchase land ledger — {{ config('app.name') }}</title>
     <style>
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 9pt;
             color: #111111;
-            margin: 14mm 12mm 16mm 12mm;
+            margin: 0;
             line-height: 1.35;
         }
         h1 {
@@ -98,9 +99,11 @@
             color: #444444;
             text-align: left;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <h1>Purchase land ledger</h1>
     <div class="meta-block">
         <div><strong>{{ config('app.name') }}</strong></div>

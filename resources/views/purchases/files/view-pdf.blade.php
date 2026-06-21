@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>{{ $purchaseFile->file_name }} — Purchase file</title>
     <style>
-        @page { margin: 8mm 6mm 10mm 6mm; }
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -48,9 +48,11 @@
             background: #f0f0f0;
             font-weight: bold;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <h1>{{ $purchaseFile->file_name }}</h1>
     <div class="meta">
         <strong>Project:</strong> {{ $purchaseFile->project?->name ?? '—' }}

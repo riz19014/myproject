@@ -4,7 +4,7 @@
     $highlightDate = $highlightDate ?? null;
 @endphp
 <div class="daybook-entries-global-list">
-    <p class="small text-muted mb-2 mb-lg-3">Search across date, description, amount, party or project name, land area (when a project is linked), party category, sub category, payment method, bank, reference, and linked record.</p>
+    <p class="small text-muted mb-2 mb-lg-3">Search across date, voucher number, description, amount, party or project name, land area (when a project is linked), party category, sub category, payment method, bank, reference, and linked record.</p>
     <div class="mb-2">
         <label for="daybook-sidebar-search" class="visually-hidden">Search daybook entries</label>
         <input type="search" id="daybook-sidebar-search" class="form-control form-control-sm" placeholder="Search by any field…" autocomplete="off" spellcheck="false">

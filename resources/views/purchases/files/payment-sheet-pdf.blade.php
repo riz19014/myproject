@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Payment sheet — {{ $purchaseFile->file_name }}</title>
     <style>
-        @page { margin: 12mm 10mm 14mm 10mm; }
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -100,9 +100,11 @@
             font-size: 7.5pt;
             color: #444;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <h1>Payment sheet</h1>
     <div class="meta">
         <div><strong>File:</strong> {{ $purchaseFile->file_name }}</div>

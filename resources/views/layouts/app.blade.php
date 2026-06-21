@@ -95,6 +95,7 @@
                     <a class="app-sidebar-link {{ request()->routeIs('land-types.*') ? 'active' : '' }}" href="{{ route('land-types.index') }}"><i class="bi bi-grid-3x2-gap app-sidebar-link__icon" aria-hidden="true"></i><span>Land types</span></a>
                     <a class="app-sidebar-link {{ request()->routeIs('settings.index', 'settings.update') ? 'active' : '' }}" href="{{ route('settings.index') }}"><i class="bi bi-sliders app-sidebar-link__icon" aria-hidden="true"></i><span>Settings</span></a>
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('daybook.entries') ? 'active' : '' }}" href="{{ route('daybook.entries') }}"><i class="bi bi-list-columns-reverse app-sidebar-link__icon" aria-hidden="true"></i><span>Daybook entries</span></a>
+                    <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('companies.*') ? 'active' : '' }}" href="{{ route('companies.index') }}"><i class="bi bi-building-gear app-sidebar-link__icon" aria-hidden="true"></i><span>Company</span></a>
                 </nav>
                 @endauth
                 <div class="app-sidebar-footer">

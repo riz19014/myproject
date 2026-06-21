@@ -61,21 +61,29 @@ final class SaleExemptionFileCalculator
      *     fraction_files: float,
      *     fraction_marla: float,
      *     whole_files_marla: float,
-     *     total_line_marla: float
+     *     total_line_marla: float,
+     *     sale_code: string,
+     *     rate_per_acre: float|null,
+     *     amount_per_file: float|null,
+     *     line_sale_amount: float|null
      *   }>
      * }
      */
-    public static function calculate(float $totalMarla, SaleExemptionConfig $config): array
+    public static function calculate(float $totalMarla, SaleExemptionConfig $config, array $ratesPerAcre = []): array
     {
         $marlaPerAcre = $config->marlaPerAcreLand();
         $acres = self::acresFromMarla($totalMarla, $marlaPerAcre);
         $rows = [];
         $globalIndex = 0;
+        $residentialIndex = 0;
 
         foreach ($config->components() as $component) {
             $prefix = self::componentCodePrefix($component);
             foreach ($component->plotTypes as $plot) {
                 $globalIndex++;
+                if ($component->slug === SaleExemptionRules::COMPONENT_RESIDENTIAL) {
+                    $residentialIndex++;
+                }
                 $marlaPerPlot = (float) $plot->marla_per_plot;
                 $nominal = self::nominalMarlaForPlot($plot);
                 $product = round($marlaPerPlot * $acres, 4);
@@ -85,9 +93,17 @@ final class SaleExemptionFileCalculator
                 $fractionMarla = round($fractionFiles * $nominal, 4);
                 $wholeFilesMarla = round($fullFiles * $marlaPerPlot, 4);
                 $totalLineMarla = round($wholeFilesMarla + $fractionMarla, 4);
+                $ratePerAcre = (float) ($ratesPerAcre[$plot->slug] ?? 0);
+                $amountPerFile = null;
+                $lineSaleAmount = null;
+                if ($ratePerAcre > 0 && $marlaPerAcre > 0 && $nominal > 0) {
+                    $amountPerFile = round($ratePerAcre * ($nominal / $marlaPerAcre), 2);
+                    $lineSaleAmount = round($amountPerFile * $fileCount, 2);
+                }
 
                 $rows[] = [
                     'code' => $prefix.'.'.$globalIndex,
+                    'sale_code' => self::plotSaleCode($component->slug, $residentialIndex),
                     'component_slug' => $component->slug,
                     'component_label' => $component->label,
                     'plot_slug' => $plot->slug,
@@ -102,6 +118,9 @@ final class SaleExemptionFileCalculator
                     'fraction_marla' => $fractionMarla,
                     'whole_files_marla' => $wholeFilesMarla,
                     'total_line_marla' => $totalLineMarla,
+                    'rate_per_acre' => $ratePerAcre > 0 ? $ratePerAcre : null,
+                    'amount_per_file' => $amountPerFile,
+                    'line_sale_amount' => $lineSaleAmount,
                 ];
             }
         }
@@ -111,7 +130,44 @@ final class SaleExemptionFileCalculator
             'acres' => $acres,
             'marla_per_acre' => $marlaPerAcre,
             'rows' => $rows,
+            'total_sale_amount' => self::sumLineSaleAmounts($rows),
         ];
+    }
+
+    public static function plotSaleCode(string $componentSlug, int $residentialIndex): string
+    {
+        if ($componentSlug === SaleExemptionRules::COMPONENT_COMMERCIAL) {
+            return 'Commercial';
+        }
+
+        return 'R'.$residentialIndex;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public static function sumLineSaleAmounts(array $rows): ?float
+    {
+        $total = 0.0;
+        $hasAmount = false;
+        foreach ($rows as $row) {
+            if ($row['line_sale_amount'] === null) {
+                continue;
+            }
+            $total += (float) $row['line_sale_amount'];
+            $hasAmount = true;
+        }
+
+        return $hasAmount ? round($total, 2) : null;
+    }
+
+    public static function formatRs(?float $amount): string
+    {
+        if ($amount === null) {
+            return '—';
+        }
+
+        return number_format($amount, 0);
     }
 
     private static function componentCodePrefix(ProjectSaleExemptionComponent $component): string

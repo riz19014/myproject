@@ -689,12 +689,17 @@ class DayBookController extends Controller
             $dateStr = $e->entry_date->format('Y-m-d');
             $dateDisp = $e->entry_date->format('j M Y');
             $dateDispShort = $e->entry_date->format('d-M-y');
+            $voucherNo = $e->voucher_no;
+            $voucherDisplay = $e->getVoucherNumber();
 
             $parts = array_filter([
                 (string) $e->id,
                 $dateStr,
                 $dateDisp,
                 $dateDispShort,
+                $voucherNo !== null ? (string) $voucherNo : '',
+                $voucherNo !== null ? strtolower($voucherDisplay) : '',
+                $voucherNo !== null ? 'voucher '.$voucherNo : '',
                 strtolower($e->description ?? ''),
                 $e->type,
                 $typeLabel,

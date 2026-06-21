@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <title>Ledger — {{ $project->name }}</title>
     <style>
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 9pt;
             color: #111;
-            margin: 14mm 12mm 16mm 12mm;
+            margin: 0;
             line-height: 1.35;
         }
         h1 {
@@ -88,9 +89,11 @@
             font-size: 9pt;
             color: #444;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <h1>Ledger</h1>
     <div class="project-name">{{ $project->name }}</div>
 

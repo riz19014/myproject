@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <title>Ledger — {{ $from->format('j M Y') }} to {{ $to->format('j M Y') }}</title>
     <style>
+        @include('pdf.partials.page-setup')
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 10px;
             color: #0f172a;
-            margin: 22px 28px 32px 28px;
+            margin: 0;
         }
         h1 {
             font-size: 17px;
@@ -118,9 +119,11 @@
             font-size: 8px;
             color: #64748b;
         }
+        @include('pdf.partials.company-header-styles')
     </style>
 </head>
 <body>
+    @include('pdf.partials.company-header')
     <h1>Ledger</h1>
     <div class="meta">
         Period: <strong>{{ $from->format('j M Y') }}</strong> to <strong>{{ $to->format('j M Y') }}</strong>

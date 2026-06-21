@@ -125,8 +125,74 @@
                     @error('file_area_sqft')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
+            @php
+                $plotRates = old('plot_rate_per_acre', $plotRatesPerAcre ?? []);
+                $residentialPlotIndex = 0;
+            @endphp
+            <div class="plot-rates-panel mt-3 mb-3">
+                <div class="plot-rates-panel__header">
+                    <div>
+                        <h3 class="plot-rates-panel__title">Sale amount per acre</h3>
+                        <p class="plot-rates-panel__subtitle mb-0">Set a separate Rs/acre rate for each plot file type. Per-file and line totals update in the calculator below.</p>
+                    </div>
+                    <span class="plot-rates-panel__badge">Rs / acre</span>
+                </div>
+                <div class="row g-2 plot-rates-grid">
+                    @foreach($config->components() as $component)
+                        @foreach($component->plotTypes as $plot)
+                            @php
+                                if ($component->slug === SaleExemptionRules::COMPONENT_RESIDENTIAL) {
+                                    $residentialPlotIndex++;
+                                    $saleLabel = 'R'.$residentialPlotIndex;
+                                    $badgeClass = 'plot-rate-card__code--residential';
+                                } else {
+                                    $saleLabel = 'Commercial';
+                                    $badgeClass = 'plot-rate-card__code--commercial';
+                                }
+                                $nominalMarla = SaleExemptionFileCalculator::nominalMarlaForPlot($plot);
+                                $savedRate = old('plot_rate_per_acre.'.$plot->slug, $plotRates[$plot->slug] ?? '');
+                                $previewPerFile = null;
+                                if ($savedRate !== '' && $savedRate !== null && $marlaPerAcreLand > 0) {
+                                    $previewPerFile = round((float) $savedRate * ($nominalMarla / $marlaPerAcreLand), 0);
+                                }
+                            @endphp
+                            <div class="col-6 col-lg-3">
+                                <div class="plot-rate-card">
+                                    <div class="plot-rate-card__top">
+                                        <span class="plot-rate-card__code {{ $badgeClass }}">{{ $saleLabel }}</span>
+                                        <span class="plot-rate-card__nominal">{{ SaleExemptionFileCalculator::formatMarlaWithUnit($nominalMarla) }}</span>
+                                    </div>
+                                    <div class="plot-rate-card__label">{{ $plot->label }}</div>
+                                    <div class="input-group input-group-sm plot-rate-card__input-group">
+                                        <span class="input-group-text">Rs</span>
+                                        <input type="number"
+                                               class="form-control form-control-theme plot-rate-input @error('plot_rate_per_acre.'.$plot->slug) is-invalid @enderror"
+                                               id="plot_rate_{{ $plot->slug }}"
+                                               name="plot_rate_per_acre[{{ $plot->slug }}]"
+                                               value="{{ $savedRate }}"
+                                               min="0"
+                                               step="0.01"
+                                               placeholder="0"
+                                               inputmode="decimal"
+                                               data-plot-slug="{{ $plot->slug }}"
+                                               data-sale-label="{{ $saleLabel }}"
+                                               data-nominal-marla="{{ $nominalMarla }}"
+                                               aria-label="{{ $saleLabel }} rate per acre">
+                                    </div>
+                                    @error('plot_rate_per_acre.'.$plot->slug)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    <div class="plot-rate-card__words-hint {{ ($savedRate !== '' && $savedRate !== null) ? '' : 'd-none' }}" data-plot-rate-acre-words="{{ $plot->slug }}"></div>
+                                    <div class="plot-rate-card__preview" data-plot-rate-preview="{{ $plot->slug }}">
+                                        Per file: <strong>{{ $previewPerFile !== null ? 'Rs '.number_format($previewPerFile, 0) : '—' }}</strong>
+                                    </div>
+                                    <div class="plot-rate-card__words-hint plot-rate-card__words-hint--sub {{ $previewPerFile !== null ? '' : 'd-none' }}" data-plot-rate-file-words="{{ $plot->slug }}"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    @endforeach
+                </div>
+            </div>
             <div class="d-flex flex-wrap align-items-center gap-2">
-                <button type="submit" class="btn btn-outline-theme btn-sm">Save area &amp; pool %</button>
+                <button type="submit" class="btn btn-outline-theme btn-sm">Save area, rates &amp; pool %</button>
                 <span class="text-muted small" id="file_area_preview_label">
                     Total: <strong>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</strong>
                 </span>
@@ -182,6 +248,7 @@
         <p class="small mb-2">
             Total: <strong id="calc_total_label">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</strong>
             · Acres: <strong id="calc_acres_label">{{ SaleExemptionFileCalculator::formatFileCount($fileCalculator['acres'] ?? 0) }}</strong>
+            · Total sale: <strong id="calc_total_sale_label">{{ ($fileCalculator['total_sale_amount'] ?? null) !== null ? 'Rs '.SaleExemptionFileCalculator::formatRs($fileCalculator['total_sale_amount']) : '—' }}</strong>
         </p>
         <div class="table-responsive">
             <table class="table table-sm table-striped table-theme mb-0" id="file_calculator_table">
@@ -196,12 +263,14 @@
                         <th class="text-end">After decimal</th>
                         <th class="text-end">Decimal in marla</th>
                         <th class="text-end">Pool line marla</th>
+                        <th class="text-end">Rs / file</th>
+                        <th class="text-end">Line total Rs</th>
                     </tr>
                 </thead>
                 <tbody id="file_calculator_body">
                     @foreach($fileCalculator['rows'] ?? [] as $row)
                         <tr>
-                            <td class="fw-semibold">{{ $row['code'] }}</td>
+                            <td class="fw-semibold">{{ $row['sale_code'] ?? $row['code'] }}</td>
                             <td>{{ $row['plot_label'] }}</td>
                             <td>{{ SaleExemptionFileCalculator::formatFileCount($row['share_percent']) }}%</td>
                             <td class="small font-monospace">
@@ -215,9 +284,26 @@
                             <td class="text-end small">{{ $row['fraction_files'] > 0 ? SaleExemptionFileCalculator::formatFileCount($row['fraction_files']) : '—' }}</td>
                             <td class="text-end small">{{ $row['fraction_marla'] > 0 ? SaleExemptionFileCalculator::formatMarlaWithUnit($row['fraction_marla']) : '—' }}</td>
                             <td class="text-end small text-muted">{{ SaleExemptionFileCalculator::formatMarlaWithUnit($row['product_marla']) }}</td>
+                            <td class="text-end small">{{ SaleExemptionFileCalculator::formatRs($row['amount_per_file'] ?? null) }}</td>
+                            <td class="text-end fw-semibold">{{ SaleExemptionFileCalculator::formatRs($row['line_sale_amount'] ?? null) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
+                @if(($fileCalculator['total_sale_amount'] ?? null) !== null)
+                    <tfoot>
+                        <tr class="table-light fw-semibold">
+                            <td colspan="10" class="text-end">Total sale amount</td>
+                            <td class="text-end" id="calc_total_sale_footer">{{ SaleExemptionFileCalculator::formatRs($fileCalculator['total_sale_amount']) }}</td>
+                        </tr>
+                    </tfoot>
+                @else
+                    <tfoot class="d-none" id="calc_total_sale_foot_wrap">
+                        <tr class="table-light fw-semibold">
+                            <td colspan="10" class="text-end">Total sale amount</td>
+                            <td class="text-end" id="calc_total_sale_footer">—</td>
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
     </div>
@@ -372,6 +458,148 @@
 </div>
 @endif
 @endsection
+
+@push('head')
+<style>
+    .plot-rates-panel {
+        background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+        border: 1px solid #e9ecef;
+        border-radius: 0.625rem;
+        padding: 0.85rem 1rem 1rem;
+    }
+    .plot-rates-panel__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.65rem;
+        border-bottom: 1px solid #eef0f2;
+    }
+    .plot-rates-panel__title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin: 0 0 0.2rem;
+    }
+    .plot-rates-panel__subtitle {
+        font-size: 0.75rem;
+        color: #6c757d;
+        line-height: 1.35;
+        max-width: 36rem;
+    }
+    .plot-rates-panel__badge {
+        flex-shrink: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #f97316;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 999px;
+        padding: 0.25rem 0.55rem;
+        white-space: nowrap;
+    }
+    .plot-rate-card {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        padding: 0.65rem 0.7rem 0.55rem;
+        height: 100%;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .plot-rate-card:focus-within {
+        border-color: #fdba74;
+        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.12);
+    }
+    .plot-rate-card__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem;
+        margin-bottom: 0.25rem;
+    }
+    .plot-rate-card__code {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        border-radius: 0.25rem;
+        padding: 0.12rem 0.4rem;
+        line-height: 1.2;
+    }
+    .plot-rate-card__code--residential {
+        color: #1d4ed8;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+    }
+    .plot-rate-card__code--commercial {
+        color: #7c3aed;
+        background: #f5f3ff;
+        border: 1px solid #ddd6fe;
+    }
+    .plot-rate-card__nominal {
+        font-size: 0.68rem;
+        color: #868e96;
+        white-space: nowrap;
+    }
+    .plot-rate-card__label {
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: #343a40;
+        margin-bottom: 0.45rem;
+        line-height: 1.25;
+        min-height: 1.95em;
+    }
+    .plot-rate-card__input-group .input-group-text {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #495057;
+        background: #f8f9fa;
+        border-color: #dee2e6;
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
+    }
+    .plot-rate-card__input-group .form-control {
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .plot-rate-card__preview {
+        margin-top: 0.4rem;
+        font-size: 0.72rem;
+        color: #6c757d;
+    }
+    .plot-rate-card__preview strong {
+        color: #212529;
+        font-weight: 600;
+    }
+    .plot-rate-card__words-hint {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #f97316;
+        line-height: 1.2;
+        margin-top: 0.15rem;
+    }
+    .plot-rate-card__words-hint--sub {
+        font-size: 0.68rem;
+        font-weight: 500;
+        color: #868e96;
+        margin-top: 0.1rem;
+    }
+    .calc-rs-words {
+        font-size: 0.68rem;
+        font-weight: 500;
+        color: #868e96;
+        line-height: 1.15;
+        margin-top: 0.1rem;
+    }
+    .calc-total-words {
+        font-weight: 500;
+        color: #868e96;
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script>
@@ -548,22 +776,125 @@
         return formatMarlaVal(n);
     }
 
+    function formatRs(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) {
+            return '—';
+        }
+        return Math.round(amount).toLocaleString('en-PK');
+    }
+
+    function scaleAmountWords(x) {
+        return (Math.round(x * 100) / 100).toFixed(2).replace(/\.?0+$/, '');
+    }
+
+    function formatRsWords(amount) {
+        if (amount === null || amount === undefined || isNaN(amount) || amount <= 0) {
+            return '';
+        }
+        var intPart = Math.round(amount);
+        if (intPart >= 10000000) {
+            return scaleAmountWords(intPart / 10000000) + ' crore';
+        }
+        if (intPart >= 100000) {
+            return scaleAmountWords(intPart / 100000) + ' lac';
+        }
+        if (intPart >= 1000) {
+            return scaleAmountWords(intPart / 1000) + ' thousand';
+        }
+        return '';
+    }
+
+    function formatRsCellHtml(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) {
+            return '—';
+        }
+        var words = formatRsWords(amount);
+        var html = formatRs(amount);
+        if (words) {
+            html += '<div class="calc-rs-words">' + words + '</div>';
+        }
+        return html;
+    }
+
+    function readPlotRates() {
+        var rates = {};
+        document.querySelectorAll('.plot-rate-input').forEach(function (el) {
+            var slug = el.getAttribute('data-plot-slug');
+            var value = parseFloat(el.value);
+            if (slug && !isNaN(value) && value > 0) {
+                rates[slug] = value;
+            }
+        });
+        return rates;
+    }
+
+    function plotSaleCode(componentSlug, residentialIndex) {
+        if (componentSlug === 'commercial') {
+            return 'Commercial';
+        }
+        return 'R' + residentialIndex;
+    }
+
+    function amountPerFileFromRate(ratePerAcre, nominalMarla) {
+        if (!ratePerAcre || !nominalMarla || !marlaPerAcreLand) {
+            return null;
+        }
+        return Math.round(ratePerAcre * (nominalMarla / marlaPerAcreLand) * 100) / 100;
+    }
+
+    function updatePlotRatePreviews() {
+        document.querySelectorAll('.plot-rate-input').forEach(function (el) {
+            var slug = el.getAttribute('data-plot-slug');
+            var preview = document.querySelector('[data-plot-rate-preview="' + slug + '"]');
+            var acreWordsEl = document.querySelector('[data-plot-rate-acre-words="' + slug + '"]');
+            var fileWordsEl = document.querySelector('[data-plot-rate-file-words="' + slug + '"]');
+            var nominal = parseFloat(el.getAttribute('data-nominal-marla') || '0');
+            var rate = parseFloat(el.value);
+            var perFile = amountPerFileFromRate(rate, nominal);
+            var acreWords = !isNaN(rate) && rate > 0 ? formatRsWords(rate) : '';
+            var fileWords = perFile !== null ? formatRsWords(perFile) : '';
+
+            if (acreWordsEl) {
+                acreWordsEl.textContent = acreWords ? ('≈ ' + acreWords) : '';
+                acreWordsEl.classList.toggle('d-none', !acreWords);
+            }
+            if (fileWordsEl) {
+                fileWordsEl.textContent = fileWords ? ('≈ ' + fileWords) : '';
+                fileWordsEl.classList.toggle('d-none', !fileWords);
+            }
+            if (preview) {
+                preview.innerHTML = 'Per file: <strong>' + (perFile !== null ? ('Rs ' + formatRs(perFile)) : '—') + '</strong>';
+            }
+        });
+    }
+
     function buildCalculatorRows(totalMarla) {
         var mpa = marlaPerAcreLand;
         var acres = mpa > 0 ? totalMarla / mpa : 0;
         var tbody = document.getElementById('file_calculator_body');
         var acresLabel = document.getElementById('calc_acres_label');
         var totalLabel = document.getElementById('calc_total_label');
+        var totalSaleLabel = document.getElementById('calc_total_sale_label');
+        var totalSaleFooter = document.getElementById('calc_total_sale_footer');
+        var totalSaleFootWrap = document.getElementById('calc_total_sale_foot_wrap');
+        var rates = readPlotRates();
         if (acresLabel) acresLabel.textContent = formatNum(acres);
         if (totalLabel) totalLabel.textContent = formatAkmsLabel(totalMarla);
         if (!tbody) return;
 
         var html = '';
         var globalIndex = 0;
+        var residentialIndex = 0;
+        var totalSale = 0;
+        var hasSale = false;
         exemptionConfig.forEach(function (comp) {
             var prefix = (comp.slug || 'x').charAt(0).toUpperCase();
             (comp.plot_types || []).forEach(function (plot) {
                 globalIndex++;
+                if (comp.slug === 'residential') {
+                    residentialIndex++;
+                }
+                var saleCode = plotSaleCode(comp.slug, residentialIndex);
                 var marla = parseFloat(plot.marla) || 0;
                 var nominal = parseFloat(plot.nominal_marla) || 0;
                 var product = Math.round(marla * acres * 10000) / 10000;
@@ -571,10 +902,15 @@
                 var fullFiles = Math.floor(files + 1e-9);
                 var fractionFiles = Math.round((files - fullFiles) * 10000) / 10000;
                 var fractionMarla = Math.round(fractionFiles * nominal * 10000) / 10000;
-                var wholeMarla = Math.round(fullFiles * marla * 10000) / 10000;
-                var totalLineMarla = Math.round((wholeMarla + fractionMarla) * 10000) / 10000;
+                var rate = rates[plot.slug] || 0;
+                var amountPerFile = amountPerFileFromRate(rate, nominal);
+                var lineSale = amountPerFile !== null ? Math.round(amountPerFile * files * 100) / 100 : null;
+                if (lineSale !== null) {
+                    totalSale += lineSale;
+                    hasSale = true;
+                }
                 html += '<tr>' +
-                    '<td class="fw-semibold">' + prefix + '.' + globalIndex + '</td>' +
+                    '<td class="fw-semibold">' + saleCode + '</td>' +
                     '<td>' + plot.label + '</td>' +
                     '<td>' + formatNum(plot.share_percent) + '%</td>' +
                     '<td class="small font-monospace">' +
@@ -586,10 +922,26 @@
                     '<td class="text-end small">' + (fractionFiles > 0 ? formatNum(fractionFiles) : '—') + '</td>' +
                     '<td class="text-end small">' + (fractionMarla > 0 ? formatMarlaM(fractionMarla) : '—') + '</td>' +
                     '<td class="text-end small text-muted">' + formatMarlaM(product) + '</td>' +
+                    '<td class="text-end small">' + formatRsCellHtml(amountPerFile) + '</td>' +
+                    '<td class="text-end fw-semibold">' + formatRsCellHtml(lineSale) + '</td>' +
                 '</tr>';
             });
         });
-        tbody.innerHTML = html || '<tr><td colspan="9" class="text-muted">Configure plot types in project exemption setup.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="11" class="text-muted">Configure plot types in project exemption setup.</td></tr>';
+        if (totalSaleLabel) {
+            if (hasSale) {
+                var totalWords = formatRsWords(totalSale);
+                totalSaleLabel.innerHTML = 'Rs ' + formatRs(totalSale) + (totalWords ? ' <span class="calc-total-words">(' + totalWords + ')</span>' : '');
+            } else {
+                totalSaleLabel.textContent = '—';
+            }
+        }
+        if (totalSaleFooter) {
+            totalSaleFooter.innerHTML = hasSale ? formatRsCellHtml(totalSale) : '—';
+        }
+        if (totalSaleFootWrap) {
+            totalSaleFootWrap.classList.toggle('d-none', !hasSale);
+        }
     }
 
     function readCalcMarla() {
@@ -621,6 +973,15 @@
             buildCalculatorRows(readCalcMarla());
         });
     });
+
+    document.querySelectorAll('.plot-rate-input').forEach(function (el) {
+        el.addEventListener('input', function () {
+            updatePlotRatePreviews();
+            buildCalculatorRows(readCalcMarla());
+        });
+    });
+
+    updatePlotRatePreviews();
 
     [fileAreaAcre, fileAreaKanal, fileAreaMarla, fileAreaSqft].forEach(function (el) {
         if (el) el.addEventListener('input', syncCalcFromFileAreaForm);
