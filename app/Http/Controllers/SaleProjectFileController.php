@@ -26,6 +26,21 @@ class SaleProjectFileController extends Controller
         return view('sales.files.index', compact('project'));
     }
 
+    public function percentageIndex()
+    {
+        $files = ProjectFile::query()
+            ->with(['project', 'dealerParty'])
+            ->join('projects', 'projects.id', '=', 'project_files.project_id')
+            ->orderBy('projects.name')
+            ->orderBy('project_files.file_number')
+            ->select('project_files.*')
+            ->get();
+
+        $projects = Project::query()->orderBy('name')->get();
+
+        return view('sales.percentage-index', compact('files', 'projects'));
+    }
+
     public function create(Project $project)
     {
         $parties = Party::query()->orderBy('name')->get();

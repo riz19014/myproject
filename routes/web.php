@@ -30,6 +30,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('users', UserController::class);
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('sale', [SaleController::class, 'index'])->name('sale.index');
+    Route::get('sale/percentage', [SaleProjectFileController::class, 'percentageIndex'])->name('sale.percentage.index');
     Route::get('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'edit'])->name('sale.projects.exemption.edit');
     Route::put('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'update'])->name('sale.projects.exemption.update');
     Route::get('sale/projects/{project}/files', [SaleProjectFileController::class, 'index'])->name('sale.files.index');
