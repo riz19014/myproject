@@ -126,16 +126,16 @@
                 </div>
             </div>
             @php
-                $plotRates = old('plot_rate_per_acre', $plotRatesPerAcre ?? []);
+                $plotRates = old('plot_rate_per_file', $plotRatesPerFile ?? []);
                 $residentialPlotIndex = 0;
             @endphp
             <div class="plot-rates-panel mt-3 mb-3">
                 <div class="plot-rates-panel__header">
                     <div>
-                        <h3 class="plot-rates-panel__title">Sale amount per acre</h3>
-                        <p class="plot-rates-panel__subtitle mb-0">Set a separate Rs/acre rate for each plot file type. Per-file and line totals update in the calculator below.</p>
+                        <h3 class="plot-rates-panel__title">Sale amount per file</h3>
+                        <p class="plot-rates-panel__subtitle mb-0">Set Rs per file for each plot type (2 Kanal, 1 Kanal, etc.). Line total = files × rate in the calculator below.</p>
                     </div>
-                    <span class="plot-rates-panel__badge">Rs / acre</span>
+                    <span class="plot-rates-panel__badge">Rs / file</span>
                 </div>
                 <div class="row g-2 plot-rates-grid">
                     @foreach($config->components() as $component)
@@ -150,11 +150,7 @@
                                     $badgeClass = 'plot-rate-card__code--commercial';
                                 }
                                 $nominalMarla = SaleExemptionFileCalculator::nominalMarlaForPlot($plot);
-                                $savedRate = old('plot_rate_per_acre.'.$plot->slug, $plotRates[$plot->slug] ?? '');
-                                $previewPerFile = null;
-                                if ($savedRate !== '' && $savedRate !== null && $marlaPerAcreLand > 0) {
-                                    $previewPerFile = round((float) $savedRate * ($nominalMarla / $marlaPerAcreLand), 0);
-                                }
+                                $savedRate = old('plot_rate_per_file.'.$plot->slug, $plotRates[$plot->slug] ?? '');
                             @endphp
                             <div class="col-6 col-lg-3">
                                 <div class="plot-rate-card">
@@ -166,9 +162,9 @@
                                     <div class="input-group input-group-sm plot-rate-card__input-group">
                                         <span class="input-group-text">Rs</span>
                                         <input type="number"
-                                               class="form-control form-control-theme plot-rate-input @error('plot_rate_per_acre.'.$plot->slug) is-invalid @enderror"
+                                               class="form-control form-control-theme plot-rate-input @error('plot_rate_per_file.'.$plot->slug) is-invalid @enderror"
                                                id="plot_rate_{{ $plot->slug }}"
-                                               name="plot_rate_per_acre[{{ $plot->slug }}]"
+                                               name="plot_rate_per_file[{{ $plot->slug }}]"
                                                value="{{ $savedRate }}"
                                                min="0"
                                                step="0.01"
@@ -177,14 +173,10 @@
                                                data-plot-slug="{{ $plot->slug }}"
                                                data-sale-label="{{ $saleLabel }}"
                                                data-nominal-marla="{{ $nominalMarla }}"
-                                               aria-label="{{ $saleLabel }} rate per acre">
+                                               aria-label="{{ $saleLabel }} rate per file">
                                     </div>
-                                    @error('plot_rate_per_acre.'.$plot->slug)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                                    <div class="plot-rate-card__words-hint {{ ($savedRate !== '' && $savedRate !== null) ? '' : 'd-none' }}" data-plot-rate-acre-words="{{ $plot->slug }}"></div>
-                                    <div class="plot-rate-card__preview" data-plot-rate-preview="{{ $plot->slug }}">
-                                        Per file: <strong>{{ $previewPerFile !== null ? 'Rs '.number_format($previewPerFile, 0) : '—' }}</strong>
-                                    </div>
-                                    <div class="plot-rate-card__words-hint plot-rate-card__words-hint--sub {{ $previewPerFile !== null ? '' : 'd-none' }}" data-plot-rate-file-words="{{ $plot->slug }}"></div>
+                                    @error('plot_rate_per_file.'.$plot->slug)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    <div class="plot-rate-card__words-hint {{ ($savedRate !== '' && $savedRate !== null) ? '' : 'd-none' }}" data-plot-rate-words="{{ $plot->slug }}"></div>
                                 </div>
                             </div>
                         @endforeach
@@ -565,27 +557,12 @@
         font-size: 0.85rem;
         font-weight: 500;
     }
-    .plot-rate-card__preview {
-        margin-top: 0.4rem;
-        font-size: 0.72rem;
-        color: #6c757d;
-    }
-    .plot-rate-card__preview strong {
-        color: #212529;
-        font-weight: 600;
-    }
     .plot-rate-card__words-hint {
         font-size: 0.72rem;
         font-weight: 600;
         color: #f97316;
         line-height: 1.2;
         margin-top: 0.15rem;
-    }
-    .plot-rate-card__words-hint--sub {
-        font-size: 0.68rem;
-        font-weight: 500;
-        color: #868e96;
-        margin-top: 0.1rem;
     }
     .calc-rs-words {
         font-size: 0.68rem;
@@ -835,35 +812,16 @@
         return 'R' + residentialIndex;
     }
 
-    function amountPerFileFromRate(ratePerAcre, nominalMarla) {
-        if (!ratePerAcre || !nominalMarla || !marlaPerAcreLand) {
-            return null;
-        }
-        return Math.round(ratePerAcre * (nominalMarla / marlaPerAcreLand) * 100) / 100;
-    }
-
     function updatePlotRatePreviews() {
         document.querySelectorAll('.plot-rate-input').forEach(function (el) {
             var slug = el.getAttribute('data-plot-slug');
-            var preview = document.querySelector('[data-plot-rate-preview="' + slug + '"]');
-            var acreWordsEl = document.querySelector('[data-plot-rate-acre-words="' + slug + '"]');
-            var fileWordsEl = document.querySelector('[data-plot-rate-file-words="' + slug + '"]');
-            var nominal = parseFloat(el.getAttribute('data-nominal-marla') || '0');
+            var wordsEl = document.querySelector('[data-plot-rate-words="' + slug + '"]');
             var rate = parseFloat(el.value);
-            var perFile = amountPerFileFromRate(rate, nominal);
-            var acreWords = !isNaN(rate) && rate > 0 ? formatRsWords(rate) : '';
-            var fileWords = perFile !== null ? formatRsWords(perFile) : '';
+            var words = !isNaN(rate) && rate > 0 ? formatRsWords(rate) : '';
 
-            if (acreWordsEl) {
-                acreWordsEl.textContent = acreWords ? ('≈ ' + acreWords) : '';
-                acreWordsEl.classList.toggle('d-none', !acreWords);
-            }
-            if (fileWordsEl) {
-                fileWordsEl.textContent = fileWords ? ('≈ ' + fileWords) : '';
-                fileWordsEl.classList.toggle('d-none', !fileWords);
-            }
-            if (preview) {
-                preview.innerHTML = 'Per file: <strong>' + (perFile !== null ? ('Rs ' + formatRs(perFile)) : '—') + '</strong>';
+            if (wordsEl) {
+                wordsEl.textContent = words ? ('≈ ' + words) : '';
+                wordsEl.classList.toggle('d-none', !words);
             }
         });
     }
@@ -903,7 +861,7 @@
                 var fractionFiles = Math.round((files - fullFiles) * 10000) / 10000;
                 var fractionMarla = Math.round(fractionFiles * nominal * 10000) / 10000;
                 var rate = rates[plot.slug] || 0;
-                var amountPerFile = amountPerFileFromRate(rate, nominal);
+                var amountPerFile = rate > 0 ? Math.round(rate * 100) / 100 : null;
                 var lineSale = amountPerFile !== null ? Math.round(amountPerFile * files * 100) / 100 : null;
                 if (lineSale !== null) {
                     totalSale += lineSale;

@@ -63,13 +63,13 @@ final class SaleExemptionFileCalculator
      *     whole_files_marla: float,
      *     total_line_marla: float,
      *     sale_code: string,
-     *     rate_per_acre: float|null,
+     *     rate_per_file: float|null,
      *     amount_per_file: float|null,
      *     line_sale_amount: float|null
      *   }>
      * }
      */
-    public static function calculate(float $totalMarla, SaleExemptionConfig $config, array $ratesPerAcre = []): array
+    public static function calculate(float $totalMarla, SaleExemptionConfig $config, array $ratesPerFile = []): array
     {
         $marlaPerAcre = $config->marlaPerAcreLand();
         $acres = self::acresFromMarla($totalMarla, $marlaPerAcre);
@@ -93,11 +93,11 @@ final class SaleExemptionFileCalculator
                 $fractionMarla = round($fractionFiles * $nominal, 4);
                 $wholeFilesMarla = round($fullFiles * $marlaPerPlot, 4);
                 $totalLineMarla = round($wholeFilesMarla + $fractionMarla, 4);
-                $ratePerAcre = (float) ($ratesPerAcre[$plot->slug] ?? 0);
+                $ratePerFile = (float) ($ratesPerFile[$plot->slug] ?? 0);
                 $amountPerFile = null;
                 $lineSaleAmount = null;
-                if ($ratePerAcre > 0 && $marlaPerAcre > 0 && $nominal > 0) {
-                    $amountPerFile = round($ratePerAcre * ($nominal / $marlaPerAcre), 2);
+                if ($ratePerFile > 0) {
+                    $amountPerFile = round($ratePerFile, 2);
                     $lineSaleAmount = round($amountPerFile * $fileCount, 2);
                 }
 
@@ -118,7 +118,7 @@ final class SaleExemptionFileCalculator
                     'fraction_marla' => $fractionMarla,
                     'whole_files_marla' => $wholeFilesMarla,
                     'total_line_marla' => $totalLineMarla,
-                    'rate_per_acre' => $ratePerAcre > 0 ? $ratePerAcre : null,
+                    'rate_per_file' => $ratePerFile > 0 ? $ratePerFile : null,
                     'amount_per_file' => $amountPerFile,
                     'line_sale_amount' => $lineSaleAmount,
                 ];

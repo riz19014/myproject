@@ -104,7 +104,7 @@ class SaleProjectFileController extends Controller
             'poolsSummary' => $poolsSummary,
             'remainingDirect' => $remainingDirect,
             'fileCalculator' => $fileCalculator,
-            'plotRatesPerAcre' => $plotRates,
+            'plotRatesPerFile' => $plotRates,
             'recentSales' => $projectFile->sales->sortByDesc('id')->take(20),
         ]);
     }
@@ -120,8 +120,8 @@ class SaleProjectFileController extends Controller
             'file_area_marla' => ['required', 'integer', 'min:0'],
             'file_area_sqft' => ['required', 'integer', 'min:0'],
             'pool_percent' => ['required', 'array'],
-            'plot_rate_per_acre' => ['nullable', 'array'],
-            'plot_rate_per_acre.*' => ['nullable', 'numeric', 'min:0'],
+            'plot_rate_per_file' => ['nullable', 'array'],
+            'plot_rate_per_file.*' => ['nullable', 'numeric', 'min:0'],
         ];
         foreach ($config->components() as $component) {
             $rules['pool_percent.'.$component->id] = ['required', 'numeric', 'min:0', 'max:100', 'regex:/^\d+(\.\d{1,4})?$/'];
@@ -166,7 +166,7 @@ class SaleProjectFileController extends Controller
         }
 
         $plotRates = [];
-        foreach ($validated['plot_rate_per_acre'] ?? [] as $slug => $rate) {
+        foreach ($validated['plot_rate_per_file'] ?? [] as $slug => $rate) {
             if ($rate === null || $rate === '') {
                 continue;
             }
