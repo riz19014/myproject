@@ -55,17 +55,19 @@
     <div class="col-sm-6 col-lg-3">
         <div class="border rounded p-2 small bg-light h-100">
             <span class="text-muted d-block">Total paid</span>
-            <span class="fw-semibold">Rs {{ number_format($totalPaid, 2) }}</span>
+            <span class="fw-semibold" id="pf-summary-total-paid">Rs {{ number_format($totalPaid, 2) }}</span>
         </div>
     </div>
     <div class="col-sm-6 col-lg-3">
         <div class="border rounded p-2 small bg-light h-100">
             <span class="text-muted d-block">Balance payable</span>
-            @if($balancePayable >= 0)
-                <span class="fw-semibold">Rs {{ number_format($balancePayable, 2) }}</span>
-            @else
-                <span class="fw-semibold text-muted">Overpaid Rs {{ number_format(abs($balancePayable), 2) }}</span>
-            @endif
+            <span @class(['fw-semibold', 'text-muted' => $balancePayable < 0]) id="pf-summary-balance-payable">
+                @if($balancePayable >= 0)
+                    Rs {{ number_format($balancePayable, 2) }}
+                @else
+                    Overpaid Rs {{ number_format(abs($balancePayable), 2) }}
+                @endif
+            </span>
         </div>
     </div>
     <div class="col-sm-6 col-lg-3">
@@ -170,7 +172,17 @@
     </div>
 </div>
 
-<script type="application/json" id="pf-ledger-json">@json(['sections' => $ledgerSections, 'tree' => $ledgerTree], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE)</script>
+@php
+    $ledgerJson = [
+        'sections' => $ledgerSections,
+        'tree' => $ledgerTree,
+        'summary' => [
+            'total_paid' => $totalPaid,
+            'balance_payable' => $balancePayable,
+        ],
+    ];
+@endphp
+<script type="application/json" id="pf-ledger-json">@json($ledgerJson, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE)</script>
 @endsection
 
 @push('head')
@@ -364,10 +376,12 @@
     var jsonEl = document.getElementById('pf-ledger-json');
     var sections = {};
     var treeByKey = {};
+    var defaultSummary = { total_paid: 0, balance_payable: 0 };
     if (jsonEl && jsonEl.textContent) {
         try {
             var parsed = JSON.parse(jsonEl.textContent);
             sections = parsed.sections || {};
+            defaultSummary = parsed.summary || defaultSummary;
             (parsed.tree || []).forEach(function(node) {
                 treeByKey[node.key] = node;
             });
@@ -376,6 +390,9 @@
             treeByKey = {};
         }
     }
+
+    var totalPaidEl = document.getElementById('pf-summary-total-paid');
+    var balancePayableEl = document.getElementById('pf-summary-balance-payable');
 
     var emptyEl = document.getElementById('pf-ledger-empty');
     var contentEl = document.getElementById('pf-ledger-content');
@@ -393,6 +410,54 @@
     var subRadios = document.querySelectorAll('.pf-ledger-sub-radio');
     var activeKey = null;
 
+    function formatRs(amount) {
+        var n = Number(amount);
+        if (!isFinite(n)) {
+            n = 0;
+        }
+        return 'Rs ' + n.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderBalancePayable(amount) {
+        var n = Number(amount);
+        if (!isFinite(n)) {
+            n = 0;
+        }
+        if (!balancePayableEl) {
+            return;
+        }
+        balancePayableEl.classList.remove('text-muted');
+        if (n >= 0) {
+            balancePayableEl.textContent = formatRs(n);
+        } else {
+            balancePayableEl.classList.add('text-muted');
+            balancePayableEl.textContent = 'Overpaid Rs ' + Math.abs(n).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+    }
+
+    function resetSummaryCards() {
+        if (totalPaidEl) {
+            totalPaidEl.textContent = formatRs(defaultSummary.total_paid || 0);
+        }
+        renderBalancePayable(defaultSummary.balance_payable || 0);
+    }
+
+    function updateSummaryFromSection(section) {
+        if (!section || !section.footer) {
+            resetSummaryCards();
+            return;
+        }
+
+        var footer = section.footer;
+        var totalPaid = footer.credit !== null && footer.credit !== undefined ? Number(footer.credit) : 0;
+        var balance = footer.running_balance !== null && footer.running_balance !== undefined ? Number(footer.running_balance) : 0;
+
+        if (totalPaidEl) {
+            totalPaidEl.textContent = formatRs(totalPaid);
+        }
+        renderBalancePayable(balance);
+    }
+
     function setLedgerActionsEnabled(enabled) {
         if (printBtn) {
             printBtn.disabled = !enabled;
@@ -403,11 +468,16 @@
         }
     }
 
-    function resetLedgerView() {
+    function resetLedgerPanel() {
         activeKey = null;
         emptyEl.classList.remove('d-none');
         contentEl.classList.add('d-none');
         setLedgerActionsEnabled(false);
+    }
+
+    function resetLedgerView() {
+        resetLedgerPanel();
+        resetSummaryCards();
     }
 
     function hidePartyPanel() {
@@ -443,10 +513,11 @@
         var node = treeByKey[subKey];
         partyListEl.innerHTML = '';
         partyPanelEl.classList.remove('d-none');
-        resetLedgerView();
+        resetLedgerPanel();
 
         if (!node || !node.parties || !node.parties.length) {
             partyListEl.innerHTML = '<p class="text-muted small mb-0">No parties in this subcategory.</p>';
+            resetSummaryCards();
             return;
         }
         node.parties.forEach(function(party) {
@@ -467,6 +538,10 @@
             bindPartyButton(btn);
             partyListEl.appendChild(btn);
         });
+
+        if (node.all_key && sections[node.all_key]) {
+            updateSummaryFromSection(sections[node.all_key]);
+        }
     }
 
     subRadios.forEach(function(radio) {
@@ -560,6 +635,8 @@
         totalDebitEl.textContent = formatLedgerAmount(footer.debit);
         totalCreditEl.textContent = formatLedgerAmount(footer.credit);
         totalBalanceEl.textContent = formatLedgerAmount(footer.running_balance);
+
+        updateSummaryFromSection(section);
     }
 
     printBtn?.addEventListener('click', function() {

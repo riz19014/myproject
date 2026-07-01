@@ -190,34 +190,32 @@
     }
     .daybook-page .daybook-metrics {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.75rem;
-        margin-bottom: 1.75rem;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0.55rem;
+        margin-bottom: 1.25rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        align-items: stretch;
     }
-    @media (min-width: 576px) {
+    @media (max-width: 991.98px) {
         .daybook-page .daybook-metrics {
-            grid-template-columns: repeat(3, 1fr);
-        }
-    }
-    @media (min-width: 1200px) {
-        .daybook-page .daybook-metrics {
-            grid-template-columns: repeat(6, 1fr);
-            gap: 0.85rem;
+            grid-template-columns: repeat(5, minmax(9.5rem, 1fr));
         }
     }
     .daybook-page .daybook-metric {
         position: relative;
-        padding: 1rem 1rem 1.1rem;
+        padding: 0.55rem 0.65rem 0.6rem;
         background: rgba(255, 255, 255, 0.72);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.9);
-        border-radius: 14px;
+        border-radius: 10px;
         box-shadow:
-            0 2px 12px rgba(15, 23, 42, 0.06),
+            0 1px 8px rgba(15, 23, 42, 0.05),
             inset 0 1px 0 rgba(255, 255, 255, 0.95);
         overflow: hidden;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
+        min-width: 0;
     }
     @media (hover: hover) and (pointer: fine) {
         .daybook-page .daybook-metric:hover {
@@ -231,41 +229,87 @@
         top: 0;
         left: 0;
         right: 0;
-        height: 3px;
-        border-radius: 14px 14px 0 0;
+        height: 2px;
+        border-radius: 10px 10px 0 0;
         opacity: 0.85;
     }
     .daybook-page .daybook-metric--prior::after { background: linear-gradient(90deg, #334155, #64748b); }
     .daybook-page .daybook-metric--open::after { background: linear-gradient(90deg, #64748b, #94a3b8); }
+    .daybook-page .daybook-metric--balances::after { background: linear-gradient(90deg, #334155, #94a3b8); }
     .daybook-page .daybook-metric--petty::after { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
     .daybook-page .daybook-metric--in::after { background: linear-gradient(90deg, #16a34a, #22c55e); }
     .daybook-page .daybook-metric--out::after { background: linear-gradient(90deg, #dc2626, #f87171); }
+    .daybook-page .daybook-metric--payments::after { background: linear-gradient(90deg, #16a34a, #f87171); }
     .daybook-page .daybook-metric--close::after { background: linear-gradient(90deg, #ea580c, #fb923c); }
+    .daybook-page .daybook-metric--cash::after { background: linear-gradient(90deg, #0d9488, #2dd4bf); }
+    .daybook-page .daybook-metric--bank::after { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+    .daybook-page .daybook-metric--settlement::after { background: linear-gradient(90deg, #0d9488, #60a5fa); }
+    .daybook-page .daybook-metric__stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+    .daybook-page .daybook-metric__row + .daybook-metric__row {
+        padding-top: 0.45rem;
+        border-top: 1px solid rgba(15, 23, 42, 0.07);
+    }
+    .daybook-page .daybook-metric--combined {
+        padding-top: 0.5rem;
+        padding-bottom: 0.55rem;
+    }
     .daybook-page .daybook-metric__label {
         display: block;
-        font-size: 0.65rem;
+        font-size: 0.58rem;
         font-weight: 800;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         color: #64748b;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.15rem;
+        line-height: 1.2;
     }
     .daybook-page .daybook-metric__val {
-        font-size: 1.05rem;
+        font-size: 0.88rem;
         font-weight: 800;
         letter-spacing: -0.02em;
         color: #0f172a;
         font-variant-numeric: tabular-nums;
-        line-height: 1.2;
+        line-height: 1.15;
     }
-    .daybook-page .daybook-metric--in .daybook-metric__val { color: #15803d; }
-    .daybook-page .daybook-metric--out .daybook-metric__val { color: #b91c1c; }
+    .daybook-page .daybook-metric--in .daybook-metric__val,
+    .daybook-page .daybook-metric__row--in .daybook-metric__val { color: #15803d; }
+    .daybook-page .daybook-metric--out .daybook-metric__val,
+    .daybook-page .daybook-metric__row--out .daybook-metric__val { color: #b91c1c; }
     .daybook-page .daybook-metric--close .daybook-metric__val { color: #c2410c; }
+    .daybook-page .daybook-metric--cash .daybook-metric__val,
+    .daybook-page .daybook-metric__row--cash .daybook-metric__val { color: #0f766e; }
+    .daybook-page .daybook-metric--bank .daybook-metric__val,
+    .daybook-page .daybook-metric__row--bank .daybook-metric__val { color: #1d4ed8; }
     .daybook-page .daybook-metric__sub {
         display: block;
-        font-size: 0.7rem;
+        font-size: 0.62rem;
         color: #94a3b8;
-        margin-top: 0.25rem;
+        margin-top: 0.1rem;
+        line-height: 1.25;
+    }
+    .daybook-page .daybook-metric__breakdown {
+        margin-top: 0.2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.08rem;
+    }
+    .daybook-page .daybook-metric__breakdown li {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.35rem;
+        font-size: 0.6rem;
+        color: #64748b;
+        line-height: 1.2;
+    }
+    .daybook-page .daybook-metric__breakdown li span:last-child {
+        font-weight: 600;
+        color: #475569;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
     }
     /* overflow: visible so searchable combos (e.g. bank) aren’t clipped at the card edge */
     .daybook-page .daybook-card {

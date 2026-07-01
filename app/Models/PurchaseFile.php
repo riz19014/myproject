@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Jobs\ProcessPurchaseFileDocumentJob;
 use Illuminate\Http\UploadedFile;
 
 class PurchaseFile extends Model
@@ -64,6 +65,22 @@ class PurchaseFile extends Model
         return $this->documents()->create([
             'name' => $file->getClientOriginalName(),
             'file_path' => $path,
+            'status' => PurchaseFileDocument::STATUS_COMPLETED,
         ]);
+    }
+
+    public function queueDocument(UploadedFile $file): PurchaseFileDocument
+    {
+        $tempPath = $file->store('purchase-files-temp/'.$this->id, 'local');
+
+        $document = $this->documents()->create([
+            'name' => $file->getClientOriginalName(),
+            'file_path' => $tempPath,
+            'status' => PurchaseFileDocument::STATUS_PENDING,
+        ]);
+
+        ProcessPurchaseFileDocumentJob::dispatch($document);
+
+        return $document;
     }
 }

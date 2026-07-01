@@ -67,30 +67,56 @@
     </div>
 
 <section class="daybook-metrics" aria-label="Day financial summary">
-    <div class="daybook-metric daybook-metric--prior">
-        <span class="daybook-metric__label">Previous close</span>
-        <span class="daybook-metric__val">Rs {{ number_format($previousDayClosing, 2) }}</span>
-        <span class="daybook-metric__sub">{{ $prevDay->format('D, j M') }}</span>
-    </div>
-    <div class="daybook-metric daybook-metric--open">
-        <span class="daybook-metric__label">Opening</span>
-        <span class="daybook-metric__val">Rs {{ number_format($openingAmount, 2) }}</span>
-        <span class="daybook-metric__sub">Carried balance</span>
+    <div class="daybook-metric daybook-metric--combined daybook-metric--balances">
+        <div class="daybook-metric__stack">
+            <div class="daybook-metric__row daybook-metric__row--prior">
+                <span class="daybook-metric__label">Previous close</span>
+                <span class="daybook-metric__val">Rs {{ number_format($previousDayClosing, 2) }}</span>
+                <span class="daybook-metric__sub">{{ $prevDay->format('D, j M') }}</span>
+            </div>
+            <div class="daybook-metric__row daybook-metric__row--open">
+                <span class="daybook-metric__label">Opening</span>
+                <span class="daybook-metric__val">Rs {{ number_format($openingAmount, 2) }}</span>
+                <span class="daybook-metric__sub">Carried balance</span>
+            </div>
+        </div>
     </div>
     <div class="daybook-metric daybook-metric--petty">
         <span class="daybook-metric__label">Petty cash</span>
         <span class="daybook-metric__val">Rs {{ number_format($pettyCashAmount, 2) }}</span>
         <span class="daybook-metric__sub">Added today</span>
     </div>
-    <div class="daybook-metric daybook-metric--in">
-        <span class="daybook-metric__label">Payment in</span>
-        <span class="daybook-metric__val">Rs {{ number_format($cashIn, 2) }}</span>
-        <span class="daybook-metric__sub">This day</span>
+    <div class="daybook-metric daybook-metric--combined daybook-metric--settlement">
+        <div class="daybook-metric__stack">
+            <div class="daybook-metric__row daybook-metric__row--cash">
+                <span class="daybook-metric__label">Cash</span>
+                <span class="daybook-metric__val">Rs {{ number_format($paymentBreakdown['cash']['total'], 2) }}</span>
+                <span class="daybook-metric__sub">In {{ number_format($paymentBreakdown['cash']['in'], 2) }} · Out {{ number_format($paymentBreakdown['cash']['out'], 2) }}</span>
+            </div>
+            <div class="daybook-metric__row daybook-metric__row--bank">
+                <span class="daybook-metric__label">Bank</span>
+                <span class="daybook-metric__val">Rs {{ number_format($paymentBreakdown['bank']['total'], 2) }}</span>
+                <ul class="daybook-metric__breakdown list-unstyled mb-0">
+                    <li><span>Pay order</span><span>Rs {{ number_format($paymentBreakdown['bank']['payorder']['total'], 2) }}</span></li>
+                    <li><span>Cheque</span><span>Rs {{ number_format($paymentBreakdown['bank']['cheque']['total'], 2) }}</span></li>
+                    <li><span>Online</span><span>Rs {{ number_format($paymentBreakdown['bank']['online']['total'], 2) }}</span></li>
+                </ul>
+            </div>
+        </div>
     </div>
-    <div class="daybook-metric daybook-metric--out">
-        <span class="daybook-metric__label">Payment out</span>
-        <span class="daybook-metric__val">Rs {{ number_format($cashOut, 2) }}</span>
-        <span class="daybook-metric__sub">This day</span>
+    <div class="daybook-metric daybook-metric--combined daybook-metric--payments">
+        <div class="daybook-metric__stack">
+            <div class="daybook-metric__row daybook-metric__row--in">
+                <span class="daybook-metric__label">Payment in</span>
+                <span class="daybook-metric__val">Rs {{ number_format($cashIn, 2) }}</span>
+                <span class="daybook-metric__sub">This day</span>
+            </div>
+            <div class="daybook-metric__row daybook-metric__row--out">
+                <span class="daybook-metric__label">Payment out</span>
+                <span class="daybook-metric__val">Rs {{ number_format($cashOut, 2) }}</span>
+                <span class="daybook-metric__sub">This day</span>
+            </div>
+        </div>
     </div>
     <div class="daybook-metric daybook-metric--close">
         <span class="daybook-metric__label">Closing</span>

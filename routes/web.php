@@ -61,6 +61,7 @@ Route::middleware('auth')->group(function () {
     Route::put('purchase/files/{purchase_file}', [PurchaseFileController::class, 'update'])->name('purchase.files.update');
     Route::delete('purchase/files/{purchase_file}', [PurchaseFileController::class, 'destroy'])->name('purchase.files.destroy');
     Route::post('purchase/files/{purchase_file}/documents', [PurchaseFileController::class, 'storeDocuments'])->name('purchase.files.documents.store');
+    Route::get('purchase/files/{purchase_file}/documents/{document}/status', [PurchaseFileController::class, 'documentStatus'])->name('purchase.files.documents.status');
     Route::delete('purchase/files/{purchase_file}/documents/{document}', [PurchaseFileController::class, 'destroyDocument'])->name('purchase.files.documents.destroy');
     Route::get('purchase/lines/pdf', [PurchaseItemController::class, 'pdf'])->name('purchase.lines.pdf');
     Route::get('purchase/lines/ledger-pdf', [PurchaseItemController::class, 'ledgerPdf'])->name('purchase.lines.ledger-pdf');

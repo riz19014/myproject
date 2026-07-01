@@ -542,6 +542,77 @@ class DayBookController extends Controller
         return $rec ? (float) $rec->amount : 0.0;
     }
 
+    /**
+     * @param  \Illuminate\Support\Collection<int, DayBookEntry>  $entries
+     * @return array{
+     *     cash: array{in: float, out: float, net: float},
+     *     bank: array{
+     *         in: float,
+     *         out: float,
+     *         net: float,
+     *         payorder: array{in: float, out: float, net: float},
+     *         cheque: array{in: float, out: float, net: float},
+     *         online: array{in: float, out: float, net: float},
+     *     }
+     * }
+     */
+    private function daybookPaymentBreakdown(Collection $entries): array
+    {
+        $methods = [
+            DayBookEntry::PAYMENT_CASH => ['in' => 0.0, 'out' => 0.0],
+            DayBookEntry::PAYMENT_PAYORDER => ['in' => 0.0, 'out' => 0.0],
+            DayBookEntry::PAYMENT_CHEQUE => ['in' => 0.0, 'out' => 0.0],
+            DayBookEntry::PAYMENT_ONLINE => ['in' => 0.0, 'out' => 0.0],
+        ];
+
+        foreach ($entries as $entry) {
+            $method = $entry->payment_method;
+            if ($method === null || $method === '') {
+                $method = DayBookEntry::PAYMENT_CASH;
+            }
+            if (! isset($methods[$method])) {
+                continue;
+            }
+
+            $amount = (float) $entry->amount;
+            if ($entry->type === DayBookEntry::TYPE_CASH_IN) {
+                $methods[$method]['in'] += $amount;
+            } else {
+                $methods[$method]['out'] += $amount;
+            }
+        }
+
+        $withNet = static function (array $bucket): array {
+            return [
+                'in' => $bucket['in'],
+                'out' => $bucket['out'],
+                'net' => $bucket['in'] - $bucket['out'],
+                'total' => $bucket['in'] + $bucket['out'],
+            ];
+        };
+
+        $cash = $withNet($methods[DayBookEntry::PAYMENT_CASH]);
+        $payorder = $withNet($methods[DayBookEntry::PAYMENT_PAYORDER]);
+        $cheque = $withNet($methods[DayBookEntry::PAYMENT_CHEQUE]);
+        $online = $withNet($methods[DayBookEntry::PAYMENT_ONLINE]);
+
+        $bankIn = $payorder['in'] + $cheque['in'] + $online['in'];
+        $bankOut = $payorder['out'] + $cheque['out'] + $online['out'];
+
+        return [
+            'cash' => $cash,
+            'bank' => [
+                'in' => $bankIn,
+                'out' => $bankOut,
+                'net' => $bankIn - $bankOut,
+                'total' => $bankIn + $bankOut,
+                'payorder' => $payorder,
+                'cheque' => $cheque,
+                'online' => $online,
+            ],
+        ];
+    }
+
     public function index(Request $request)
     {
         $day = $request->filled('date')
@@ -586,6 +657,8 @@ class DayBookController extends Controller
         }
         $closingBalance = $running;
 
+        $paymentBreakdown = $this->daybookPaymentBreakdown($entries);
+
         $projects = Project::orderBy('name')->get();
         $parties = Party::orderBy('name')->get();
         $partySubCategories = PartySubCategory::query()
@@ -608,6 +681,7 @@ class DayBookController extends Controller
             'cashIn' => $cashIn,
             'cashOut' => $cashOut,
             'closingBalance' => $closingBalance,
+            'paymentBreakdown' => $paymentBreakdown,
             'projects' => $projects,
             'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
             'parties' => $parties,

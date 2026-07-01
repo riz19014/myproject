@@ -26,7 +26,7 @@
             </div>
             <div>
                 <h2 class="h5 mb-1">Upload documents</h2>
-                <p class="text-muted small mb-0">Any file type · maximum <strong>1 MB</strong> per file · you can select multiple files at once.</p>
+                <p class="text-muted small mb-0">Any file type · maximum <strong>50 MB</strong> per file · you can select multiple files at once. Large files are processed in the background after upload.</p>
             </div>
         </div>
 
@@ -167,8 +167,9 @@
 @push('scripts')
 <script>
 (function() {
-    var MAX_BYTES = 1024 * 1024;
+    var MAX_BYTES = 50 * 1024 * 1024;
     var uploadUrl = @json(route('purchase.files.documents.store', $purchase_file));
+    var statusUrlTemplate = @json(route('purchase.files.documents.status', [$purchase_file, '__DOC__']));
     var destroyUrlTemplate = @json(route('purchase.files.documents.destroy', [$purchase_file, '__DOC__']));
     var csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
@@ -187,6 +188,80 @@
     var emptyEl = document.getElementById('pf-docs-empty');
     var tableWrap = document.getElementById('pf-docs-table-wrap');
     var countBadge = document.getElementById('pf-docs-count-badge');
+
+    function setUploadingState(isUploading) {
+        uploadBtn.disabled = isUploading;
+        if (isUploading) {
+            spinner.classList.remove('d-none');
+        } else {
+            spinner.classList.add('d-none');
+        }
+    }
+
+    function actionButtonHtml(doc) {
+        if (doc.url) {
+            return '<a href="' + escapeHtml(doc.url) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-theme me-1" title="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>';
+        }
+
+        return '<button type="button" class="btn btn-sm btn-outline-success me-1" disabled title="Saved"><i class="bi bi-check-lg" aria-hidden="true"></i></button>';
+    }
+
+    function updateDocumentRow(tr, doc) {
+        if (!tr) return;
+
+        var nameCell = tr.querySelector('td:first-child');
+        if (nameCell) {
+            var statusBadge = doc.status_label && doc.is_processing
+                ? ' <span class="badge rounded-pill text-bg-warning ms-1 pf-doc-status-badge">' + escapeHtml(doc.status_label) + '</span>'
+                : '';
+            nameCell.innerHTML = '<i class="bi bi-file-earmark pf-doc-icon" aria-hidden="true"></i>' + escapeHtml(doc.name) + statusBadge;
+        }
+
+        var sizeCell = tr.children[1];
+        if (sizeCell) {
+            sizeCell.textContent = doc.size_label || '—';
+        }
+
+        var actionsCell = tr.querySelector('td:last-child');
+        if (actionsCell) {
+            var destroyUrl = destroyUrlTemplate.replace('__DOC__', String(doc.id));
+            actionsCell.innerHTML =
+                actionButtonHtml(doc) +
+                '<form action="' + escapeHtml(destroyUrl) + '" method="post" class="d-inline pf-doc-delete-form">' +
+                '<input type="hidden" name="_token" value="' + escapeHtml(csrf) + '">' +
+                '<input type="hidden" name="_method" value="DELETE">' +
+                '<button type="button" class="btn btn-sm btn-outline-danger btn-delete-confirm" data-title="Remove document?" title="Remove"><i class="bi bi-trash" aria-hidden="true"></i></button>' +
+                '</form>';
+        }
+
+        if (doc.is_processing) {
+            tr.setAttribute('data-doc-processing', '1');
+        } else {
+            tr.removeAttribute('data-doc-processing');
+        }
+    }
+
+    function pollProcessingDocuments() {
+        var rows = tbody.querySelectorAll('tr[data-doc-processing="1"]');
+        if (!rows.length) return;
+
+        rows.forEach(function(tr) {
+            var docId = tr.getAttribute('data-doc-id');
+            if (!docId) return;
+
+            fetch(statusUrlTemplate.replace('__DOC__', docId), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function(res) { return res.ok ? res.json() : null; })
+                .then(function(doc) {
+                    if (doc) updateDocumentRow(tr, doc);
+                })
+                .catch(function() {});
+        });
+    }
+
+    var pollTimer = setInterval(pollProcessingDocuments, 2000);
+    pollProcessingDocuments();
 
     function setError(msg) {
         if (!errorEl) return;
@@ -215,7 +290,7 @@
     function validateFiles(files) {
         for (var i = 0; i < files.length; i++) {
             if (files[i].size > MAX_BYTES) {
-                return '"' + files[i].name + '" exceeds 1 MB. Please choose a smaller file.';
+                return '"' + files[i].name + '" exceeds 50 MB. Please choose a smaller file.';
             }
         }
         return null;
@@ -258,13 +333,19 @@
     function appendRow(doc) {
         var tr = document.createElement('tr');
         tr.setAttribute('data-doc-id', String(doc.id));
+        if (doc.is_processing) {
+            tr.setAttribute('data-doc-processing', '1');
+        }
         var destroyUrl = destroyUrlTemplate.replace('__DOC__', String(doc.id));
+        var statusBadge = doc.status_label && doc.is_processing
+            ? ' <span class="badge rounded-pill text-bg-warning ms-1 pf-doc-status-badge">' + escapeHtml(doc.status_label) + '</span>'
+            : '';
         tr.innerHTML =
-            '<td><i class="bi bi-file-earmark pf-doc-icon" aria-hidden="true"></i>' + escapeHtml(doc.name) + '</td>' +
+            '<td><i class="bi bi-file-earmark pf-doc-icon" aria-hidden="true"></i>' + escapeHtml(doc.name) + statusBadge + '</td>' +
             '<td class="small text-muted">' + escapeHtml(doc.size_label || '—') + '</td>' +
             '<td class="small text-muted">' + escapeHtml(doc.created_at) + '</td>' +
             '<td class="text-end text-nowrap">' +
-            '<a href="' + escapeHtml(doc.url) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-theme me-1" title="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>' +
+            actionButtonHtml(doc) +
             '<form action="' + escapeHtml(destroyUrl) + '" method="post" class="d-inline pf-doc-delete-form">' +
             '<input type="hidden" name="_token" value="' + escapeHtml(csrf) + '">' +
             '<input type="hidden" name="_method" value="DELETE">' +
@@ -304,6 +385,69 @@
         }
     });
 
+    function parseUploadResponse(xhr) {
+        var data = null;
+        try {
+            data = JSON.parse(xhr.responseText);
+        } catch (ex) {
+            data = null;
+        }
+        if (xhr.status >= 200 && xhr.status < 300 && data && data.documents) {
+            return { ok: true, data: data };
+        }
+        var msg = 'Upload failed. Please try again.';
+        if (xhr.status === 413 || (data && data.message === 'The POST data is too large.')) {
+            msg = 'Upload too large for the server. Try one file at a time or ask your admin to raise PHP post_max_size.';
+        } else if (data && data.message) {
+            msg = data.message;
+        }
+        if (data && data.errors) {
+            var parts = [];
+            Object.keys(data.errors).forEach(function(k) {
+                parts = parts.concat(data.errors[k]);
+            });
+            if (parts.length) msg = parts.join(' ');
+        }
+        return { ok: false, message: msg };
+    }
+
+    function uploadSingleFile(file, fileIndex, totalFiles) {
+        return new Promise(function(resolve, reject) {
+            var formData = new FormData();
+            formData.append('documents[]', file);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadUrl);
+            xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
+            xhr.setRequestHeader('Accept', 'application/json');
+
+            xhr.upload.addEventListener('progress', function(ev) {
+                if (!ev.lengthComputable) return;
+                var filePct = ev.loaded / ev.total;
+                var overallPct = Math.min(99, Math.round(((fileIndex + filePct) / totalFiles) * 100));
+                var label = totalFiles > 1
+                    ? 'Uploading file ' + (fileIndex + 1) + ' of ' + totalFiles + '…'
+                    : 'Uploading…';
+                setProgress(overallPct, label);
+            });
+
+            xhr.onload = function() {
+                var result = parseUploadResponse(xhr);
+                if (result.ok) {
+                    resolve(result.data);
+                    return;
+                }
+                reject(new Error(result.message));
+            };
+
+            xhr.onerror = function() {
+                reject(new Error('Network error. Please try again.'));
+            };
+
+            xhr.send(formData);
+        });
+    }
+
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         setError(null);
@@ -318,68 +462,46 @@
             return;
         }
 
-        var formData = new FormData();
+        setUploadingState(true);
+        setProgress(0, files.length > 1 ? 'Uploading file 1 of ' + files.length + '…' : 'Uploading…');
+
+        var chain = Promise.resolve();
+        var uploadedDocs = [];
+        var lastMessage = '';
+
         for (var i = 0; i < files.length; i++) {
-            formData.append('documents[]', files[i]);
+            (function(index, file) {
+                chain = chain.then(function() {
+                    return uploadSingleFile(file, index, files.length).then(function(data) {
+                        if (data.documents) {
+                            uploadedDocs = uploadedDocs.concat(data.documents);
+                        }
+                        lastMessage = data.message || lastMessage;
+                    });
+                });
+            })(i, files[i]);
         }
 
-        uploadBtn.disabled = true;
-        spinner.classList.remove('d-none');
-        setProgress(0, 'Uploading…');
-
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', uploadUrl);
-        xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
-        xhr.setRequestHeader('Accept', 'application/json');
-
-        xhr.upload.addEventListener('progress', function(ev) {
-            if (ev.lengthComputable) {
-                var pct = Math.min(99, Math.round((ev.loaded / ev.total) * 100));
-                setProgress(pct, 'Uploading…');
+        chain.then(function() {
+            setProgress(100, 'Upload complete');
+            uploadedDocs.forEach(appendRow);
+            input.value = '';
+            updateHint();
+            setTimeout(resetProgress, 800);
+            if (typeof window.showAppToast === 'function') {
+                window.showAppToast(lastMessage || (uploadedDocs.length + ' file(s) uploaded.'));
             }
+        }).catch(function(error) {
+            resetProgress();
+            if (uploadedDocs.length) {
+                uploadedDocs.forEach(appendRow);
+                setError((error && error.message ? error.message : 'Upload failed.') + ' ' + uploadedDocs.length + ' file(s) were uploaded before the error.');
+            } else {
+                setError(error && error.message ? error.message : 'Upload failed. Please try again.');
+            }
+        }).finally(function() {
+            setUploadingState(false);
         });
-
-        xhr.onload = function() {
-            uploadBtn.disabled = false;
-            spinner.classList.add('d-none');
-            var data;
-            try {
-                data = JSON.parse(xhr.responseText);
-            } catch (ex) {
-                data = null;
-            }
-            if (xhr.status >= 200 && xhr.status < 300 && data && data.documents) {
-                setProgress(100, 'Complete');
-                data.documents.forEach(appendRow);
-                input.value = '';
-                updateHint();
-                setTimeout(resetProgress, 800);
-                if (typeof window.showAppToast === 'function') {
-                    window.showAppToast(data.message || 'Uploaded.');
-                }
-                return;
-            }
-            resetProgress();
-            var msg = 'Upload failed. Please try again.';
-            if (data && data.message) msg = data.message;
-            if (data && data.errors) {
-                var parts = [];
-                Object.keys(data.errors).forEach(function(k) {
-                    parts = parts.concat(data.errors[k]);
-                });
-                if (parts.length) msg = parts.join(' ');
-            }
-            setError(msg);
-        };
-
-        xhr.onerror = function() {
-            uploadBtn.disabled = false;
-            spinner.classList.add('d-none');
-            resetProgress();
-            setError('Network error. Please try again.');
-        };
-
-        xhr.send(formData);
     });
 
     tbody.addEventListener('click', function(e) {

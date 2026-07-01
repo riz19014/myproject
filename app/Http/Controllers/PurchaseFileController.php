@@ -1456,27 +1456,27 @@ class PurchaseFileController extends Controller
     {
         $request->validate([
             'documents' => ['required', 'array', 'min:1'],
-            'documents.*' => ['file', 'max:1024'],
+            'documents.*' => ['file', 'max:51200'],
         ], [
-            'documents.*.max' => 'Each file must be 1 MB or smaller.',
+            'documents.*.max' => 'Each file must be 50 MB or smaller.',
         ]);
 
         $created = [];
         foreach ($request->file('documents') as $file) {
-            $doc = $purchase_file->addDocument($file);
+            $doc = $purchase_file->queueDocument($file);
             $created[] = $this->documentPayload($doc);
         }
 
         if ($request->wantsJson()) {
             return response()->json([
-                'message' => count($created).' file(s) uploaded successfully.',
+                'message' => count($created).' file(s) received. Processing in the background.',
                 'documents' => $created,
             ]);
         }
 
         return redirect()
             ->route('purchase.files.documents', $purchase_file)
-            ->with('success', count($created).' file(s) uploaded.');
+            ->with('success', count($created).' file(s) received. Processing in the background.');
     }
 
     public function destroyDocument(PurchaseFile $purchase_file, int $document)
@@ -1487,6 +1487,13 @@ class PurchaseFileController extends Controller
         return redirect()
             ->route('purchase.files.documents', $purchase_file)
             ->with('success', 'Document removed.');
+    }
+
+    public function documentStatus(PurchaseFile $purchase_file, int $document)
+    {
+        $doc = $purchase_file->documents()->findOrFail($document);
+
+        return response()->json($this->documentPayload($doc));
     }
 
     /**
@@ -1510,17 +1517,31 @@ class PurchaseFileController extends Controller
      */
     private function documentPayload(PurchaseFileDocument $doc): array
     {
-        $bytes = Storage::disk('public')->exists($doc->file_path)
-            ? (int) Storage::disk('public')->size($doc->file_path)
+        $disk = $doc->storageDisk();
+        $bytes = $doc->file_path && Storage::disk($disk)->exists($doc->file_path)
+            ? (int) Storage::disk($disk)->size($doc->file_path)
             : 0;
 
         return [
             'id' => $doc->id,
             'name' => $doc->name,
-            'url' => asset('storage/'.$doc->file_path),
+            'url' => $doc->isProcessed() ? asset('storage/'.$doc->file_path) : null,
             'size_label' => $this->formatBytes($bytes),
             'created_at' => $doc->created_at?->format('d M Y, H:i') ?? '—',
+            'status' => $doc->status,
+            'status_label' => $this->documentStatusLabel($doc),
+            'is_processing' => $doc->isProcessing(),
         ];
+    }
+
+    private function documentStatusLabel(PurchaseFileDocument $doc): string
+    {
+        return match ($doc->status) {
+            PurchaseFileDocument::STATUS_PENDING => 'Queued',
+            PurchaseFileDocument::STATUS_PROCESSING => 'Processing',
+            PurchaseFileDocument::STATUS_FAILED => 'Failed',
+            default => 'Ready',
+        };
     }
 
     private function formatBytes(int $bytes): string
