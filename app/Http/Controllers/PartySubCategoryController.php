@@ -5,9 +5,34 @@ namespace App\Http\Controllers;
 use App\Models\PartyCategory;
 use App\Models\PartySubCategory;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class PartySubCategoryController extends Controller
 {
+    /**
+     * @return array<string, mixed>
+     */
+    private function subCategoryRules(): array
+    {
+        return [
+            'category_id' => ['required', 'integer', 'exists:party_categories,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'unit' => ['nullable', 'string', 'max:50', Rule::in(config('construction_units', []))],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatedSubCategory(Request $request): array
+    {
+        $request->merge([
+            'unit' => $request->input('unit') ?: null,
+        ]);
+
+        return $request->validate($this->subCategoryRules());
+    }
+
     public function index()
     {
         $partySubCategories = PartySubCategory::query()
@@ -27,12 +52,13 @@ class PartySubCategoryController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'category_id' => ['required', 'integer', 'exists:party_categories,id'],
-            'name' => ['required', 'string', 'max:255'],
-        ]);
+        $validated = $this->validatedSubCategory($request);
 
-        PartySubCategory::create($validated);
+        PartySubCategory::create([
+            'category_id' => $validated['category_id'],
+            'name' => $validated['name'],
+            'unit' => $validated['unit'] ?? null,
+        ]);
 
         return redirect()->route('party-sub-categories.index')
             ->with('success', 'Party sub category created successfully.');
@@ -43,14 +69,12 @@ class PartySubCategoryController extends Controller
      */
     public function quickStore(Request $request)
     {
-        $validated = $request->validate([
-            'category_id' => ['required', 'integer', 'exists:party_categories,id'],
-            'name' => ['required', 'string', 'max:255'],
-        ]);
+        $validated = $this->validatedSubCategory($request);
 
         $partySubCategory = PartySubCategory::create([
             'category_id' => $validated['category_id'],
             'name' => trim($validated['name']),
+            'unit' => $validated['unit'] ?? null,
         ]);
         $partySubCategory->load('category');
 
@@ -72,12 +96,13 @@ class PartySubCategoryController extends Controller
 
     public function update(Request $request, PartySubCategory $party_sub_category)
     {
-        $validated = $request->validate([
-            'category_id' => ['required', 'integer', 'exists:party_categories,id'],
-            'name' => ['required', 'string', 'max:255'],
-        ]);
+        $validated = $this->validatedSubCategory($request);
 
-        $party_sub_category->update($validated);
+        $party_sub_category->update([
+            'category_id' => $validated['category_id'],
+            'name' => $validated['name'],
+            'unit' => $validated['unit'] ?? null,
+        ]);
 
         return redirect()->route('party-sub-categories.index')
             ->with('success', 'Party sub category updated successfully.');

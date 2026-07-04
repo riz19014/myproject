@@ -72,6 +72,7 @@ Route::middleware('auth')->group(function () {
     Route::put('purchase/records/{purchase_item}', [PurchaseItemController::class, 'update'])->name('purchase.records.update');
     Route::delete('purchase/records/{purchase_item}', [PurchaseItemController::class, 'destroy'])->name('purchase.records.destroy');
     Route::post('projects/quick-store', [ProjectController::class, 'quickStore'])->name('projects.quick-store');
+    Route::patch('projects/reorder', [ProjectController::class, 'reorder'])->name('projects.reorder');
     Route::post('parties/quick-store', [PartyController::class, 'quickStore'])->name('parties.quick-store');
     Route::post('party-sub-categories/quick-store', [PartySubCategoryController::class, 'quickStore'])->name('party-sub-categories.quick-store');
     Route::resource('parties', PartyController::class)->except(['show']);

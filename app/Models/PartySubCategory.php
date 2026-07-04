@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PartySubCategory extends Model
 {
-    protected $fillable = ['category_id', 'name'];
+    protected $fillable = ['category_id', 'name', 'unit'];
 
     public function category(): BelongsTo
     {

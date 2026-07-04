@@ -16,6 +16,7 @@
                     <th style="width: 56px;">#</th>
                     <th>Category</th>
                     <th>Name</th>
+                    <th>Unit</th>
                     <th width="200">Actions</th>
                 </tr>
             </thead>
@@ -25,6 +26,7 @@
                         <td>{{ $partySubCategories->firstItem() + $loop->index }}</td>
                         <td>{{ $partySubCategory->category->name }}</td>
                         <td>{{ $partySubCategory->name }}</td>
+                        <td>{{ $partySubCategory->unit ?? '—' }}</td>
                         <td>
                             <a href="{{ route('party-sub-categories.edit', $partySubCategory) }}" class="btn btn-sm btn-outline-theme">Edit</a>
                             <form action="{{ route('party-sub-categories.destroy', $partySubCategory) }}" method="POST" class="d-inline">
@@ -36,7 +38,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="text-center">No party sub categories yet. <a href="{{ route('party-sub-categories.create') }}">Create one</a>.</td>
+                        <td colspan="5" class="text-center">No party sub categories yet. <a href="{{ route('party-sub-categories.create') }}">Create one</a>.</td>
                     </tr>
                 @endforelse
             </tbody>

@@ -11,9 +11,22 @@ class Project extends Model
 {
     protected $fillable = [
         'name',
+        'sort_order',
         'land_type_id',
         'marla_per_acre',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Project $project): void {
+            if ($project->sort_order !== null) {
+                return;
+            }
+
+            $max = static::query()->max('sort_order');
+            $project->sort_order = $max !== null ? (int) $max + 1 : 1;
+        });
+    }
 
     protected function casts(): array
     {

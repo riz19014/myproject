@@ -9,7 +9,7 @@
 </div>
 
 <div class="card card-theme">
-    <div class="card-body">
+    <div class="card-body" style="overflow: visible;">
         <form action="{{ route('party-sub-categories.store') }}" method="POST">
             @csrf
 
@@ -33,6 +33,8 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+
+            @include('party-sub-categories.partials.unit-select')
 
             <button type="submit" class="btn btn-pink">Create</button>
         </form>

@@ -153,5 +153,131 @@
             hideList: hideList
         };
     };
+
+    window.PartyFormFields.initStringCombo = function (cfg) {
+        if (!cfg || !cfg.hidden || !cfg.search || !cfg.list || !cfg.wrap || cfg.wrap.dataset.stringComboBound === '1') {
+            return null;
+        }
+        cfg.wrap.dataset.stringComboBound = '1';
+        var values = cfg.values || [];
+
+        function norm(s) {
+            return String(s || '').toLowerCase();
+        }
+
+        function filterValues(q) {
+            var nq = norm(q).trim();
+            if (!nq) return values.slice();
+            return values.filter(function (value) {
+                return norm(value).indexOf(nq) !== -1;
+            });
+        }
+
+        function hideList() {
+            cfg.list.classList.add('d-none');
+            cfg.list.setAttribute('hidden', '');
+            cfg.search.setAttribute('aria-expanded', 'false');
+        }
+
+        function showList() {
+            cfg.list.classList.remove('d-none');
+            cfg.list.removeAttribute('hidden');
+            cfg.search.setAttribute('aria-expanded', 'true');
+        }
+
+        function appendClearOption() {
+            if (cfg.allowEmpty === false) return;
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.className = 'text-muted';
+            btn.textContent = cfg.emptyLabel || 'No unit';
+            btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            btn.addEventListener('click', function () {
+                cfg.hidden.value = '';
+                cfg.search.value = '';
+                hideList();
+            });
+            li.appendChild(btn);
+            cfg.list.appendChild(li);
+        }
+
+        function renderList(filtered) {
+            cfg.list.innerHTML = '';
+            appendClearOption();
+            if (!filtered.length) {
+                var li0 = document.createElement('li');
+                li0.className = 'daybook-form-combo-empty';
+                li0.setAttribute('role', 'presentation');
+                li0.textContent = values.length ? (cfg.noMatchText || 'No units match.') : (cfg.emptyText || 'No units configured.');
+                cfg.list.appendChild(li0);
+                showList();
+                return;
+            }
+            filtered.forEach(function (value) {
+                var li = document.createElement('li');
+                li.setAttribute('role', 'none');
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.setAttribute('role', 'option');
+                btn.textContent = value;
+                btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+                btn.addEventListener('click', function () {
+                    cfg.hidden.value = value;
+                    cfg.search.value = value;
+                    hideList();
+                });
+                li.appendChild(btn);
+                cfg.list.appendChild(li);
+            });
+            showList();
+        }
+
+        function openFiltered() {
+            renderList(filterValues(cfg.search.value));
+        }
+
+        function setValue(value) {
+            var match = values.find(function (v) { return v === value; });
+            cfg.hidden.value = match || '';
+            cfg.search.value = match || '';
+        }
+
+        if (cfg.initialValue) {
+            setValue(cfg.initialValue);
+        }
+
+        cfg.search.addEventListener('focus', openFiltered);
+        cfg.search.addEventListener('input', function () {
+            var still = values.some(function (v) {
+                return v === cfg.hidden.value && v === cfg.search.value;
+            });
+            if (!still) cfg.hidden.value = '';
+            openFiltered();
+        });
+        cfg.search.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hideList();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (cfg.list.classList.contains('d-none')) return;
+            if (!cfg.wrap.contains(e.target)) hideList();
+        });
+
+        return {
+            clear: function () {
+                cfg.hidden.value = '';
+                cfg.search.value = '';
+                hideList();
+            },
+            setValue: setValue,
+            hideList: hideList
+        };
+    };
 })();
 </script>

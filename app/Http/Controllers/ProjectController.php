@@ -20,6 +20,7 @@ use App\Support\SaleExemptionFileCalculator;
 use App\Support\SaleLandMozaGroups;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -28,8 +29,9 @@ class ProjectController extends Controller
     public function index(Request $request)
     {
         $search = trim((string) $request->query('q', ''));
+        $canReorder = $search === '';
 
-        $projects = Project::query()
+        $query = Project::query()
             ->with('landType')
             ->withCount('purchaseFiles')
             ->when($search !== '', function ($query) use ($search) {
@@ -39,11 +41,39 @@ class ProjectController extends Controller
                         ->orWhereHas('landType', fn ($lt) => $lt->where('name', 'like', $like));
                 });
             })
-            ->orderByDesc('id')
-            ->paginate(10)
-            ->withQueryString();
+            ->orderBy('sort_order')
+            ->orderBy('id');
 
-        return view('projects.index', compact('projects', 'search'));
+        if ($canReorder) {
+            $projects = $query->get();
+        } else {
+            $projects = $query->paginate(10)->withQueryString();
+        }
+
+        return view('projects.index', compact('projects', 'search', 'canReorder'));
+    }
+
+    public function reorder(Request $request)
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['required', 'integer', 'distinct', 'exists:projects,id'],
+        ]);
+
+        $expectedCount = Project::query()->count();
+        if (count($validated['order']) !== $expectedCount) {
+            return response()->json([
+                'message' => 'The submitted order must include every project.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($validated): void {
+            foreach ($validated['order'] as $index => $id) {
+                Project::query()->whereKey($id)->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return response()->json(['message' => 'Project order saved.']);
     }
 
     public function saleIndex()
