@@ -31,6 +31,7 @@ class PurchaseFileController extends Controller
         $files = PurchaseFile::query()
             ->with(['project.landType', 'purchaseItems.party'])
             ->withCount(['purchaseItems', 'documents'])
+            ->whereNull('sale_land_at')
             ->when($projectId, fn ($q) => $q->where('project_id', (int) $projectId))
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.$search.'%';
@@ -47,14 +48,8 @@ class PurchaseFileController extends Controller
 
         $projects = Project::query()->orderBy('name')->get(['id', 'name']);
 
-        $projectSaleLandFileCount = $projectId
-            ? PurchaseFile::query()
-                ->where('project_id', (int) $projectId)
-                ->whereNotNull('sale_land_at')
-                ->count()
-            : 0;
 
-        return view('purchases.files.index', compact('files', 'projects', 'projectId', 'search', 'projectSaleLandFileCount'));
+        return view('purchases.files.index', compact('files', 'projects', 'projectId', 'search'));
     }
 
     public function create(Request $request)

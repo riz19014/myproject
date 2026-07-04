@@ -9,16 +9,10 @@
         <p class="text-muted small mb-0">Named files per project. Add <strong>sellers</strong> (party, land, amount) against each file.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-        <a href="{{ route('purchase.files.create', $projectId ? ['project' => $projectId] : []) }}" class="btn btn-pink">Add purchase file</a>
-        @if($projectId)
-            <a href="{{ route('sale.files.index', $projectId) }}" class="btn btn-outline-theme">Sale files</a>
-        @endif
-        @if($projectId && ($projectSaleLandFileCount ?? 0) > 0)
-            <a href="{{ route('projects.sale-land', $projectId) }}" class="btn btn-outline-theme">View all sale land</a>
-        @endif
-        @if($projectId)
-            <a href="{{ route('projects.show', $projectId) }}" class="btn btn-outline-theme">Back to project</a>
-        @endif
+        <a href="{{ route('purchase.files.create', $projectId ? ['project' => $projectId] : []) }}" class="btn btn-pink">Add Purchase File</a>
+        <a href="{{ $projectId ? route('sale.files.index', $projectId) : route('sale.index') }}" class="btn btn-outline-theme">Sale Files</a>
+        <a href="{{ $projectId ? route('projects.sale-land', $projectId) : route('projects.index') }}" class="btn btn-outline-theme">View All Sale Land</a>
+        <a href="{{ $projectId ? route('projects.show', $projectId) : route('projects.index') }}" class="btn btn-outline-theme">Back to Project</a>
         <a href="{{ route('purchase.index') }}" class="btn btn-outline-theme">Back to Purchase</a>
     </div>
 </div>
@@ -99,9 +93,6 @@
                                 <td>{{ $loop->iteration }}</td>
                                 <td class="fw-semibold">
                                     <a href="{{ route('purchase.files.show', $file) }}" class="text-decoration-none">{{ $file->file_name }}</a>
-                                    @if($file->isSaleLand())
-                                        <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1" title="Marked as sale land on {{ $file->sale_land_at->format('d M Y') }}">Sale land</span>
-                                    @endif
                                 </td>
                                 <td class="small text-nowrap">{{ $file->file_date?->format('d M Y') ?? '—' }}</td>
                                 <td class="small">{{ $file->project?->name ?? '—' }}</td>
@@ -126,26 +117,22 @@
                                        class="btn btn-sm btn-outline-secondary purchase-payment-pdf-link"
                                        data-pdf-url="{{ route('purchase.files.payment-sheet-pdf', $file) }}"
                                        title="Download payment sheet PDF">Payment PDF</a>
-                                    @if($file->isSaleLand())
-                                        <a href="{{ route('projects.sale-land', ['project' => $file->project_id, 'purchase_file' => $file->id]) }}" class="btn btn-sm btn-outline-secondary" title="Already marked on {{ $file->sale_land_at->format('d M Y') }}">View sale land</a>
-                                    @else
-                                        <button type="button"
-                                            class="btn btn-sm btn-outline-theme btn-sale-land-confirm"
-                                            data-form-id="sale-land-form-{{ $file->id }}"
-                                            data-file-name="{{ $file->file_name }}"
-                                            data-file-date="{{ $file->file_date?->format('d M Y') ?? '—' }}"
-                                            data-project-name="{{ $file->project?->name ?? '—' }}"
-                                            data-sellers-count="{{ $file->purchase_items_count }}"
-                                            data-land-area="{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileTotalMarla) }}"
-                                            data-total-rs="{{ number_format($fileTotalRs, 0) }}"
-                                            data-seller-names="{{ $fileSellerNames->isEmpty() ? '—' : $fileSellerNames->implode(', ') }}"
-                                            data-mozas="{{ $fileMozas->isEmpty() ? '—' : $fileMozas->implode(', ') }}"
-                                            data-khasras="{{ $fileKhasras->isEmpty() ? '—' : $fileKhasras->implode(', ') }}"
-                                            data-documents-count="{{ $file->documents_count }}">Sale land</button>
-                                        <form id="sale-land-form-{{ $file->id }}" method="post" action="{{ route('purchase.files.sale-land', $file) }}" class="d-none">
-                                            @csrf
-                                        </form>
-                                    @endif
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-theme btn-sale-land-confirm"
+                                        data-form-id="sale-land-form-{{ $file->id }}"
+                                        data-file-name="{{ $file->file_name }}"
+                                        data-file-date="{{ $file->file_date?->format('d M Y') ?? '—' }}"
+                                        data-project-name="{{ $file->project?->name ?? '—' }}"
+                                        data-sellers-count="{{ $file->purchase_items_count }}"
+                                        data-land-area="{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileTotalMarla) }}"
+                                        data-total-rs="{{ number_format($fileTotalRs, 0) }}"
+                                        data-seller-names="{{ $fileSellerNames->isEmpty() ? '—' : $fileSellerNames->implode(', ') }}"
+                                        data-mozas="{{ $fileMozas->isEmpty() ? '—' : $fileMozas->implode(', ') }}"
+                                        data-khasras="{{ $fileKhasras->isEmpty() ? '—' : $fileKhasras->implode(', ') }}"
+                                        data-documents-count="{{ $file->documents_count }}">Sale land</button>
+                                    <form id="sale-land-form-{{ $file->id }}" method="post" action="{{ route('purchase.files.sale-land', $file) }}" class="d-none">
+                                        @csrf
+                                    </form>
                                     <a href="{{ route('purchase.files.edit', $file) }}" class="btn btn-sm btn-outline-theme">Edit</a>
                                     <form action="{{ route('purchase.files.destroy', $file) }}" method="post" class="d-inline">
                                         @csrf
