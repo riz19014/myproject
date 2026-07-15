@@ -81,7 +81,7 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-12 col-lg-4">
+            <div class="col-12 col-lg-4" id="daybook_party_sub_category_wrap">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="daybook_form_party_sub_search">Sub category <span class="text-muted fw-normal">(optional)</span></label>
                     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -110,6 +110,7 @@
             </div>
         </div>
         <script type="application/json" id="daybook-form-projects-json">@json($daybookProjectsJson)</script>
+        <script type="application/json" id="daybook-form-factory-sub-json">@json($factoryConstructionSubCategoriesJson ?? collect())</script>
         <script type="application/json" id="daybook-form-purchase-file-default">@json(old('purchase_file_id', $daybookPurchaseFileIdDefault ?? ''))</script>
         <script type="application/json" id="daybook-form-parties-json">@json($parties->map(function ($p) {
             return ['id' => $p->id, 'label' => $p->name, 'sub_category_id' => $p->sub_category_id];
@@ -167,7 +168,82 @@
                 >
             </div>
         </div>
+
+        {{-- Factory-only: Construction & Material expense fields (hidden unless selected project is Factory) --}}
+        <div class="row g-4 mt-1 pt-3 border-top border-secondary border-opacity-25 d-none" id="daybook_factory_fields">
+            <div class="col-md-6">
+                <label class="form-label daybook-label" for="daybook_factory_sub_category_id">Sub Category</label>
+                <select
+                    id="daybook_factory_sub_category_id"
+                    name="sub_category_id"
+                    class="form-select form-select-theme @error('sub_category_id') is-invalid @enderror"
+                >
+                    <option value="">— Select sub category —</option>
+                </select>
+                @error('sub_category_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-6">
+                <label class="form-label daybook-label" for="daybook_factory_unit">Unit <span class="text-muted fw-normal">(auto-filled, editable)</span></label>
+                <div class="daybook-form-combo @error('unit') is-invalid @enderror">
+                    <input
+                        id="daybook_factory_unit"
+                        name="unit"
+                        type="text"
+                        class="form-control form-control-theme @error('unit') is-invalid @enderror"
+                        value="{{ old('unit', $daybookFactoryUnitDefault ?? '') }}"
+                        placeholder="e.g. Bag, Kg, CFT"
+                        autocomplete="off"
+                        role="combobox"
+                        aria-expanded="false"
+                        aria-controls="daybook_factory_unit_listbox"
+                        aria-autocomplete="list"
+                    >
+                    <ul class="daybook-form-combo-list d-none" id="daybook_factory_unit_listbox" role="listbox" hidden></ul>
+                </div>
+                <script type="application/json" id="daybook-form-units-json">@json(array_values(config('construction_units', [])))</script>
+                @error('unit')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-6">
+                <label class="form-label daybook-label" for="daybook_factory_quantity">Quantity</label>
+                <input
+                    id="daybook_factory_quantity"
+                    type="number"
+                    name="quantity"
+                    class="form-control form-control-theme @error('quantity') is-invalid @enderror"
+                    value="{{ old('quantity', $daybookFactoryQuantityDefault ?? '') }}"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
+                    autocomplete="off"
+                >
+                @error('quantity')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-6">
+                <label class="form-label daybook-label" for="daybook_factory_unit_price">Unit Price</label>
+                <input
+                    id="daybook_factory_unit_price"
+                    type="number"
+                    name="unit_price"
+                    class="form-control form-control-theme @error('unit_price') is-invalid @enderror"
+                    value="{{ old('unit_price', $daybookFactoryUnitPriceDefault ?? '') }}"
+                    min="0"
+                    step="0.01"
+                    inputmode="decimal"
+                    autocomplete="off"
+                >
+                @error('unit_price')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
         @php($daybookPaymentMethodOld = old('payment_method', $daybookPaymentMethodDefault ?? 'cash'))
+        @php($daybookPaidByPartyIdOld = old('paid_by_party_id', $daybookPaidByPartyIdDefault ?? ''))
         <div class="row g-4 mt-1 pt-3 border-top border-secondary border-opacity-25">
             <div class="col-md-6 col-xl-3">
                 <label class="form-label daybook-label" for="entry_payment_method">Settlement</label>
@@ -181,7 +257,31 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-md-6 col-xl-5 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
+            <div class="col-md-6 col-xl-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <label class="form-label daybook-label mb-0" for="entry_paid_by_party_search">Paid by <span class="text-muted fw-normal">(optional)</span></label>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="entry_paid_by_party_reset" aria-label="Clear paid by">Reset</button>
+                </div>
+                <div class="daybook-form-combo @error('paid_by_party_id') is-invalid @enderror">
+                    <input type="hidden" name="paid_by_party_id" id="entry_paid_by_party_id" value="{{ $daybookPaidByPartyIdOld }}">
+                    <input
+                        type="text"
+                        class="form-control form-control-theme @error('paid_by_party_id') is-invalid @enderror"
+                        id="entry_paid_by_party_search"
+                        placeholder="Who paid? Search party…"
+                        autocomplete="off"
+                        role="combobox"
+                        aria-expanded="false"
+                        aria-controls="entry_paid_by_party_listbox"
+                        aria-autocomplete="list"
+                    >
+                    <ul class="daybook-form-combo-list d-none" id="entry_paid_by_party_listbox" role="listbox" hidden></ul>
+                </div>
+                @error('paid_by_party_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-6 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
                 <label class="form-label daybook-label" for="entry_payment_bank_search">Bank</label>
                 <div class="daybook-form-combo @error('payment_bank') is-invalid @enderror">
                     <input type="hidden" name="payment_bank" id="entry_payment_bank" value="{{ old('payment_bank', $daybookPaymentBankDefault ?? '') }}">
@@ -202,7 +302,7 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-md-12 col-xl-4 {{ in_array($daybookPaymentMethodOld, ['cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_reference_row">
+            <div class="col-md-12 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_reference_row">
                 <label class="form-label daybook-label" for="entry_payment_reference" id="entry_payment_reference_label">{{ $daybookPaymentMethodOld === 'payorder' ? 'Pay order reference #' : 'Cheque #' }}</label>
                 <input type="text" id="entry_payment_reference" name="payment_reference" class="form-control form-control-theme @error('payment_reference') is-invalid @enderror" placeholder="{{ $daybookPaymentMethodOld === 'payorder' ? 'Reference number' : 'Cheque number' }}" value="{{ old('payment_reference', $daybookPaymentReferenceDefault ?? '') }}" maxlength="100" autocomplete="off">
                 @error('payment_reference')

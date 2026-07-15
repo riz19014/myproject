@@ -13,10 +13,16 @@ class DayBookEntry extends Model
         'voucher_no',
         'type',
         'amount',
+        // Factory-only expense fields (nullable; only for Factory projects)
+        'sub_category_id',
+        'unit',
+        'quantity',
+        'unit_price',
         'description',
         'payment_method',
         'payment_bank',
         'payment_reference',
+        'paid_by_party_id',
         'link_type',
         'link_id',
         'project_id',
@@ -29,6 +35,7 @@ class DayBookEntry extends Model
         return [
             'entry_date' => 'date',
             'amount' => 'decimal:2',
+            'unit_price' => 'decimal:2',
         ];
     }
 
@@ -45,6 +52,37 @@ class DayBookEntry extends Model
     public function partySubCategory(): BelongsTo
     {
         return $this->belongsTo(PartySubCategory::class);
+    }
+
+    public function paidByParty(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'paid_by_party_id');
+    }
+
+    public function subCategory(): BelongsTo
+    {
+        return $this->belongsTo(PartySubCategory::class, 'sub_category_id');
+    }
+
+    /**
+     * True when this entry carries Factory expense details (Construction & Material).
+     */
+    public function isFactoryExpense(): bool
+    {
+        return $this->sub_category_id !== null
+            || $this->quantity !== null
+            || $this->unit_price !== null;
+    }
+
+    public function getFactorySubCategoryLabel(): string
+    {
+        $sc = $this->subCategory;
+        if (! $sc) {
+            return '—';
+        }
+        $cat = $sc->category?->name ?? '—';
+
+        return $cat.' — '.$sc->name;
     }
 
     public const TYPE_CASH_IN = 'cash_in';
@@ -175,6 +213,28 @@ class DayBookEntry extends Model
         };
     }
 
+    public function getPaidByLabel(): string
+    {
+        return $this->paidByParty?->name ?? '—';
+    }
+
+    /**
+     * Settlement plus optional paid-by party for lists / ledgers / history.
+     */
+    public function getSettlementWithPaidByLabel(): string
+    {
+        $settlement = $this->getSettlementLabel();
+        $paidBy = $this->getPaidByLabel();
+        if ($paidBy === '—') {
+            return $settlement;
+        }
+        if ($settlement === '—') {
+            return 'Paid by: '.$paidBy;
+        }
+
+        return $settlement.' · Paid by: '.$paidBy;
+    }
+
     /**
      * Compact payment settlement lines for purchase file ledger (PDF / UI).
      *
@@ -196,6 +256,11 @@ class DayBookEntry extends Model
 
         if ($methodLabel !== null && $methodLabel !== '') {
             $lines[] = ['kind' => 'method', 'text' => $methodLabel];
+        }
+
+        $paidBy = $this->getPaidByLabel();
+        if ($paidBy !== '—') {
+            $lines[] = ['kind' => 'meta', 'text' => 'Paid by: '.$paidBy];
         }
 
         $bank = trim((string) $this->payment_bank);

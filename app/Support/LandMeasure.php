@@ -31,6 +31,33 @@ final class LandMeasure
         return sprintf('A %d — K %d — M %d — SQFT %d', $a, $k, $m, $sqft);
     }
 
+    /** Compact dashed label for summary strips, e.g. A-8-4K-14M */
+    public static function formatAkmsCompactFromMarla(float $totalMarla): string
+    {
+        $eps = 1e-6;
+        if ($totalMarla <= 0 && $totalMarla > -$eps) {
+            return 'A-0-0K-0M';
+        }
+        $wholeMarla = (int) floor($totalMarla + $eps);
+        $a = intdiv($wholeMarla, 160);
+        $r = $wholeMarla - $a * 160;
+        $k = intdiv($r, 20);
+        $m = $r - $k * 20;
+        $frac = $totalMarla - $wholeMarla;
+        if ($frac < 0) {
+            $frac = 0;
+        }
+        $base = sprintf('A-%d-%dK-%dM', $a, $k, $m);
+        if ($frac > $eps) {
+            $sqft = (int) round($frac * 272.25);
+            if ($sqft > 0) {
+                return $base.'-'.$sqft.'SQFT';
+            }
+        }
+
+        return $base;
+    }
+
     public static function toMarla(float $amount, string $unit): float
     {
         return match ($unit) {

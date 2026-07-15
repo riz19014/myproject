@@ -7,6 +7,7 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
 use App\Models\Sale;
+use App\Support\FileSaleLandService;
 use App\Support\LandMeasure;
 use App\Support\ProjectExemptionDefaults;
 use App\Support\SaleExemptionConfig;
@@ -19,11 +20,13 @@ use Illuminate\Validation\ValidationException;
 
 class SaleProjectFileController extends Controller
 {
-    public function index(Project $project)
+    public function index(Project $project, FileSaleLandService $fileSaleLandService)
     {
         $project->load(['landType', 'projectFiles' => fn ($q) => $q->with(['dealerParty', 'sales'])->orderBy('file_number')]);
 
-        return view('sales.files.index', compact('project'));
+        $fileSaleSummary = $fileSaleLandService->buildFileSaleSummary($project);
+
+        return view('sales.files.index', compact('project', 'fileSaleSummary'));
     }
 
     public function percentageIndex()

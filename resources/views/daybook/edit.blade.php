@@ -43,6 +43,7 @@
                     'daybookPaymentMethodDefault' => $daybookPaymentMethodDefault ?? 'cash',
                     'daybookPaymentBankDefault' => $daybookPaymentBankDefault ?? '',
                     'daybookPaymentReferenceDefault' => $daybookPaymentReferenceDefault ?? '',
+                    'daybookPaidByPartyIdDefault' => $daybookPaidByPartyIdDefault ?? '',
                     'daybookPurchaseFileIdDefault' => $daybookPurchaseFileIdDefault ?? '',
                 ])
             </div>

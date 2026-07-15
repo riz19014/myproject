@@ -239,6 +239,7 @@
                 syncPurchaseFileSelect(row.id, '');
                 hideProjectList();
                 syncProjectResetVisibility();
+                if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
             });
             li.appendChild(btn);
             projectList.appendChild(li);
@@ -402,6 +403,7 @@
             if (sb) subSearch.value = sb.label;
         }
         syncAllFieldResetVisibility();
+        if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
     })();
 
     if (purchaseFileSelect) {
@@ -416,6 +418,7 @@
         syncPurchaseFileSelect('', '');
         syncProjectResetVisibility();
         openFilteredProjectList();
+        if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
     });
     projectSearch.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
@@ -478,6 +481,7 @@
             syncPurchaseFileSelect('', '');
             hideProjectList();
             syncProjectResetVisibility();
+            if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
             projectSearch.focus();
         });
     }
@@ -1548,5 +1552,399 @@
             }
         });
     }
+})();
+
+(function () {
+    var hidden = document.getElementById('entry_paid_by_party_id');
+    var search = document.getElementById('entry_paid_by_party_search');
+    var list = document.getElementById('entry_paid_by_party_listbox');
+    var wrap = search ? search.closest('.daybook-form-combo') : null;
+    var resetBtn = document.getElementById('entry_paid_by_party_reset');
+    var jsonEl = document.getElementById('daybook-form-parties-json');
+    if (!hidden || !search || !list || !jsonEl) return;
+
+    var partyRows = [];
+    try {
+        partyRows = JSON.parse(jsonEl.textContent) || [];
+    } catch (e) {
+        partyRows = [];
+    }
+
+    function toggleReset(visible) {
+        if (!resetBtn) return;
+        resetBtn.classList.toggle('d-none', !visible);
+        resetBtn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    }
+
+    function syncReset() {
+        toggleReset(String(hidden.value || '').trim() !== '');
+    }
+
+    function hideList() {
+        list.classList.add('d-none');
+        list.setAttribute('hidden', '');
+        search.setAttribute('aria-expanded', 'false');
+    }
+
+    function showList() {
+        list.classList.remove('d-none');
+        list.removeAttribute('hidden');
+        search.setAttribute('aria-expanded', 'true');
+    }
+
+    function filterRows(q) {
+        var nq = (q || '').toLowerCase().trim();
+        if (!nq) return partyRows.slice();
+        return partyRows.filter(function (row) {
+            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderList(rows) {
+        list.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = partyRows.length ? 'No parties match.' : 'No parties yet.';
+            list.appendChild(li0);
+            showList();
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.dataset.id = String(row.id);
+            btn.textContent = row.label;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                hidden.value = String(row.id);
+                search.value = row.label;
+                hideList();
+                syncReset();
+            });
+            li.appendChild(btn);
+            list.appendChild(li);
+        });
+        showList();
+    }
+
+    function openFiltered() {
+        renderList(filterRows(search.value));
+    }
+
+    function syncFromHidden() {
+        if (!hidden.value) {
+            search.value = '';
+            syncReset();
+            return;
+        }
+        var match = partyRows.find(function (r) {
+            return String(r.id) === String(hidden.value);
+        });
+        search.value = match ? match.label : '';
+        if (!match) {
+            hidden.value = '';
+        }
+        syncReset();
+    }
+
+    syncFromHidden();
+
+    search.addEventListener('focus', openFiltered);
+    search.addEventListener('input', function () {
+        hidden.value = '';
+        syncReset();
+        openFiltered();
+    });
+    search.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            hideList();
+        }
+    });
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            hidden.value = '';
+            search.value = '';
+            hideList();
+            syncReset();
+            search.focus();
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        if (!wrap || wrap.contains(e.target)) return;
+        if (resetBtn && resetBtn.contains(e.target)) return;
+        hideList();
+    });
+})();
+
+(function () {
+    var projectHidden = document.getElementById('daybook_form_project_id');
+    var partySubWrap = document.getElementById('daybook_party_sub_category_wrap');
+    var factoryWrap = document.getElementById('daybook_factory_fields');
+    var subSelect = document.getElementById('daybook_factory_sub_category_id');
+    var unitInput = document.getElementById('daybook_factory_unit');
+    var unitList = document.getElementById('daybook_factory_unit_listbox');
+    var unitWrap = unitInput ? unitInput.closest('.daybook-form-combo') : null;
+    var unitJsonEl = document.getElementById('daybook-form-units-json');
+    var qtyInput = document.getElementById('daybook_factory_quantity');
+    var priceInput = document.getElementById('daybook_factory_unit_price');
+    var amountInput = document.getElementById('entry_amount');
+    var factoryJsonEl = document.getElementById('daybook-form-factory-sub-json');
+    if (!projectHidden || !factoryWrap || !subSelect || !qtyInput || !priceInput || !amountInput) return;
+
+    var factorySubRows = [];
+    if (factoryJsonEl) {
+        try {
+            factorySubRows = JSON.parse(factoryJsonEl.textContent) || [];
+        } catch (e) {
+            factorySubRows = [];
+        }
+    }
+
+    var unitOptions = [];
+    if (unitJsonEl) {
+        try {
+            unitOptions = JSON.parse(unitJsonEl.textContent) || [];
+        } catch (e) {
+            unitOptions = [];
+        }
+    }
+
+    function getSelectedProject() {
+        var pid = String(projectHidden.value || '').trim();
+        if (!pid) return null;
+        var rows = window.__daybookFormProjectRows || [];
+        return rows.find(function (r) { return String(r.id) === pid; }) || null;
+    }
+
+    function isFactoryProjectSelected() {
+        var pr = getSelectedProject();
+        if (!pr) return false;
+        if (typeof pr.is_factory === 'boolean') return pr.is_factory;
+        var lt = (pr.land_type || '').toString().trim().toLowerCase();
+        return lt === 'factory';
+    }
+
+    function syncFactoryOptionList(selectedId) {
+        var selected = String(selectedId || '').trim();
+        subSelect.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = '— Select sub category —';
+        subSelect.appendChild(opt0);
+        factorySubRows.forEach(function (r) {
+            var opt = document.createElement('option');
+            opt.value = String(r.id);
+            opt.textContent = r.label || ('#' + r.id);
+            subSelect.appendChild(opt);
+        });
+        if (selected && factorySubRows.some(function (r) { return String(r.id) === selected; })) {
+            subSelect.value = selected;
+        } else {
+            subSelect.value = '';
+        }
+    }
+
+    function setRequired(el, on) {
+        if (!el) return;
+        if (on) el.setAttribute('required', '');
+        else el.removeAttribute('required');
+    }
+
+    function setReadOnly(el, on) {
+        if (!el) return;
+        el.readOnly = !!on;
+        el.setAttribute('aria-readonly', on ? 'true' : 'false');
+    }
+
+    function normalizeUnsignedInt(raw) {
+        var m = String(raw || '').trim().match(/^\d+/);
+        var n = m ? parseInt(m[0], 10) : NaN;
+        if (!isFinite(n) || n < 1) return null;
+        return n;
+    }
+
+    function normalizePositiveNumber(raw) {
+        var s = String(raw || '').trim();
+        if (!s) return null;
+        var v = parseFloat(s);
+        if (!isFinite(v) || v <= 0) return null;
+        return v;
+    }
+
+    // Auto-fill the unit from the sub category's default. `force` overwrites even a manually-typed unit
+    // (used when the user actively picks a sub category); otherwise only fills when empty.
+    function setUnitFromSubCategoryId(id, force) {
+        if (!unitInput) return;
+        var sid = String(id || '').trim();
+        var row = factorySubRows.find(function (r) { return String(r.id) === sid; }) || null;
+        var unit = row ? (row.unit || '') : '';
+        if (force || String(unitInput.value || '').trim() === '') {
+            unitInput.value = unit;
+        }
+    }
+
+    function updateAmountFromQtyPrice() {
+        if (!isFactoryProjectSelected()) return;
+        var q = normalizeUnsignedInt(qtyInput.value);
+        var p = normalizePositiveNumber(priceInput.value);
+        if (q === null || p === null) {
+            amountInput.value = '';
+            amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+            return;
+        }
+        var amt = (q * p);
+        amountInput.value = amt.toFixed(2);
+        amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function enforceQtyInput() {
+        if (qtyInput.value === '') return;
+        var q = normalizeUnsignedInt(qtyInput.value);
+        if (q === null) {
+            qtyInput.value = '';
+            return;
+        }
+        qtyInput.value = String(q);
+    }
+
+    function hideUnitList() {
+        if (!unitList || !unitInput) return;
+        unitList.classList.add('d-none');
+        unitList.setAttribute('hidden', '');
+        unitInput.setAttribute('aria-expanded', 'false');
+    }
+
+    function showUnitList() {
+        if (!unitList || !unitInput) return;
+        unitList.classList.remove('d-none');
+        unitList.removeAttribute('hidden');
+        unitInput.setAttribute('aria-expanded', 'true');
+    }
+
+    function filterUnitOptions(q) {
+        var nq = (q || '').toLowerCase().trim();
+        if (!nq) return unitOptions.slice();
+        return unitOptions.filter(function (u) {
+            return String(u).toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderUnitList(rows) {
+        if (!unitList) return;
+        unitList.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = unitOptions.length ? 'No units match. Type to add your own.' : 'No units configured.';
+            unitList.appendChild(li0);
+            showUnitList();
+            return;
+        }
+        rows.forEach(function (u) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.textContent = String(u);
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                unitInput.value = String(u);
+                hideUnitList();
+            });
+            li.appendChild(btn);
+            unitList.appendChild(li);
+        });
+        showUnitList();
+    }
+
+    function openFilteredUnitList() {
+        renderUnitList(filterUnitOptions(unitInput ? unitInput.value : ''));
+    }
+
+    function syncMode() {
+        var on = isFactoryProjectSelected();
+        factoryWrap.classList.toggle('d-none', !on);
+        if (partySubWrap) partySubWrap.classList.toggle('d-none', on);
+
+        setRequired(subSelect, on);
+        setRequired(qtyInput, on);
+        setRequired(priceInput, on);
+        setReadOnly(amountInput, on);
+
+        if (!on) {
+            if (subSelect) subSelect.value = '';
+            if (qtyInput) qtyInput.value = '';
+            if (priceInput) priceInput.value = '';
+            if (unitInput) unitInput.value = '';
+            return;
+        }
+
+        // When switching to Factory mode, avoid accidentally submitting the normal party_sub_category_id.
+        var normalSubHidden = document.getElementById('daybook_form_party_sub_category_id');
+        var normalSubSearch = document.getElementById('daybook_form_party_sub_search');
+        if (normalSubHidden) normalSubHidden.value = '';
+        if (normalSubSearch) normalSubSearch.value = '';
+
+        var oldSelected = "{{ old('sub_category_id', $daybookFactorySubCategoryIdDefault ?? '') }}";
+        var oldQty = "{{ old('quantity', $daybookFactoryQuantityDefault ?? '') }}";
+        var oldPrice = "{{ old('unit_price', $daybookFactoryUnitPriceDefault ?? '') }}";
+
+        var keepSelected = String(subSelect.value || '').trim() || oldSelected;
+        syncFactoryOptionList(keepSelected);
+        if (String(qtyInput.value || '').trim() === '' && oldQty !== '') qtyInput.value = oldQty;
+        if (String(priceInput.value || '').trim() === '' && oldPrice !== '') priceInput.value = oldPrice;
+        // On init keep any existing/old unit; only fill from default when empty.
+        setUnitFromSubCategoryId(subSelect.value, false);
+        updateAmountFromQtyPrice();
+    }
+
+    window.__daybookSyncFactoryMode = syncMode;
+
+    syncMode();
+
+    // Picking a sub category overwrites the unit with its default; the user can still edit it afterwards.
+    subSelect.addEventListener('change', function () {
+        setUnitFromSubCategoryId(subSelect.value, true);
+    });
+
+    if (unitInput && unitList) {
+        unitInput.addEventListener('focus', function () {
+            openFilteredUnitList();
+        });
+        unitInput.addEventListener('input', function () {
+            openFilteredUnitList();
+        });
+        unitInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hideUnitList();
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (unitWrap && !unitWrap.contains(e.target)) hideUnitList();
+        });
+    }
+
+    qtyInput.addEventListener('input', function () {
+        enforceQtyInput();
+        updateAmountFromQtyPrice();
+    });
+    priceInput.addEventListener('input', function () {
+        updateAmountFromQtyPrice();
+    });
 })();
 </script>

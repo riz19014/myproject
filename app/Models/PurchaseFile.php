@@ -58,6 +58,18 @@ class PurchaseFile extends Model
         return $this->hasMany(PurchaseFileSaleLandMozaOverride::class);
     }
 
+    public function fileSaleLand(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(FileSaleLand::class, 'sale_land_id');
+    }
+
+    public function isMovedToFileSale(): bool
+    {
+        return $this->relationLoaded('fileSaleLand')
+            ? $this->fileSaleLand !== null
+            : $this->fileSaleLand()->exists();
+    }
+
     public function addDocument(UploadedFile $file): PurchaseFileDocument
     {
         $path = $file->store('purchase-files/'.$this->id, 'public');

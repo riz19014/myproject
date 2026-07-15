@@ -26,6 +26,26 @@ use Illuminate\Validation\Rule;
 class DayBookController extends Controller
 {
     /**
+     * Party sub-categories limited to "Construction & Material" (Factory expenses UI).
+     *
+     * @return \Illuminate\Support\Collection<int, array{id:int,label:string,unit:?string}>
+     */
+    private function factoryConstructionSubCategoriesJsonPayload(): Collection
+    {
+        return PartySubCategory::query()
+            ->select(['id', 'name', 'unit', 'category_id'])
+            ->whereHas('category', fn ($q) => $q->where('name', 'Construction & Material'))
+            ->orderBy('name')
+            ->get()
+            ->map(fn (PartySubCategory $sc) => [
+                'id' => $sc->id,
+                'label' => $sc->name,
+                'unit' => $sc->unit,
+            ])
+            ->values();
+    }
+
+    /**
      * Closing balance for a calendar day: carried opening + petty cash + entries.
      */
     private function computeClosingForDate(Carbon $day): float
@@ -183,6 +203,7 @@ class DayBookController extends Controller
 
         $entriesQuery = DayBookEntry::query()
             ->whereDate('entry_date', $day)
+            ->with('paidByParty')
             ->orderBy('id');
 
         if ($partyId !== null) {
@@ -228,7 +249,7 @@ class DayBookController extends Controller
                     'amount_str' => $amountStr,
                     'balance' => $running,
                     'signed_delta' => $signedDelta,
-                    'settlement' => $e->getSettlementLabel(),
+                    'settlement' => $e->getSettlementWithPaidByLabel(),
                 ];
             }
             $closingBalance = $running;
@@ -278,7 +299,7 @@ class DayBookController extends Controller
                 'amount_str' => $amountStr,
                 'balance' => $running,
                 'signed_delta' => $signedDelta,
-                'settlement' => $e->getSettlementLabel(),
+                'settlement' => $e->getSettlementWithPaidByLabel(),
             ];
         }
         $closingBalance = $running;
@@ -353,6 +374,7 @@ class DayBookController extends Controller
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
             ->where('link_type', DayBookEntry::LINK_PARTY)
             ->where('link_id', $partyId)
+            ->with('paidByParty')
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -371,7 +393,7 @@ class DayBookController extends Controller
             $rows[] = [
                 'date' => $e->entry_date->format('d M Y'),
                 'payment' => $typeLabel,
-                'settlement' => $e->getSettlementLabel(),
+                'settlement' => $e->getSettlementWithPaidByLabel(),
                 'amount' => $this->ledgerStatementAmountCell($amountStr),
                 'description' => $e->description ?: '—',
                 'balance' => $running,
@@ -396,6 +418,7 @@ class DayBookController extends Controller
 
         $entries = DayBookEntry::query()
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
+            ->with('paidByParty')
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -420,7 +443,7 @@ class DayBookController extends Controller
             $rows[] = [
                 'date' => $e->entry_date->format('d M Y'),
                 'payment' => $typeLabel,
-                'settlement' => $e->getSettlementLabel(),
+                'settlement' => $e->getSettlementWithPaidByLabel(),
                 'amount' => $this->ledgerStatementAmountCell($amountStr),
                 'description' => $desc,
                 'balance' => $running,
@@ -625,7 +648,7 @@ class DayBookController extends Controller
 
         $entries = DayBookEntry::query()
             ->whereDate('entry_date', $day)
-            ->with(['partySubCategory.category', 'purchaseFile'])
+            ->with(['partySubCategory.category', 'purchaseFile', 'paidByParty'])
             ->orderBy('id')
             ->get();
 
@@ -684,6 +707,7 @@ class DayBookController extends Controller
             'paymentBreakdown' => $paymentBreakdown,
             'projects' => $projects,
             'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
+            'factoryConstructionSubCategoriesJson' => $this->factoryConstructionSubCategoriesJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
             'partyCategories' => $partyCategories,
@@ -721,7 +745,7 @@ class DayBookController extends Controller
     private function buildDaybookSidebarRows(int $limit): Collection
     {
         $entries = DayBookEntry::query()
-            ->with(['project.landType', 'partySubCategory.category', 'purchaseFile'])
+            ->with(['project.landType', 'partySubCategory.category', 'subCategory.category', 'purchaseFile', 'paidByParty'])
             ->orderByDesc('entry_date')
             ->orderByDesc('id')
             ->limit($limit)
@@ -783,6 +807,7 @@ class DayBookController extends Controller
                 strtolower($e->payment_method ?? ''),
                 strtolower($e->payment_bank ?? ''),
                 strtolower($e->payment_reference ?? ''),
+                strtolower($e->paidByParty?->name ?? ''),
                 strtolower($settlement),
                 strtolower($linkLabel),
                 strtolower($linkProject?->name ?? ''),
@@ -804,13 +829,15 @@ class DayBookController extends Controller
                 'url' => route('daybook.show', $e),
                 'entry_date' => $dateStr,
                 'date_display' => $dateDisp,
+                'voucher_no' => $voucherNo,
+                'voucher_display' => $voucherNo !== null ? $voucherDisplay : '',
                 'description' => $e->description,
                 'type_label' => $typeLabel,
                 'amount' => (float) $e->amount,
-                'amount_display' => $e->type === DayBookEntry::TYPE_CASH_IN
-                    ? '+'.number_format((float) $e->amount, 0)
-                    : '−'.number_format((float) $e->amount, 0),
+                'is_cash_in' => $e->type === DayBookEntry::TYPE_CASH_IN,
+                'amount_display' => number_format((float) $e->amount, 0),
                 'settlement' => $settlement,
+                'paid_by' => $e->getPaidByLabel(),
                 'link_label' => $linkLabel,
                 'linked_project_name' => $linkProject?->name ?? '',
                 'linked_project_area' => $linkedProjectAreaLine,
@@ -820,6 +847,11 @@ class DayBookController extends Controller
                 'category' => $categoryName,
                 'land_type' => $landTypeName,
                 'purchase_file_name' => $purchaseFileName,
+                'is_factory' => $e->isFactoryExpense(),
+                'factory_sub_category' => $e->getFactorySubCategoryLabel(),
+                'unit' => $e->unit ?? '',
+                'quantity' => $e->quantity !== null ? number_format((int) $e->quantity) : '',
+                'unit_price' => $e->unit_price !== null ? number_format((float) $e->unit_price, 2) : '',
                 'is_today' => $e->entry_date->toDateString() === Carbon::today()->toDateString(),
                 'search_blob' => $searchBlob,
             ];
@@ -895,15 +927,21 @@ class DayBookController extends Controller
         return Project::query()
             ->orderBy('name')
             ->with([
+                'landType',
                 'parties',
                 'purchaseFiles' => fn ($q) => $q->orderBy('file_name'),
             ])
             ->get()
             ->map(function (Project $p) {
+                $landTypeName = $p->landType?->name;
+                $isFactory = $landTypeName !== null && mb_strtolower(trim($landTypeName)) === 'factory';
+
                 return array_merge(
                     [
                         'id' => $p->id,
                         'label' => $p->name,
+                        'land_type' => $landTypeName,
+                        'is_factory' => $isFactory,
                         'purchase_files' => $p->purchaseFiles->map(fn (PurchaseFile $f) => [
                             'id' => $f->id,
                             'label' => $f->file_name,
@@ -1190,6 +1228,9 @@ class DayBookController extends Controller
             $validated['payment_reference'] = null;
         }
 
+        $paidByPartyId = $validated['paid_by_party_id'] ?? null;
+        $validated['paid_by_party_id'] = ! empty($paidByPartyId) ? (int) $paidByPartyId : null;
+
         return $validated;
     }
 
@@ -1241,10 +1282,16 @@ class DayBookController extends Controller
                     ['required', 'string', 'max:100'],
                     ['nullable']
                 ),
+                'paid_by_party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
+                // Factory-only (Construction & Material)
+                'sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
+                'unit' => ['nullable', 'string', 'max:50'],
+                'quantity' => ['nullable', 'integer', 'min:1'],
+                'unit_price' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
                 'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
                 'link_id' => ['nullable', 'integer', 'min:1'],
             ],
@@ -1252,7 +1299,9 @@ class DayBookController extends Controller
                 'project_id.exists' => 'The selected project is invalid.',
                 'purchase_file_id.exists' => 'The selected file is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
+                'paid_by_party_id.exists' => 'The selected paid-by party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
+                'sub_category_id.exists' => 'The selected sub category is invalid.',
                 'payment_bank.in' => 'Please choose a bank from the list.',
             ]
         );
@@ -1290,6 +1339,50 @@ class DayBookController extends Controller
             $validated['party_sub_category_id'] = null;
         }
 
+        $isFactoryExpense = false;
+        if (! empty($contextProjectId)) {
+            $project = Project::query()->with('landType')->find($contextProjectId);
+            $lt = $project?->landType?->name;
+            $isFactoryExpense = $lt !== null && mb_strtolower(trim($lt)) === 'factory';
+        }
+
+        if ($isFactoryExpense) {
+            $request->validate([
+                'sub_category_id' => ['required', 'integer', Rule::exists('party_sub_categories', 'id')],
+                'quantity' => ['required', 'integer', 'min:1'],
+                'unit_price' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
+            ], [], [
+                'sub_category_id' => 'sub category',
+                'unit_price' => 'unit price',
+            ]);
+
+            $sc = PartySubCategory::query()
+                ->where('id', (int) $validated['sub_category_id'])
+                ->whereHas('category', fn ($q) => $q->where('name', 'Construction & Material'))
+                ->first();
+            if (! $sc) {
+                return back()
+                    ->withErrors(['sub_category_id' => 'Please choose a sub category from Construction & Material.'])
+                    ->withInput();
+            }
+
+            $validated['unit'] = $sc->unit;
+            $validated['quantity'] = (int) $validated['quantity'];
+            $validated['unit_price'] = number_format((float) $validated['unit_price'], 2, '.', '');
+            $expected = round(((int) $validated['quantity']) * ((float) $validated['unit_price']), 2);
+            $amount = round((float) $validated['amount'], 2);
+            if (abs($expected - $amount) > 0.009) {
+                return back()
+                    ->withErrors(['amount' => 'Amount must equal Quantity × Unit Price.'])
+                    ->withInput();
+            }
+        } else {
+            $validated['sub_category_id'] = null;
+            $validated['unit'] = null;
+            $validated['quantity'] = null;
+            $validated['unit_price'] = null;
+        }
+
         $purchaseFileResult = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
         if ($purchaseFileResult instanceof \Illuminate\Http\RedirectResponse) {
             return $purchaseFileResult;
@@ -1310,7 +1403,7 @@ class DayBookController extends Controller
 
     public function show(DayBookEntry $entry)
     {
-        $entry->load(['partySubCategory.category', 'purchaseFile']);
+        $entry->load(['partySubCategory.category', 'subCategory.category', 'purchaseFile', 'project.landType', 'paidByParty']);
         $entry = DaybookVoucher::assignIfMissing($entry);
 
         return view('daybook.show', compact('entry'));
@@ -1318,7 +1411,7 @@ class DayBookController extends Controller
 
     public function voucher(DayBookEntry $entry)
     {
-        $entry->load(['partySubCategory.category', 'purchaseFile']);
+        $entry->load(['partySubCategory.category', 'purchaseFile', 'paidByParty']);
         $entry = DaybookVoucher::assignIfMissing($entry);
 
         return view('daybook.voucher', compact('entry'));
@@ -1326,7 +1419,7 @@ class DayBookController extends Controller
 
     public function edit(DayBookEntry $entry)
     {
-        $entry->load(['partySubCategory.category', 'purchaseFile']);
+        $entry->load(['partySubCategory.category', 'purchaseFile', 'paidByParty']);
 
         $projects = Project::orderBy('name')->get();
         $parties = Party::orderBy('name')->get();
@@ -1350,6 +1443,7 @@ class DayBookController extends Controller
             'entry' => $entry,
             'projects' => $projects,
             'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
+            'factoryConstructionSubCategoriesJson' => $this->factoryConstructionSubCategoriesJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
             'partyCategories' => $partyCategories,
@@ -1357,6 +1451,10 @@ class DayBookController extends Controller
             'daybookProjectIdDefault' => $formProjectId !== null ? (string) $formProjectId : '',
             'daybookPartyIdDefault' => $formPartyId !== null ? (string) $formPartyId : '',
             'daybookPartySubCategoryIdDefault' => $entry->party_sub_category_id !== null ? (string) $entry->party_sub_category_id : '',
+            'daybookFactorySubCategoryIdDefault' => $entry->sub_category_id !== null ? (string) $entry->sub_category_id : '',
+            'daybookFactoryUnitDefault' => $entry->unit ?? '',
+            'daybookFactoryQuantityDefault' => $entry->quantity !== null ? (string) $entry->quantity : '',
+            'daybookFactoryUnitPriceDefault' => $entry->unit_price !== null ? number_format((float) $entry->unit_price, 2, '.', '') : '',
             'daybookEntryDate' => $entry->entry_date->format('Y-m-d'),
             'daybookTypeDefault' => $entry->type,
             'daybookAmountDefault' => number_format((float) $entry->amount, 2, '.', ''),
@@ -1364,6 +1462,7 @@ class DayBookController extends Controller
             'daybookPaymentMethodDefault' => $entry->payment_method ?? DayBookEntry::PAYMENT_CASH,
             'daybookPaymentBankDefault' => $entry->payment_bank ?? '',
             'daybookPaymentReferenceDefault' => $entry->payment_reference ?? '',
+            'daybookPaidByPartyIdDefault' => $entry->paid_by_party_id !== null ? (string) $entry->paid_by_party_id : '',
             'daybookPurchaseFileIdDefault' => $entry->purchase_file_id !== null ? (string) $entry->purchase_file_id : '',
         ]);
     }
@@ -1399,10 +1498,16 @@ class DayBookController extends Controller
                     ['required', 'string', 'max:100'],
                     ['nullable']
                 ),
+                'paid_by_party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
+                // Factory-only (Construction & Material)
+                'sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
+                'unit' => ['nullable', 'string', 'max:50'],
+                'quantity' => ['nullable', 'integer', 'min:1'],
+                'unit_price' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
                 'link_type' => ['nullable', 'in:office,project,land,plot,factory,customer,party'],
                 'link_id' => ['nullable', 'integer', 'min:1'],
             ],
@@ -1410,7 +1515,9 @@ class DayBookController extends Controller
                 'project_id.exists' => 'The selected project is invalid.',
                 'purchase_file_id.exists' => 'The selected file is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
+                'paid_by_party_id.exists' => 'The selected paid-by party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
+                'sub_category_id.exists' => 'The selected sub category is invalid.',
                 'payment_bank.in' => 'Please choose a bank from the list.',
             ]
         );
@@ -1446,6 +1553,50 @@ class DayBookController extends Controller
         $validated['project_id'] = $contextProjectId;
         if (empty($validated['party_sub_category_id'])) {
             $validated['party_sub_category_id'] = null;
+        }
+
+        $isFactoryExpense = false;
+        if (! empty($contextProjectId)) {
+            $project = Project::query()->with('landType')->find($contextProjectId);
+            $lt = $project?->landType?->name;
+            $isFactoryExpense = $lt !== null && mb_strtolower(trim($lt)) === 'factory';
+        }
+
+        if ($isFactoryExpense) {
+            $request->validate([
+                'sub_category_id' => ['required', 'integer', Rule::exists('party_sub_categories', 'id')],
+                'quantity' => ['required', 'integer', 'min:1'],
+                'unit_price' => ['required', 'regex:/^\d+(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
+            ], [], [
+                'sub_category_id' => 'sub category',
+                'unit_price' => 'unit price',
+            ]);
+
+            $sc = PartySubCategory::query()
+                ->where('id', (int) $validated['sub_category_id'])
+                ->whereHas('category', fn ($q) => $q->where('name', 'Construction & Material'))
+                ->first();
+            if (! $sc) {
+                return back()
+                    ->withErrors(['sub_category_id' => 'Please choose a sub category from Construction & Material.'])
+                    ->withInput();
+            }
+
+            $validated['unit'] = $sc->unit;
+            $validated['quantity'] = (int) $validated['quantity'];
+            $validated['unit_price'] = number_format((float) $validated['unit_price'], 2, '.', '');
+            $expected = round(((int) $validated['quantity']) * ((float) $validated['unit_price']), 2);
+            $amount = round((float) $validated['amount'], 2);
+            if (abs($expected - $amount) > 0.009) {
+                return back()
+                    ->withErrors(['amount' => 'Amount must equal Quantity × Unit Price.'])
+                    ->withInput();
+            }
+        } else {
+            $validated['sub_category_id'] = null;
+            $validated['unit'] = null;
+            $validated['quantity'] = null;
+            $validated['unit_price'] = null;
         }
 
         $purchaseFileResult = $this->applyPurchaseFileToEntry($validated, $contextProjectId);

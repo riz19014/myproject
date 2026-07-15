@@ -19,10 +19,6 @@
                         <i class="bi bi-journal-text" aria-hidden="true"></i>
                         <span>Open daybook</span>
                     </a>
-                    <a href="{{ route('daybook.ledger') }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
-                        <i class="bi bi-journal-bookmark" aria-hidden="true"></i>
-                        <span>Ledger</span>
-                    </a>
                 </div>
             </div>
             @include('daybook.partials.entries-global-list', [
@@ -68,6 +64,86 @@
     }
     input.addEventListener('input', runFilter);
     input.addEventListener('search', runFilter);
+})();
+
+(function () {
+    var modalEl = document.getElementById('daybookEntryModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    if (modalEl.parentNode !== document.body) {
+        document.body.appendChild(modalEl);
+    }
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    function setRow(id, value) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = (value === null || value === undefined || value === '') ? '—' : value;
+        var item = el.closest('.daybook-modal-item');
+        if (item) item.classList.toggle('d-none', el.textContent === '—');
+    }
+
+    function openFromButton(btn) {
+        var data;
+        try {
+            data = JSON.parse(btn.getAttribute('data-daybook-entry')) || {};
+        } catch (e) {
+            return;
+        }
+
+        var subtitle = document.getElementById('daybook-modal-subtitle');
+        if (subtitle) subtitle.textContent = data.voucher ? ('Voucher ' + data.voucher) : ('Entry #' + (data.id || ''));
+
+        setRow('daybook-modal-voucher', data.voucher);
+        setRow('daybook-modal-date', data.date);
+        setRow('daybook-modal-type', data.type_label);
+        setRow('daybook-modal-settlement', data.settlement === '—' ? '' : data.settlement);
+        setRow('daybook-modal-paid-by', (!data.paid_by || data.paid_by === '—') ? '' : data.paid_by);
+        setRow('daybook-modal-description', data.description === '—' ? '' : data.description);
+        setRow('daybook-modal-link', data.link_label);
+
+        var projectText = data.project_name || '';
+        if (projectText && data.land_type) projectText += ' (' + data.land_type + ')';
+        setRow('daybook-modal-project', projectText);
+
+        setRow('daybook-modal-file', data.purchase_file);
+
+        var subcat = '';
+        if (data.sub_category && data.sub_category !== '—') {
+            subcat = (data.category ? data.category + ' · ' : '') + data.sub_category;
+        }
+        setRow('daybook-modal-subcat', subcat);
+
+        var factoryWrap = document.getElementById('daybook-modal-factory');
+        if (factoryWrap) {
+            if (data.is_factory) {
+                factoryWrap.classList.remove('d-none');
+                setRow('daybook-modal-fsubcat', data.factory_sub_category === '—' ? '' : data.factory_sub_category);
+                setRow('daybook-modal-unit', data.unit);
+                setRow('daybook-modal-qty', data.quantity);
+                setRow('daybook-modal-price', data.unit_price ? ('Rs ' + data.unit_price) : '');
+            } else {
+                factoryWrap.classList.add('d-none');
+            }
+        }
+
+        var amountEl = document.getElementById('daybook-modal-amount');
+        if (amountEl) {
+            amountEl.textContent = data.amount || '—';
+            amountEl.classList.remove('daybook-amount--in', 'daybook-amount--out');
+            amountEl.classList.add(data.is_cash_in ? 'daybook-amount--in' : 'daybook-amount--out');
+        }
+
+        var openFull = document.getElementById('daybook-modal-open-full');
+        if (openFull && data.url) openFull.setAttribute('href', data.url);
+
+        modal.show();
+    }
+
+    document.querySelectorAll('.daybook-entries-view-btn[data-daybook-entry]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            openFromButton(btn);
+        });
+    });
 })();
 </script>
 @endpush

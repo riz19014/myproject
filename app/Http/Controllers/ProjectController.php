@@ -12,6 +12,7 @@ use App\Models\PurchaseFile;
 use App\Models\PurchaseFileSaleLandMozaOverride;
 use App\Models\PurchaseItem;
 use App\Models\Sale;
+use App\Support\FileSaleLandService;
 use App\Support\LandMeasure;
 use App\Support\LandPrecision;
 use App\Support\ProjectExemptionDefaults;
@@ -33,7 +34,7 @@ class ProjectController extends Controller
 
         $query = Project::query()
             ->with('landType')
-            ->withCount('purchaseFiles')
+            ->withCount(['purchaseFiles', 'parties'])
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.$search.'%';
                 $query->where(function ($q) use ($like) {
@@ -341,6 +342,7 @@ class ProjectController extends Controller
         $marlaPerAcreLand = $exemptionConfig->marlaPerAcreLand();
         $customers = Customer::query()->orderBy('name')->get();
         $saleLandModalData = $this->buildSaleLandModalData($project, $saleLandSheet);
+        $movedToFileSaleIds = app(FileSaleLandService::class)->movedSaleLandIds($project);
 
         return view('projects.sale-land', compact(
             'project',
@@ -350,6 +352,7 @@ class ProjectController extends Controller
             'scopedPurchaseFiles',
             'customers',
             'saleLandModalData',
+            'movedToFileSaleIds',
         ));
     }
 
@@ -473,12 +476,36 @@ class ProjectController extends Controller
         return back()->with('success', 'Sale land row updated.');
     }
 
-    public function destroySaleLand(Project $project, PurchaseFile $purchase_file)
+    public function moveToFileSale(Request $request, Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $validated = $request->validate([
+            'purchase_file_ids' => ['required', 'array', 'min:1'],
+            'purchase_file_ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        $result = $fileSaleLandService->moveToFileSale($project, $validated['purchase_file_ids']);
+
+        $message = count($result['moved']) > 0
+            ? count($result['moved']).' sale land file(s) moved to file sale.'
+            : 'Selected file(s) were already in file sale.';
+
+        if ($request->expectsJson()) {
+            return response()->json(array_merge($result, ['message' => $message]));
+        }
+
+        return back()->with(
+            count($result['moved']) > 0 ? 'success' : 'info',
+            $message,
+        );
+    }
+
+    public function destroySaleLand(Project $project, PurchaseFile $purchase_file, FileSaleLandService $fileSaleLandService)
     {
         abort_unless($purchase_file->project_id === $project->id, 404);
         abort_unless($purchase_file->isSaleLand(), 404);
 
         $name = $purchase_file->file_name;
+        $fileSaleLandService->removeForSaleLand($purchase_file);
         $purchase_file->saleLandMozaOverrides()->delete();
         $purchase_file->update(['sale_land_at' => null]);
 
@@ -931,6 +958,99 @@ class ProjectController extends Controller
         $safeName = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name);
 
         return $pdf->download('project-ledger-'.$safeName.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    public function partners(Project $project)
+    {
+        $project->load(['landType', 'parties' => fn ($q) => $q->orderBy('name')]);
+        $parties = Party::query()->orderBy('name')->get();
+
+        return view('projects.partners', compact('project', 'parties'));
+    }
+
+    public function storePartner(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'party_id' => [
+                'required',
+                'integer',
+                Rule::exists('parties', 'id'),
+                Rule::unique('party_project', 'party_id')->where(fn ($q) => $q->where('project_id', $project->id)),
+            ],
+            'area_acre' => ['nullable', 'integer', 'min:0'],
+            'area_kanal' => ['nullable', 'integer', 'min:0'],
+            'area_marla' => ['nullable', 'integer', 'min:0'],
+            'area_sqft' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'party_id.unique' => 'This partner is already on the project.',
+        ]);
+
+        $marla = LandMeasure::marlaFromAkms(
+            (int) ($validated['area_acre'] ?? 0),
+            (int) ($validated['area_kanal'] ?? 0),
+            (int) ($validated['area_marla'] ?? 0),
+            (int) ($validated['area_sqft'] ?? 0)
+        );
+
+        $project->parties()->attach((int) $validated['party_id'], [
+            'land_area' => $marla > 0 ? LandPrecision::forStorage($marla) : null,
+            'land_area_unit' => $marla > 0 ? 'marla' : null,
+        ]);
+
+        return redirect()
+            ->route('projects.partners', $project)
+            ->with('success', 'Partner added to project.');
+    }
+
+    public function updatePartners(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'partners' => ['nullable', 'array'],
+            'partners.*.party_id' => ['required', 'integer', 'exists:parties,id'],
+            'partners.*.area_acre' => ['nullable', 'integer', 'min:0'],
+            'partners.*.area_kanal' => ['nullable', 'integer', 'min:0'],
+            'partners.*.area_marla' => ['nullable', 'integer', 'min:0'],
+            'partners.*.area_sqft' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $rows = $validated['partners'] ?? [];
+        $sync = [];
+        $seen = [];
+
+        foreach ($rows as $row) {
+            $pid = (int) $row['party_id'];
+            if (isset($seen[$pid])) {
+                continue;
+            }
+            $seen[$pid] = true;
+
+            $marla = LandMeasure::marlaFromAkms(
+                (int) ($row['area_acre'] ?? 0),
+                (int) ($row['area_kanal'] ?? 0),
+                (int) ($row['area_marla'] ?? 0),
+                (int) ($row['area_sqft'] ?? 0)
+            );
+
+            $sync[$pid] = [
+                'land_area' => $marla > 0 ? LandPrecision::forStorage($marla) : null,
+                'land_area_unit' => $marla > 0 ? 'marla' : null,
+            ];
+        }
+
+        $project->parties()->sync($sync);
+
+        return redirect()
+            ->route('projects.partners', $project)
+            ->with('success', 'Partners updated.');
+    }
+
+    public function destroyPartner(Project $project, Party $party)
+    {
+        $project->parties()->detach($party->id);
+
+        return redirect()
+            ->route('projects.partners', $project)
+            ->with('success', 'Partner removed from project.');
     }
 
     public function edit(Project $project)

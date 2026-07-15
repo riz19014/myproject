@@ -4,14 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\DayBookEntry;
 use App\Models\Factory;
+use App\Models\Project;
 use Illuminate\Http\Request;
 
 class FactoryController extends Controller
 {
     public function index()
     {
-        $factories = Factory::orderBy('id', 'desc')->paginate(10);
-        return view('factories.index', compact('factories'));
+        $projects = Project::query()
+            ->with(['landType', 'parties' => fn ($q) => $q->orderBy('name')])
+            ->withCount(['parties'])
+            ->whereHas('landType', function ($q) {
+                $q->where('name', 'like', '%factory%');
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('factories.index', compact('projects'));
     }
 
     public function create()

@@ -60,9 +60,9 @@
         background: rgba(59, 130, 246, 0.12);
         color: #1d4ed8;
     }
-    .project-hub-link__icon--files {
-        background: rgba(249, 115, 22, 0.14);
-        color: #ea580c;
+    .project-hub-link__icon--partners {
+        background: rgba(168, 85, 247, 0.12);
+        color: #7e22ce;
     }
     .project-hub-link__title {
         font-size: 1.125rem;
@@ -102,7 +102,17 @@
 </header>
 
 <div class="row g-3 g-lg-4 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('projects.partners', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--partners" aria-hidden="true">
+                <i class="bi bi-people"></i>
+            </span>
+            <span class="project-hub-link__title">Partners</span>
+            <p class="project-hub-link__desc">Add or remove project partners (parties) and optional land areas.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
         <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="project-hub-link">
             <span class="project-hub-link__icon project-hub-link__icon--purchase" aria-hidden="true">
                 <i class="bi bi-bag-check"></i>
@@ -112,7 +122,7 @@
             <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
         </a>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
         <a href="{{ route('projects.sale-land', $project) }}" class="project-hub-link">
             <span class="project-hub-link__icon project-hub-link__icon--sale" aria-hidden="true">
                 <i class="bi bi-signpost-split"></i>
@@ -122,7 +132,7 @@
             <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
         </a>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
         <a href="{{ route('sale.files.index', $project) }}" class="project-hub-link">
             <span class="project-hub-link__icon project-hub-link__icon--files" aria-hidden="true">
                 <i class="bi bi-files"></i>

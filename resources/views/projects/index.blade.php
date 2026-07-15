@@ -102,7 +102,8 @@
                             <th>Name</th>
                             <th>Land type</th>
                             <th class="text-center" style="width: 90px;">Files</th>
-                            <th style="width: 200px;">Actions</th>
+                            <th class="text-center" style="width: 90px;">Partners</th>
+                            <th style="width: 260px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="projects-sortable-tbody">
@@ -123,8 +124,14 @@
                                         {{ $project->purchase_files_count }}
                                     </a>
                                 </td>
+                                <td class="text-center">
+                                    <a href="{{ route('projects.partners', $project) }}" class="badge rounded-pill text-bg-light border text-decoration-none fw-semibold px-3 py-2" title="Manage partners">
+                                        {{ $project->parties_count }}
+                                    </a>
+                                </td>
                                 <td class="text-nowrap">
                                     <a href="{{ route('projects.show', $project) }}" class="btn btn-sm btn-outline-theme">View</a>
+                                    <a href="{{ route('projects.partners', $project) }}" class="btn btn-sm btn-pink">Partners</a>
                                     <a href="{{ route('projects.edit', $project) }}" class="btn btn-sm btn-outline-theme">Edit</a>
                                     <form action="{{ route('projects.destroy', $project) }}" method="POST" class="d-inline">
                                         @csrf

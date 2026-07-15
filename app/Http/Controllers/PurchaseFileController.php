@@ -654,7 +654,7 @@ class PurchaseFileController extends Controller
 
         $allEntries = DayBookEntry::query()
             ->where('purchase_file_id', $file->id)
-            ->with(['partySubCategory.category'])
+            ->with(['partySubCategory.category', 'paidByParty'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -753,7 +753,7 @@ class PurchaseFileController extends Controller
     {
         $allEntries = DayBookEntry::query()
             ->where('purchase_file_id', $file->id)
-            ->with(['partySubCategory.category'])
+            ->with(['partySubCategory.category', 'paidByParty'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();

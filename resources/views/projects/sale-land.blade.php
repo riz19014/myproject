@@ -9,6 +9,7 @@
     $formulaTotals = $saleLandSheet['formula_totals'] ?? ['total_land' => '—', 'formula_values' => []];
     $scopedPurchaseFiles = $scopedPurchaseFiles ?? collect();
     $scopedPurchaseFileIds = $scopedPurchaseFiles->pluck('id')->all();
+    $movedToFileSaleIds = $movedToFileSaleIds ?? [];
     $fileCount = collect($sheetRows)->where('show_file_name', true)->count();
     $rowCount = count($sheetRows);
 @endphp
@@ -67,8 +68,11 @@
                 </div>
                 <div class="col-md-7 d-flex flex-wrap align-items-center justify-content-md-end gap-2">
                     <span class="small text-muted" id="sale-land-search-count"></span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-all">Select all</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-none">Clear</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-move-check-all">Select all for move</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-move-check-none">Clear move</button>
+                    <button type="button" class="btn btn-sm btn-pink" id="sale-land-move-to-file-sale">Move to File Sale</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-all">Select all PDF</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-none">Clear PDF</button>
                     <a href="{{ route('sale.projects.exemption.edit', $project) }}" class="btn btn-sm btn-outline-secondary">Exemption setup</a>
                 </div>
             </div>
@@ -85,18 +89,37 @@
                         </thead>
                         <tbody>
                             @foreach($sheetRows as $row)
-                                <tr data-row-idx="{{ $loop->index }}" class="{{ $row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '' }}">
+                                @php
+                                    $isInFileSale = in_array($row['purchase_file_id'], $movedToFileSaleIds, true);
+                                @endphp
+                                <tr data-row-idx="{{ $loop->index }}"
+                                    data-purchase-file-id="{{ $row['purchase_file_id'] }}"
+                                    class="{{ trim(($row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '').' '.($isInFileSale ? 'sale-land-sheet__row--in-file-sale' : '')) }}">
                                     @if($row['show_file_name'])
                                         <td class="sale-land-sheet__file-name-cell" rowspan="{{ $row['file_name_rowspan'] }}">
                                             <div class="sale-land-sheet__file-name-wrap">
                                                 <div class="sale-land-sheet__file-name-main">
-                                                    <input type="checkbox"
-                                                           class="form-check-input sale-land-file-check"
-                                                           value="{{ $row['purchase_file_id'] }}"
-                                                           id="sale-land-file-{{ $row['purchase_file_id'] }}"
-                                                           aria-label="Include {{ $row['file_name'] }} in PDF"
-                                                           @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
-                                                    <label class="sale-land-sheet__file-name-text mb-0" for="sale-land-file-{{ $row['purchase_file_id'] }}">{{ $row['file_name'] }}</label>
+                                                    <div class="sale-land-sheet__file-checks">
+                                                        <input type="checkbox"
+                                                               class="form-check-input sale-land-file-move-check"
+                                                               value="{{ $row['purchase_file_id'] }}"
+                                                               id="sale-land-move-{{ $row['purchase_file_id'] }}"
+                                                               aria-label="Move {{ $row['file_name'] }} to file sale"
+                                                               @checked($isInFileSale)
+                                                               @disabled($isInFileSale)>
+                                                        <input type="checkbox"
+                                                               class="form-check-input sale-land-file-check"
+                                                               value="{{ $row['purchase_file_id'] }}"
+                                                               id="sale-land-file-{{ $row['purchase_file_id'] }}"
+                                                               aria-label="Include {{ $row['file_name'] }} in PDF"
+                                                               @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
+                                                    </div>
+                                                    <label class="sale-land-sheet__file-name-text mb-0" for="sale-land-move-{{ $row['purchase_file_id'] }}">
+                                                        {{ $row['file_name'] }}
+                                                        @if($isInFileSale)
+                                                            <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">In file sale</span>
+                                                        @endif
+                                                    </label>
                                                 </div>
                                                 <div class="sale-land-sheet__file-actions">
                                                     <form method="post"
@@ -155,8 +178,11 @@
                         </thead>
                         <tbody>
                             @foreach($sheetRows as $row)
+                                @php
+                                    $isInFileSale = in_array($row['purchase_file_id'], $movedToFileSaleIds, true);
+                                @endphp
                                 <tr data-row-idx="{{ $loop->index }}"
-                                    class="{{ $row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '' }}"
+                                    class="{{ trim(($row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '').' '.($isInFileSale ? 'sale-land-sheet__row--in-file-sale' : '')) }}"
                                     data-purchase-file-id="{{ $row['purchase_file_id'] }}"
                                     data-moza-key="{{ $row['moza_key'] }}"
                                     data-search-text="{{ e(strtolower(implode(' ', array_filter([
@@ -446,6 +472,18 @@
     .sale-land-file-check {
         flex: 0 0 auto;
         margin-top: 0.2rem;
+    }
+    .sale-land-sheet__file-checks {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        flex: 0 0 auto;
+    }
+    .sale-land-sheet__row--in-file-sale td {
+        background: rgba(34, 197, 94, 0.12) !important;
+    }
+    .sale-land-sheet__row--in-file-sale.is-hovered td {
+        background: rgba(34, 197, 94, 0.18) !important;
     }
     .sale-land-sheet__file-actions {
         flex: 0 0 auto;
@@ -874,6 +912,99 @@
             document.querySelectorAll('.sale-land-file-check').forEach(function(cb) {
                 cb.checked = false;
             });
+        });
+    }
+
+    var moveCheckAllBtn = document.getElementById('sale-land-move-check-all');
+    var moveCheckNoneBtn = document.getElementById('sale-land-move-check-none');
+    var moveToFileSaleBtn = document.getElementById('sale-land-move-to-file-sale');
+    var moveToFileSaleUrl = @json(route('projects.sale-land.move-to-file-sale', $project));
+
+    function applyFileSaleRowState(movedIds) {
+        var idSet = new Set((movedIds || []).map(function(id) { return String(id); }));
+
+        document.querySelectorAll('.sale-land-sheet--frozen tbody tr[data-purchase-file-id], .sale-land-sheet--scroll tbody tr[data-purchase-file-id]').forEach(function(row) {
+            var fileId = row.dataset.purchaseFileId;
+            var inFileSale = idSet.has(String(fileId));
+            row.classList.toggle('sale-land-sheet__row--in-file-sale', inFileSale);
+        });
+
+        document.querySelectorAll('.sale-land-file-move-check').forEach(function(cb) {
+            var inFileSale = idSet.has(String(cb.value));
+            cb.checked = inFileSale;
+            cb.disabled = inFileSale;
+        });
+    }
+
+    if (moveCheckAllBtn) {
+        moveCheckAllBtn.addEventListener('click', function() {
+            document.querySelectorAll('.sale-land-file-move-check:not(:disabled)').forEach(function(cb) {
+                cb.checked = true;
+            });
+        });
+    }
+    if (moveCheckNoneBtn) {
+        moveCheckNoneBtn.addEventListener('click', function() {
+            document.querySelectorAll('.sale-land-file-move-check:not(:disabled)').forEach(function(cb) {
+                cb.checked = false;
+            });
+        });
+    }
+    if (moveToFileSaleBtn) {
+        moveToFileSaleBtn.addEventListener('click', function() {
+            var selected = Array.from(document.querySelectorAll('.sale-land-file-move-check:checked:not(:disabled)')).map(function(cb) {
+                return parseInt(cb.value, 10);
+            }).filter(function(id) { return !isNaN(id); });
+
+            if (!selected.length) {
+                alert('Select at least one sale land file that is not already in file sale.');
+                return;
+            }
+
+            moveToFileSaleBtn.disabled = true;
+
+            fetch(moveToFileSaleUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ purchase_file_ids: selected })
+            })
+                .then(function(res) {
+                    return res.json().then(function(data) {
+                        return { ok: res.ok, data: data };
+                    }).catch(function() {
+                        return { ok: false, data: {} };
+                    });
+                })
+                .then(function(result) {
+                    moveToFileSaleBtn.disabled = false;
+                    if (!result.ok) {
+                        var msg = (result.data && result.data.message) ? result.data.message : 'Could not move selected files.';
+                        if (result.data && result.data.errors) {
+                            var parts = [];
+                            Object.keys(result.data.errors).forEach(function(key) {
+                                parts = parts.concat(result.data.errors[key]);
+                            });
+                            if (parts.length) msg = parts.join(' ');
+                        }
+                        alert(msg);
+                        return;
+                    }
+
+                    applyFileSaleRowState(result.data.moved_ids || []);
+
+                    if (result.data.message) {
+                        window.location.reload();
+                    }
+                })
+                .catch(function() {
+                    moveToFileSaleBtn.disabled = false;
+                    alert('Could not move selected files. Please try again.');
+                });
         });
     }
 

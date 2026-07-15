@@ -78,9 +78,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('parties', PartyController::class)->except(['show']);
     Route::get('projects/{project}/ledger-pdf', [ProjectController::class, 'ledgerPdf'])->name('projects.ledger.pdf');
     Route::get('projects/{project}/purchase', [ProjectController::class, 'purchase'])->name('projects.purchase');
+    Route::get('projects/{project}/partners', [ProjectController::class, 'partners'])->name('projects.partners');
+    Route::put('projects/{project}/partners', [ProjectController::class, 'updatePartners'])->name('projects.partners.update');
+    Route::post('projects/{project}/partners', [ProjectController::class, 'storePartner'])->name('projects.partners.store');
+    Route::delete('projects/{project}/partners/{party}', [ProjectController::class, 'destroyPartner'])->name('projects.partners.destroy');
     Route::get('projects/{project}/sale-land', [ProjectController::class, 'saleLand'])->name('projects.sale-land');
     Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
+    Route::post('projects/{project}/sale-land/move-to-file-sale', [ProjectController::class, 'moveToFileSale'])->name('projects.sale-land.move-to-file-sale');
     Route::delete('projects/{project}/sale-land/{purchase_file}', [ProjectController::class, 'destroySaleLand'])->name('projects.sale-land.destroy');
     Route::post('projects/{project}/sale-land/{purchase_file}/sale', [ProjectController::class, 'storeSaleLandSale'])->name('projects.sale-land.sale.store');
     Route::resource('projects', ProjectController::class);

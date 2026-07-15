@@ -72,6 +72,11 @@ class Project extends Model
         return $this->hasMany(PurchaseFile::class);
     }
 
+    public function fileSaleLands(): HasMany
+    {
+        return $this->hasMany(FileSaleLand::class);
+    }
+
     public function saleExemptionComponents(): HasMany
     {
         return $this->hasMany(ProjectSaleExemptionComponent::class)->orderBy('sort_order');
