@@ -5,7 +5,7 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Add Land</h1>
-    <a href="{{ route('lands.index') }}" class="btn btn-outline-theme">Back to List</a>
+    <a href="{{ route('sale-land.index') }}" class="btn btn-outline-theme">Back to List</a>
 </div>
 
 <div class="card card-theme">

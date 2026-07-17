@@ -134,8 +134,14 @@
         </tr>
         @if($entry->getPurchaseFileLabel() !== '—')
         <tr>
-            <th>Purchase file</th>
+            <th>Sale file</th>
             <td>{{ $entry->getPurchaseFileLabel() }}</td>
+        </tr>
+        @endif
+        @if($entry->getSoldAreaLabel() !== '—')
+        <tr>
+            <th>Sold area</th>
+            <td>{{ $entry->getSoldAreaLabel() }}</td>
         </tr>
         @endif
         @if($entry->getPartySubCategoryLabel() !== '—')

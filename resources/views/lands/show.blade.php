@@ -7,7 +7,7 @@
     <h1>{{ $land->name }}</h1>
     <div class="d-flex gap-2">
         <a href="{{ route('lands.edit', $land) }}" class="btn btn-outline-theme">Edit</a>
-        <a href="{{ route('lands.index') }}" class="btn btn-outline-theme">Back to List</a>
+        <a href="{{ route('sale-land.index') }}" class="btn btn-outline-theme">Back to List</a>
     </div>
 </div>
 

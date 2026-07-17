@@ -38,8 +38,8 @@
                 @enderror
                 <div class="mt-2" id="daybook_form_file_wrap">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                        <label class="form-label daybook-label mb-0" for="daybook_form_purchase_file_id">File <span class="text-muted fw-normal">(optional)</span></label>
-                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_file_reset" aria-label="Clear file">Reset</button>
+                        <label class="form-label daybook-label mb-0" for="daybook_form_purchase_file_id">Sale file <span class="text-muted fw-normal">(optional)</span></label>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_file_reset" aria-label="Clear sale file">Reset</button>
                     </div>
                     <select
                         name="purchase_file_id"
@@ -52,6 +52,52 @@
                     @error('purchase_file_id')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
+                    <div id="daybook_sale_file_meta" class="small text-muted mt-2 d-none">
+                        <div><span class="fw-semibold text-body">Available:</span> <span id="daybook_sale_file_remaining">—</span></div>
+                        <div><span class="fw-semibold text-body">Total / Sold:</span> <span id="daybook_sale_file_totals">—</span></div>
+                        <div><span class="fw-semibold text-body">Status:</span> <span id="daybook_sale_file_status">—</span></div>
+                        <div id="daybook_sale_file_sellers_wrap" class="d-none"><span class="fw-semibold text-body">Sellers:</span> <span id="daybook_sale_file_sellers">—</span></div>
+                    </div>
+                    <div id="daybook_sold_area_wrap" class="row g-2 mt-2 d-none">
+                        <div class="col-7">
+                            <label class="form-label daybook-label" for="daybook_sold_area_qty">Area sold</label>
+                            <input
+                                type="number"
+                                name="sold_area_qty"
+                                id="daybook_sold_area_qty"
+                                class="form-control form-control-theme @error('sold_area_qty') is-invalid @enderror"
+                                value="{{ old('sold_area_qty', $daybookSoldAreaQtyDefault ?? '') }}"
+                                min="0"
+                                step="0.0001"
+                                inputmode="decimal"
+                                placeholder="0"
+                                autocomplete="off"
+                            >
+                            @error('sold_area_qty')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label daybook-label" for="daybook_sold_area_unit">Unit</label>
+                            @php($daybookSoldAreaUnitOld = old('sold_area_unit', $daybookSoldAreaUnitDefault ?? 'marla'))
+                            <select
+                                name="sold_area_unit"
+                                id="daybook_sold_area_unit"
+                                class="form-select form-select-theme @error('sold_area_unit') is-invalid @enderror"
+                            >
+                                <option value="marla" @selected($daybookSoldAreaUnitOld === 'marla')>Marla</option>
+                                <option value="kanal" @selected($daybookSoldAreaUnitOld === 'kanal')>Kanal</option>
+                                <option value="acre" @selected($daybookSoldAreaUnitOld === 'acre')>Acre</option>
+                                <option value="sqft" @selected($daybookSoldAreaUnitOld === 'sqft')>Sq. Ft.</option>
+                            </select>
+                            @error('sold_area_unit')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" id="daybook_sold_area_fill_remaining">Sell full available balance</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-12 col-lg-4">

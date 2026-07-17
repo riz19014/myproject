@@ -65,6 +65,9 @@
                                 @if(($row['paid_by'] ?? '—') !== '—')
                                     <div class="text-muted">Paid by: {{ $row['paid_by'] }}</div>
                                 @endif
+                                @if(($row['sold_area'] ?? '—') !== '—')
+                                    <div class="text-muted">Sold area: {{ $row['sold_area'] }}</div>
+                                @endif
                             </td>
                             <td class="text-end text-nowrap">
                                 @php($daybookModalData = [
@@ -82,6 +85,7 @@
                                     'project_name' => $row['project_name'],
                                     'land_type' => $row['land_type'],
                                     'purchase_file' => $row['purchase_file_name'],
+                                    'sold_area' => $row['sold_area'] ?? '—',
                                     'category' => $row['category'],
                                     'sub_category' => $row['sub_category'],
                                     'is_factory' => $row['is_factory'],
@@ -120,7 +124,8 @@
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Paid by</span><span id="daybook-modal-paid-by" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Linked to</span><span id="daybook-modal-link" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Project</span><span id="daybook-modal-project" class="daybook-modal-val"></span></div>
-                    <div class="daybook-modal-item"><span class="daybook-modal-key">Purchase file</span><span id="daybook-modal-file" class="daybook-modal-val"></span></div>
+                    <div class="daybook-modal-item"><span class="daybook-modal-key">Sale file</span><span id="daybook-modal-file" class="daybook-modal-val"></span></div>
+                    <div class="daybook-modal-item"><span class="daybook-modal-key">Sold area</span><span id="daybook-modal-sold-area" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Party sub category</span><span id="daybook-modal-subcat" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item daybook-modal-item--wide"><span class="daybook-modal-key">Description</span><span id="daybook-modal-description" class="daybook-modal-val"></span></div>
                 </div>

@@ -166,18 +166,29 @@
             purchaseFileSelect.appendChild(opt0);
             purchaseFileSelect.value = '';
             purchaseFileSelect.disabled = true;
+            syncSaleFileMeta(null);
+            syncFileResetVisibility();
             return;
         }
         var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
-        var files = (project && project.purchase_files) ? project.purchase_files : [];
+        var files = (project && (project.sale_files || project.purchase_files)) ? (project.sale_files || project.purchase_files) : [];
         var optBlank = document.createElement('option');
         optBlank.value = '';
-        optBlank.textContent = files.length ? '— No file —' : '— No files for this project —';
+        optBlank.textContent = files.length ? '— No sale file —' : '— No sale files for this project —';
         purchaseFileSelect.appendChild(optBlank);
         files.forEach(function (f) {
             var opt = document.createElement('option');
             opt.value = String(f.id);
-            opt.textContent = f.label;
+            var label = f.label || f.file_name || ('File #' + f.id);
+            if (f.is_fully_sold) {
+                label += ' — Fully Sold';
+            } else if (f.remaining_label && f.remaining_label !== '—') {
+                label += ' (Avail: ' + f.remaining_label + ')';
+            }
+            opt.textContent = label;
+            if (f.is_fully_sold && String(f.id) !== selected) {
+                opt.disabled = true;
+            }
             purchaseFileSelect.appendChild(opt);
         });
         purchaseFileSelect.disabled = false;
@@ -186,7 +197,64 @@
         } else {
             purchaseFileSelect.value = '';
         }
+        syncSaleFileMeta(currentSaleFile());
         syncFileResetVisibility();
+    }
+
+    function currentSaleFile() {
+        if (!purchaseFileSelect || !projectHidden) return null;
+        var pid = String(projectHidden.value || '').trim();
+        var fid = String(purchaseFileSelect.value || '').trim();
+        if (!pid || !fid) return null;
+        var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
+        var files = (project && (project.sale_files || project.purchase_files)) ? (project.sale_files || project.purchase_files) : [];
+        return files.find(function (f) { return String(f.id) === fid; }) || null;
+    }
+
+    function syncSaleFileMeta(file) {
+        var meta = document.getElementById('daybook_sale_file_meta');
+        var areaWrap = document.getElementById('daybook_sold_area_wrap');
+        var remainingEl = document.getElementById('daybook_sale_file_remaining');
+        var totalsEl = document.getElementById('daybook_sale_file_totals');
+        var statusEl = document.getElementById('daybook_sale_file_status');
+        var sellersWrap = document.getElementById('daybook_sale_file_sellers_wrap');
+        var sellersEl = document.getElementById('daybook_sale_file_sellers');
+        var qtyInput = document.getElementById('daybook_sold_area_qty');
+        if (!meta || !areaWrap) return;
+
+        if (!file) {
+            meta.classList.add('d-none');
+            areaWrap.classList.add('d-none');
+            if (qtyInput && !qtyInput.dataset.keepValue) {
+                // leave existing edit values alone until cleared by reset
+            }
+            return;
+        }
+
+        meta.classList.remove('d-none');
+        areaWrap.classList.remove('d-none');
+        if (remainingEl) remainingEl.textContent = file.remaining_label || '—';
+        if (totalsEl) {
+            totalsEl.textContent = (file.total_label || '—') + ' / ' + (file.sold_label || '—');
+        }
+        if (statusEl) statusEl.textContent = file.status || '—';
+        if (sellersWrap && sellersEl) {
+            var sellers = Array.isArray(file.sellers) ? file.sellers : [];
+            if (sellers.length) {
+                sellersWrap.classList.remove('d-none');
+                sellersEl.textContent = sellers.join(', ');
+            } else {
+                sellersWrap.classList.add('d-none');
+                sellersEl.textContent = '—';
+            }
+        }
+        if (file.is_fully_sold && qtyInput && !String(qtyInput.value || '').trim()) {
+            qtyInput.placeholder = 'Fully sold — no further area';
+            qtyInput.disabled = true;
+        } else if (qtyInput) {
+            qtyInput.disabled = false;
+            qtyInput.placeholder = '0';
+        }
     }
 
     window.__daybookSyncPurchaseFileSelect = syncPurchaseFileSelect;
@@ -236,6 +304,7 @@
             btn.addEventListener('click', function () {
                 projectHidden.value = String(row.id);
                 projectSearch.value = row.label;
+                clearSoldAreaInputs();
                 syncPurchaseFileSelect(row.id, '');
                 hideProjectList();
                 syncProjectResetVisibility();
@@ -407,7 +476,38 @@
     })();
 
     if (purchaseFileSelect) {
-        purchaseFileSelect.addEventListener('change', syncFileResetVisibility);
+        purchaseFileSelect.addEventListener('change', function () {
+            clearSoldAreaInputs();
+            syncSaleFileMeta(currentSaleFile());
+            syncFileResetVisibility();
+        });
+    }
+
+    function clearSoldAreaInputs() {
+        var qtyInput = document.getElementById('daybook_sold_area_qty');
+        var unitSelect = document.getElementById('daybook_sold_area_unit');
+        if (qtyInput) {
+            qtyInput.value = '';
+            qtyInput.disabled = false;
+            qtyInput.placeholder = '0';
+        }
+        if (unitSelect) unitSelect.value = 'marla';
+    }
+
+    var soldAreaFillBtn = document.getElementById('daybook_sold_area_fill_remaining');
+    if (soldAreaFillBtn) {
+        soldAreaFillBtn.addEventListener('click', function () {
+            var file = currentSaleFile();
+            var qtyInput = document.getElementById('daybook_sold_area_qty');
+            var unitSelect = document.getElementById('daybook_sold_area_unit');
+            if (!file || !qtyInput || !unitSelect) return;
+            if (file.is_fully_sold || !(file.remaining_marla > 0)) return;
+            unitSelect.value = 'marla';
+            var rem = Number(file.remaining_marla) || 0;
+            qtyInput.value = String(Math.round(rem * 10000) / 10000);
+            qtyInput.disabled = false;
+            qtyInput.focus();
+        });
     }
 
     projectSearch.addEventListener('focus', function () {
@@ -415,6 +515,7 @@
     });
     projectSearch.addEventListener('input', function () {
         projectHidden.value = '';
+        clearSoldAreaInputs();
         syncPurchaseFileSelect('', '');
         syncProjectResetVisibility();
         openFilteredProjectList();
@@ -478,6 +579,7 @@
         projectResetBtn.addEventListener('click', function () {
             projectHidden.value = '';
             projectSearch.value = '';
+            clearSoldAreaInputs();
             syncPurchaseFileSelect('', '');
             hideProjectList();
             syncProjectResetVisibility();
@@ -506,6 +608,8 @@
             if (!purchaseFileSelect.disabled) {
                 purchaseFileSelect.value = '';
             }
+            clearSoldAreaInputs();
+            syncSaleFileMeta(null);
             syncFileResetVisibility();
             purchaseFileSelect.focus();
         });

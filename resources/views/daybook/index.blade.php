@@ -201,6 +201,9 @@
                                 @if($e->getPaidByLabel() !== '—')
                                     <div class="small text-muted">Paid by: {{ $e->getPaidByLabel() }}</div>
                                 @endif
+                                @if($e->getSoldAreaLabel() !== '—')
+                                    <div class="small text-muted">Sold area: {{ $e->getSoldAreaLabel() }}</div>
+                                @endif
                             </td>
                             <td class="text-end font-monospace">
                                 @if($e->type === 'cash_in')

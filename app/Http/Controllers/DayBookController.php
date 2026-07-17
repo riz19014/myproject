@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\DayBookEntry;
 use App\Models\DaybookOpeningBalance;
 use App\Models\Factory;
+use App\Models\FileSaleLand;
 use App\Models\Land;
 use App\Models\LandType;
 use App\Models\Party;
@@ -21,7 +22,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DayBookController extends Controller
 {
@@ -693,6 +696,22 @@ class DayBookController extends Controller
         $landTypes = LandType::orderBy('name')->get();
         $partyCategories = PartyCategory::orderBy('name')->get();
 
+        $daybookProjectIdDefault = '';
+        $daybookPurchaseFileIdDefault = '';
+        if ($request->filled('project') && Project::query()->whereKey((int) $request->query('project'))->exists()) {
+            $daybookProjectIdDefault = (string) (int) $request->query('project');
+            if ($request->filled('purchase_file_id')) {
+                $fileOk = PurchaseFile::query()
+                    ->whereKey((int) $request->query('purchase_file_id'))
+                    ->where('project_id', (int) $daybookProjectIdDefault)
+                    ->whereHas('fileSaleLand')
+                    ->exists();
+                if ($fileOk) {
+                    $daybookPurchaseFileIdDefault = (string) (int) $request->query('purchase_file_id');
+                }
+            }
+        }
+
         return view('daybook.index', [
             'day' => $day,
             'prevDay' => $prevDay,
@@ -712,6 +731,8 @@ class DayBookController extends Controller
             'partySubCategories' => $partySubCategories,
             'partyCategories' => $partyCategories,
             'landTypes' => $landTypes,
+            'daybookProjectIdDefault' => $daybookProjectIdDefault,
+            'daybookPurchaseFileIdDefault' => $daybookPurchaseFileIdDefault,
         ]);
     }
 
@@ -818,6 +839,7 @@ class DayBookController extends Controller
                 strtolower($projectArea),
                 strtolower($landTypeName),
                 strtolower($purchaseFileName),
+                strtolower($e->getSoldAreaLabel()),
                 strtolower($subCat),
                 strtolower($categoryName),
             ]);
@@ -847,6 +869,7 @@ class DayBookController extends Controller
                 'category' => $categoryName,
                 'land_type' => $landTypeName,
                 'purchase_file_name' => $purchaseFileName,
+                'sold_area' => $e->getSoldAreaLabel(),
                 'is_factory' => $e->isFactoryExpense(),
                 'factory_sub_category' => $e->getFactorySubCategoryLabel(),
                 'unit' => $e->unit ?? '',
@@ -922,19 +945,31 @@ class DayBookController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function daybookProjectsJsonPayload()
+    private function daybookProjectsJsonPayload(?int $excludeDaybookEntryId = null)
     {
+        $movedFileIdsByProject = FileSaleLand::query()
+            ->get(['project_id', 'sale_land_id'])
+            ->groupBy('project_id')
+            ->map(fn (Collection $rows) => $rows->pluck('sale_land_id')->map(fn ($id) => (int) $id)->all());
+
         return Project::query()
             ->orderBy('name')
             ->with([
                 'landType',
                 'parties',
-                'purchaseFiles' => fn ($q) => $q->orderBy('file_name'),
+                'purchaseFiles' => fn ($q) => $q->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
             ])
             ->get()
-            ->map(function (Project $p) {
+            ->map(function (Project $p) use ($movedFileIdsByProject, $excludeDaybookEntryId) {
                 $landTypeName = $p->landType?->name;
                 $isFactory = $landTypeName !== null && mb_strtolower(trim($landTypeName)) === 'factory';
+                $movedIds = $movedFileIdsByProject->get($p->id, []);
+
+                $saleFiles = $p->purchaseFiles
+                    ->filter(fn (PurchaseFile $f) => in_array((int) $f->id, $movedIds, true))
+                    ->values()
+                    ->map(fn (PurchaseFile $f) => $f->daybookSaleFilePayload($excludeDaybookEntryId))
+                    ->all();
 
                 return array_merge(
                     [
@@ -942,9 +977,10 @@ class DayBookController extends Controller
                         'label' => $p->name,
                         'land_type' => $landTypeName,
                         'is_factory' => $isFactory,
-                        'purchase_files' => $p->purchaseFiles->map(fn (PurchaseFile $f) => [
-                            'id' => $f->id,
-                            'label' => $f->file_name,
+                        'sale_files' => $saleFiles,
+                        'purchase_files' => collect($saleFiles)->map(fn (array $f) => [
+                            'id' => $f['id'],
+                            'label' => $f['label'],
                         ])->values()->all(),
                     ],
                     LandMeasure::projectPartyAreaPayload($p)
@@ -955,37 +991,107 @@ class DayBookController extends Controller
 
     /**
      * @param  array<string, mixed>  $validated
-     * @return array<string, mixed>|\Illuminate\Http\RedirectResponse
+     * @return array<string, mixed>
      */
-    private function applyPurchaseFileToEntry(array $validated, ?int $contextProjectId)
+    private function applyPurchaseFileToEntry(array $validated, ?int $contextProjectId, ?int $excludeEntryId = null): array
     {
         $fileId = $validated['purchase_file_id'] ?? null;
         unset($validated['purchase_file_id']);
 
+        $soldAreaQty = $validated['sold_area_qty'] ?? null;
+        $soldAreaUnit = $validated['sold_area_unit'] ?? null;
+        unset($validated['sold_area_qty'], $validated['sold_area_unit'], $validated['sold_area_marla']);
+
+        $hasSoldAreaInput = $soldAreaQty !== null && $soldAreaQty !== '' && (float) $soldAreaQty > 0;
+
         if (empty($fileId)) {
+            if ($hasSoldAreaInput) {
+                throw ValidationException::withMessages([
+                    'purchase_file_id' => 'Select a project sale file before entering sold area.',
+                ]);
+            }
             $validated['purchase_file_id'] = null;
+            $validated['sold_area_marla'] = null;
+            $validated['sold_area_qty'] = null;
+            $validated['sold_area_unit'] = null;
 
             return $validated;
         }
 
         if (empty($contextProjectId)) {
-            return back()
-                ->withErrors(['purchase_file_id' => 'Select a project before choosing a file.'])
-                ->withInput();
+            throw ValidationException::withMessages([
+                'purchase_file_id' => 'Select a project before choosing a sale file.',
+            ]);
         }
 
-        $belongs = PurchaseFile::query()
+        /** @var PurchaseFile|null $file */
+        $file = PurchaseFile::query()
             ->where('id', (int) $fileId)
             ->where('project_id', (int) $contextProjectId)
-            ->exists();
+            ->with(['purchaseItems', 'fileSaleLand', 'sales'])
+            ->lockForUpdate()
+            ->first();
 
-        if (! $belongs) {
-            return back()
-                ->withErrors(['purchase_file_id' => 'The selected file does not belong to this project.'])
-                ->withInput();
+        if (! $file) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => 'The selected file does not belong to this project.',
+            ]);
         }
 
-        $validated['purchase_file_id'] = (int) $fileId;
+        if (! $file->isMovedToFileSale()) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => 'Only files moved to File Sale can be selected.',
+            ]);
+        }
+
+        $validated['purchase_file_id'] = (int) $file->id;
+
+        if (! $hasSoldAreaInput) {
+            $validated['sold_area_marla'] = null;
+            $validated['sold_area_qty'] = null;
+            $validated['sold_area_unit'] = null;
+
+            return $validated;
+        }
+
+        $unit = is_string($soldAreaUnit) ? strtolower(trim($soldAreaUnit)) : '';
+        if (! in_array($unit, ['marla', 'kanal', 'acre', 'sqft'], true)) {
+            throw ValidationException::withMessages([
+                'sold_area_unit' => 'Choose a valid area unit (marla, kanal, acre, or sq ft).',
+            ]);
+        }
+
+        $qty = round((float) $soldAreaQty, 4);
+        if ($qty <= 0) {
+            throw ValidationException::withMessages([
+                'sold_area_qty' => 'Sold area must be greater than zero.',
+            ]);
+        }
+
+        $soldMarla = round(LandMeasure::toMarla($qty, $unit), 6);
+        if ($soldMarla <= 1e-6) {
+            throw ValidationException::withMessages([
+                'sold_area_qty' => 'Sold area must be greater than zero.',
+            ]);
+        }
+
+        $remaining = $file->remainingLandMarla($excludeEntryId);
+        if ($soldMarla - $remaining > 1e-4) {
+            throw ValidationException::withMessages([
+                'sold_area_qty' => 'Cannot sell more than the available balance ('
+                    .LandMeasure::formatAkmsLabelFromMarla($remaining).').',
+            ]);
+        }
+
+        if ($file->isFullySold($excludeEntryId) && $excludeEntryId === null) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => 'This sale file is fully sold and cannot accept further sales.',
+            ]);
+        }
+
+        $validated['sold_area_marla'] = number_format($soldMarla, 6, '.', '');
+        $validated['sold_area_qty'] = number_format($qty, 4, '.', '');
+        $validated['sold_area_unit'] = $unit;
 
         return $validated;
     }
@@ -1285,6 +1391,8 @@ class DayBookController extends Controller
                 'paid_by_party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
+                'sold_area_qty' => ['nullable', 'numeric', 'min:0'],
+                'sold_area_unit' => ['nullable', 'string', Rule::in(['marla', 'kanal', 'acre', 'sqft'])],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
                 // Factory-only (Construction & Material)
@@ -1297,12 +1405,13 @@ class DayBookController extends Controller
             ],
             [
                 'project_id.exists' => 'The selected project is invalid.',
-                'purchase_file_id.exists' => 'The selected file is invalid.',
+                'purchase_file_id.exists' => 'The selected sale file is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
                 'paid_by_party_id.exists' => 'The selected paid-by party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
                 'sub_category_id.exists' => 'The selected sub category is invalid.',
                 'payment_bank.in' => 'Please choose a bank from the list.',
+                'sold_area_unit.in' => 'Choose a valid area unit.',
             ]
         );
 
@@ -1383,16 +1492,15 @@ class DayBookController extends Controller
             $validated['unit_price'] = null;
         }
 
-        $purchaseFileResult = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
-        if ($purchaseFileResult instanceof \Illuminate\Http\RedirectResponse) {
-            return $purchaseFileResult;
-        }
-        $validated = $purchaseFileResult;
+        $entry = DB::transaction(function () use ($validated, $contextProjectId) {
+            $validated = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
+            $validated = $this->normalizePaymentSettlement($validated);
 
-        $validated = $this->normalizePaymentSettlement($validated);
+            $entry = DayBookEntry::create($validated);
+            DaybookVoucher::assignIfMissing($entry);
 
-        $entry = DayBookEntry::create($validated);
-        DaybookVoucher::assignIfMissing($entry);
+            return $entry;
+        });
 
         $dateParam = $request->input('return_date', $validated['entry_date']);
 
@@ -1442,7 +1550,7 @@ class DayBookController extends Controller
         return view('daybook.edit', [
             'entry' => $entry,
             'projects' => $projects,
-            'daybookProjectsJson' => $this->daybookProjectsJsonPayload(),
+            'daybookProjectsJson' => $this->daybookProjectsJsonPayload((int) $entry->id),
             'factoryConstructionSubCategoriesJson' => $this->factoryConstructionSubCategoriesJsonPayload(),
             'parties' => $parties,
             'partySubCategories' => $partySubCategories,
@@ -1464,6 +1572,8 @@ class DayBookController extends Controller
             'daybookPaymentReferenceDefault' => $entry->payment_reference ?? '',
             'daybookPaidByPartyIdDefault' => $entry->paid_by_party_id !== null ? (string) $entry->paid_by_party_id : '',
             'daybookPurchaseFileIdDefault' => $entry->purchase_file_id !== null ? (string) $entry->purchase_file_id : '',
+            'daybookSoldAreaQtyDefault' => $entry->sold_area_qty !== null ? rtrim(rtrim(number_format((float) $entry->sold_area_qty, 4, '.', ''), '0'), '.') : '',
+            'daybookSoldAreaUnitDefault' => $entry->sold_area_unit ?: 'marla',
         ]);
     }
 
@@ -1501,6 +1611,8 @@ class DayBookController extends Controller
                 'paid_by_party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
+                'sold_area_qty' => ['nullable', 'numeric', 'min:0'],
+                'sold_area_unit' => ['nullable', 'string', Rule::in(['marla', 'kanal', 'acre', 'sqft'])],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'party_sub_category_id' => ['nullable', 'integer', Rule::exists('party_sub_categories', 'id')],
                 // Factory-only (Construction & Material)
@@ -1513,12 +1625,13 @@ class DayBookController extends Controller
             ],
             [
                 'project_id.exists' => 'The selected project is invalid.',
-                'purchase_file_id.exists' => 'The selected file is invalid.',
+                'purchase_file_id.exists' => 'The selected sale file is invalid.',
                 'party_id.exists' => 'The selected party is invalid.',
                 'paid_by_party_id.exists' => 'The selected paid-by party is invalid.',
                 'party_sub_category_id.exists' => 'The selected sub category is invalid.',
                 'sub_category_id.exists' => 'The selected sub category is invalid.',
                 'payment_bank.in' => 'Please choose a bank from the list.',
+                'sold_area_unit.in' => 'Choose a valid area unit.',
             ]
         );
 
@@ -1599,15 +1712,11 @@ class DayBookController extends Controller
             $validated['unit_price'] = null;
         }
 
-        $purchaseFileResult = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
-        if ($purchaseFileResult instanceof \Illuminate\Http\RedirectResponse) {
-            return $purchaseFileResult;
-        }
-        $validated = $purchaseFileResult;
-
-        $validated = $this->normalizePaymentSettlement($validated);
-
-        $entry->update($validated);
+        DB::transaction(function () use ($validated, $contextProjectId, $entry) {
+            $validated = $this->applyPurchaseFileToEntry($validated, $contextProjectId, (int) $entry->id);
+            $validated = $this->normalizePaymentSettlement($validated);
+            $entry->update($validated);
+        });
 
         return redirect()
             ->route('daybook.show', $entry)
@@ -1616,7 +1725,9 @@ class DayBookController extends Controller
 
     public function destroy(DayBookEntry $entry)
     {
-        $entry->delete();
+        DB::transaction(function () use ($entry) {
+            $entry->delete();
+        });
 
         return redirect()->route('daybook.index')->with('success', 'Entry deleted.');
     }

@@ -269,6 +269,59 @@
 
     <div class="card card-theme mb-4">
         <div class="card-header py-3">
+            <h2 class="h6 mb-0">Sale land files — area balance</h2>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-theme mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 56px;">#</th>
+                            <th>File</th>
+                            <th>Total land</th>
+                            <th class="text-end">Sold</th>
+                            <th class="text-end">Available</th>
+                            <th>Status</th>
+                            <th style="width: 120px;">Sell</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($movedFiles as $file)
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td class="fw-semibold">{{ $file['name'] ?? $file['label'] ?? '—' }}</td>
+                                <td class="small">{{ $file['total_label'] ?? '—' }}</td>
+                                <td class="text-end small">{{ $file['sold_label'] ?? '—' }}</td>
+                                <td class="text-end small fw-semibold">{{ $file['remaining_label'] ?? '—' }}</td>
+                                <td>
+                                    @php
+                                        $status = $file['status'] ?? 'Available';
+                                    @endphp
+                                    @if(($file['is_fully_sold'] ?? false) || $status === 'Fully Sold')
+                                        <span class="badge text-bg-secondary">Fully Sold</span>
+                                    @elseif($status === 'Partially Sold')
+                                        <span class="badge text-bg-warning">Partially Sold</span>
+                                    @else
+                                        <span class="badge text-bg-success">Available</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($file['is_fully_sold'] ?? false)
+                                        <span class="text-muted small">—</span>
+                                    @else
+                                        <a href="{{ route('daybook.index', ['project' => $project->id, 'purchase_file_id' => $file['id'] ?? null]) }}" class="btn btn-sm btn-pink">Daybook</a>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-theme mb-4">
+        <div class="card-header py-3">
             <h2 class="h6 mb-0">Daybook</h2>
         </div>
         <div class="card-body p-0">

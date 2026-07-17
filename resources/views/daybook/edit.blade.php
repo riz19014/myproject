@@ -45,6 +45,8 @@
                     'daybookPaymentReferenceDefault' => $daybookPaymentReferenceDefault ?? '',
                     'daybookPaidByPartyIdDefault' => $daybookPaidByPartyIdDefault ?? '',
                     'daybookPurchaseFileIdDefault' => $daybookPurchaseFileIdDefault ?? '',
+                    'daybookSoldAreaQtyDefault' => $daybookSoldAreaQtyDefault ?? '',
+                    'daybookSoldAreaUnitDefault' => $daybookSoldAreaUnitDefault ?? 'marla',
                 ])
             </div>
             <div class="daybook-form-inner pt-0 pb-4">

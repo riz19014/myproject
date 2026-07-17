@@ -101,7 +101,7 @@ final class FileSaleLandService
             ->where('project_id', $project->id)
             ->whereIn('id', $ids)
             ->whereNotNull('sale_land_at')
-            ->with(['purchaseItems', 'fileSaleLand'])
+            ->with(['purchaseItems.party', 'fileSaleLand'])
             ->orderBy('file_name')
             ->get();
     }
@@ -213,10 +213,10 @@ final class FileSaleLandService
                 'sale_files_amount_formatted' => 'Rs '.number_format($saleFilesAmount, 0),
             ],
             'daybook_rows' => $this->buildDaybookSummary($project, $purchaseFileIds),
-            'moved_files' => $files->map(fn (PurchaseFile $file) => [
-                'id' => $file->id,
-                'name' => $file->file_name,
-            ])->values()->all(),
+            'moved_files' => $files->map(fn (PurchaseFile $file) => array_merge(
+                $file->daybookSaleFilePayload(),
+                ['name' => $file->file_name]
+            ))->values()->all(),
         ];
     }
 

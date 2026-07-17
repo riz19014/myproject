@@ -106,6 +106,7 @@
         setRow('daybook-modal-project', projectText);
 
         setRow('daybook-modal-file', data.purchase_file);
+        setRow('daybook-modal-sold-area', (!data.sold_area || data.sold_area === '—') ? '' : data.sold_area);
 
         var subcat = '';
         if (data.sub_category && data.sub_category !== '—') {

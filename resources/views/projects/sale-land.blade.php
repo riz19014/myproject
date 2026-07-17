@@ -114,12 +114,16 @@
                                                                aria-label="Include {{ $row['file_name'] }} in PDF"
                                                                @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
                                                     </div>
-                                                    <label class="sale-land-sheet__file-name-text mb-0" for="sale-land-move-{{ $row['purchase_file_id'] }}">
-                                                        {{ $row['file_name'] }}
+                                                    <div class="sale-land-sheet__file-name-text mb-0">
+                                                        <a href="{{ route('purchase.files.show', $row['purchase_file_id']) }}"
+                                                           class="sale-land-sheet__file-name-link text-decoration-none"
+                                                           title="View payment details">
+                                                            {{ $row['file_name'] }}
+                                                        </a>
                                                         @if($isInFileSale)
                                                             <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">In file sale</span>
                                                         @endif
-                                                    </label>
+                                                    </div>
                                                 </div>
                                                 <div class="sale-land-sheet__file-actions">
                                                     <form method="post"
@@ -137,12 +141,18 @@
                                                             <i class="bi bi-trash" aria-hidden="true"></i>
                                                         </button>
                                                     </form>
+                                                    <a href="{{ route('purchase.files.show', $row['purchase_file_id']) }}"
+                                                       class="sale-land-sheet__file-sale-link"
+                                                       title="View payment details"
+                                                       aria-label="View payment details for {{ $row['file_name'] }}">
+                                                        <i class="bi bi-cash-stack" aria-hidden="true"></i>
+                                                    </a>
                                                     <button type="button"
                                                             class="sale-land-sheet__file-sale-link sale-land-open-sale-modal"
                                                             data-purchase-file-id="{{ $row['purchase_file_id'] }}"
                                                             title="Sell to customer"
                                                             aria-label="Sell {{ $row['file_name'] }} to customer">
-                                                        <i class="bi bi-files" aria-hidden="true"></i>
+                                                        <i class="bi bi-cart-plus" aria-hidden="true"></i>
                                                     </button>
                                                 </div>
                                             </div>
@@ -468,6 +478,14 @@
         word-break: break-word;
         cursor: pointer;
         font-weight: 600;
+    }
+    .sale-land-sheet__file-name-link {
+        color: inherit;
+        font-weight: 600;
+    }
+    .sale-land-sheet__file-name-link:hover {
+        color: var(--accent-orange, #f97316);
+        text-decoration: underline !important;
     }
     .sale-land-file-check {
         flex: 0 0 auto;

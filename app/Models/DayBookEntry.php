@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\LandMeasure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +28,9 @@ class DayBookEntry extends Model
         'link_id',
         'project_id',
         'purchase_file_id',
+        'sold_area_marla',
+        'sold_area_qty',
+        'sold_area_unit',
         'party_sub_category_id',
     ];
 
@@ -36,6 +40,8 @@ class DayBookEntry extends Model
             'entry_date' => 'date',
             'amount' => 'decimal:2',
             'unit_price' => 'decimal:2',
+            'sold_area_marla' => 'decimal:6',
+            'sold_area_qty' => 'decimal:4',
         ];
     }
 
@@ -218,6 +224,27 @@ class DayBookEntry extends Model
         return $this->paidByParty?->name ?? '—';
     }
 
+    public function hasFileSaleArea(): bool
+    {
+        return $this->sold_area_marla !== null && (float) $this->sold_area_marla > 1e-6;
+    }
+
+    public function getSoldAreaLabel(): string
+    {
+        if (! $this->hasFileSaleArea()) {
+            return '—';
+        }
+
+        $qty = $this->sold_area_qty !== null ? (float) $this->sold_area_qty : null;
+        $unit = trim((string) $this->sold_area_unit);
+        if ($qty !== null && $qty > 0 && $unit !== '' && in_array($unit, ['marla', 'kanal', 'acre', 'sqft'], true)) {
+            return LandMeasure::formatAmountUnit($qty, $unit)
+                .' ('.LandMeasure::formatAkmsLabelFromMarla((float) $this->sold_area_marla).')';
+        }
+
+        return LandMeasure::formatAkmsLabelFromMarla((float) $this->sold_area_marla);
+    }
+
     /**
      * Settlement plus optional paid-by party for lists / ledgers / history.
      */
@@ -261,6 +288,10 @@ class DayBookEntry extends Model
         $paidBy = $this->getPaidByLabel();
         if ($paidBy !== '—') {
             $lines[] = ['kind' => 'meta', 'text' => 'Paid by: '.$paidBy];
+        }
+
+        if ($this->hasFileSaleArea()) {
+            $lines[] = ['kind' => 'meta', 'text' => 'Sold area: '.$this->getSoldAreaLabel()];
         }
 
         $bank = trim((string) $this->payment_bank);

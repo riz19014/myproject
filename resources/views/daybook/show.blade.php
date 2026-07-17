@@ -52,7 +52,8 @@
                             @endif
                         </td>
                     </tr>
-                    <tr><th>Purchase file</th><td>{{ $entry->getPurchaseFileLabel() }}</td></tr>
+                    <tr><th>Sale file</th><td>{{ $entry->getPurchaseFileLabel() }}</td></tr>
+                    <tr><th>Sold area</th><td>{{ $entry->getSoldAreaLabel() }}</td></tr>
                     <tr><th>Party sub category</th><td>{{ $entry->getPartySubCategoryLabel() }}</td></tr>
                 </table>
             </div>
