@@ -8,7 +8,7 @@
         <h1 class="mb-1">Sale Land</h1>
         <p class="text-muted small mb-0">Sold land from Daybook file sales, plus land records.</p>
     </div>
-    <a href="{{ route('lands.create') }}" class="btn btn-pink">Add Land</a>
+    {{--<a href="{{ route('lands.create') }}" class="btn btn-pink">Add Land</a>--}}
 </div>
 
 <div class="card card-theme mb-4">

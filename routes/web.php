@@ -93,7 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::put('projects/{project}/files/{projectFile}/sell', [ProjectController::class, 'sellFile'])->name('projects.files.sell');
     Route::post('projects/{project}/files/{projectFile}/documents', [ProjectController::class, 'uploadFileDocument'])->name('projects.files.documents.store');
     Route::delete('projects/{project}/files/{projectFile}/documents/{document}', [ProjectController::class, 'destroyFileDocument'])->name('projects.files.documents.destroy');
-    Route::get('sale-land', [LandController::class, 'index'])->name('sale-land.index');
+    Route::get('sold-land-files', [LandController::class, 'index'])->name('sale-land.index');
     Route::get('lands', fn () => redirect()->route('sale-land.index'))->name('lands.index');
     Route::resource('lands', LandController::class)->except(['index']);
     Route::post('lands/{land}/plots', [LandController::class, 'addPlot'])->name('lands.plots.store');
