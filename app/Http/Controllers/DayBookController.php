@@ -703,7 +703,6 @@ class DayBookController extends Controller
                 $fileOk = PurchaseFile::query()
                     ->whereKey((int) $request->query('purchase_file_id'))
                     ->where('project_id', (int) $daybookProjectIdDefault)
-                    ->whereHas('fileSaleLand')
                     ->exists();
                 if ($fileOk) {
                     $daybookPurchaseFileIdDefault = (string) (int) $request->query('purchase_file_id');
@@ -1030,12 +1029,6 @@ class DayBookController extends Controller
             ]);
         }
 
-        if (! $file->isMovedToFileSale()) {
-            throw ValidationException::withMessages([
-                'purchase_file_id' => 'Only files moved to File Sale can be selected.',
-            ]);
-        }
-
         $validated['purchase_file_id'] = (int) $file->id;
 
         if (! $hasSoldAreaInput) {
@@ -1044,6 +1037,12 @@ class DayBookController extends Controller
             $validated['sold_area_unit'] = null;
 
             return $validated;
+        }
+
+        if (! $file->isMovedToFileSale()) {
+            throw ValidationException::withMessages([
+                'sold_area_qty' => 'Sold area can only be recorded for files moved to File Sale.',
+            ]);
         }
 
         $unit = is_string($soldAreaUnit) ? strtolower(trim($soldAreaUnit)) : '';

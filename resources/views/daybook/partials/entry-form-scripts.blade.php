@@ -231,6 +231,13 @@
             return;
         }
 
+        if (!file.is_file_sale) {
+            meta.classList.add('d-none');
+            areaWrap.classList.add('d-none');
+            clearSoldAreaInputs();
+            return;
+        }
+
         meta.classList.remove('d-none');
         areaWrap.classList.remove('d-none');
         if (remainingEl) remainingEl.textContent = file.remaining_label || '—';

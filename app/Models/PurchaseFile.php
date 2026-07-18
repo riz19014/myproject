@@ -187,6 +187,7 @@ class PurchaseFile extends Model
             'label' => $this->file_name,
             'file_name' => $this->file_name,
             'project_id' => $this->project_id,
+            'is_file_sale' => $this->isMovedToFileSale(),
             'total_marla' => $total,
             'sold_marla' => $sold,
             'remaining_marla' => $remaining,
