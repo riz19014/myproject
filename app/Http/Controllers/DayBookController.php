@@ -951,7 +951,7 @@ class DayBookController extends Controller
             ->with([
                 'landType',
                 'parties',
-                'purchaseFiles' => fn ($q) => $q->whereNotNull('sale_land_at')->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
+                'purchaseFiles' => fn ($q) => $q->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
             ])
             ->get()
             ->map(function (Project $p) use ($excludeDaybookEntryId) {
