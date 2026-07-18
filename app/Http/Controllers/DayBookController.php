@@ -6,7 +6,6 @@ use App\Models\Customer;
 use App\Models\DayBookEntry;
 use App\Models\DaybookOpeningBalance;
 use App\Models\Factory;
-use App\Models\FileSaleLand;
 use App\Models\Land;
 use App\Models\LandType;
 use App\Models\Party;
@@ -947,28 +946,21 @@ class DayBookController extends Controller
      */
     private function daybookProjectsJsonPayload(?int $excludeDaybookEntryId = null)
     {
-        $movedFileIdsByProject = FileSaleLand::query()
-            ->get(['project_id', 'sale_land_id'])
-            ->groupBy('project_id')
-            ->map(fn (Collection $rows) => $rows->pluck('sale_land_id')->map(fn ($id) => (int) $id)->all());
-
         return Project::query()
             ->orderBy('name')
             ->with([
                 'landType',
                 'parties',
-                'purchaseFiles' => fn ($q) => $q->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
+                'purchaseFiles' => fn ($q) => $q->whereNotNull('sale_land_at')->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
             ])
             ->get()
-            ->map(function (Project $p) use ($movedFileIdsByProject, $excludeDaybookEntryId) {
+            ->map(function (Project $p) use ($excludeDaybookEntryId) {
                 $landTypeName = $p->landType?->name;
                 $isFactory = $landTypeName !== null && mb_strtolower(trim($landTypeName)) === 'factory';
-                $movedIds = $movedFileIdsByProject->get($p->id, []);
 
                 $saleFiles = $p->purchaseFiles
-                    ->filter(fn (PurchaseFile $f) => in_array((int) $f->id, $movedIds, true))
-                    ->values()
                     ->map(fn (PurchaseFile $f) => $f->daybookSaleFilePayload($excludeDaybookEntryId))
+                    ->values()
                     ->all();
 
                 return array_merge(
