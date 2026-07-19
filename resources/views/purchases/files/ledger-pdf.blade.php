@@ -244,5 +244,9 @@
         </table>
     @endforeach
 @endif
+
+@include('purchases.files.partials.signature-details', [
+    'signatureDetails' => $signatureDetails,
+])
 </body>
 </html>

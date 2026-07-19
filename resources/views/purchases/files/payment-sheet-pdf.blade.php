@@ -239,5 +239,9 @@
     <div class="footer-note">
         Payment out reduces the balance payable; payment in increases it. Only daybook lines with this purchase file selected are included.
     </div>
+
+    @include('purchases.files.partials.signature-details', [
+        'signatureDetails' => $signatureDetails,
+    ])
 </body>
 </html>

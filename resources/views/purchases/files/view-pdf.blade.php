@@ -65,5 +65,9 @@
         'tableClass' => 'sheet',
         'wrapResponsive' => false,
     ])
+
+    @include('purchases.files.partials.signature-details', [
+        'signatureDetails' => $signatureDetails,
+    ])
 </body>
 </html>

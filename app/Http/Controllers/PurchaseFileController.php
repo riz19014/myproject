@@ -300,6 +300,7 @@ class PurchaseFileController extends Controller
             'project',
             'dealers.subCategory.category',
             'purchaseItems' => fn ($q) => $q->with(['party.subCategory.category'])->orderBy('id'),
+            'projectPartners.party',
         ])->loadCount('documents');
 
         $data = $this->buildPurchaseFileViewData($purchase_file);
@@ -318,12 +319,16 @@ class PurchaseFileController extends Controller
             'project',
             'dealers',
             'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
+            'projectPartners.party',
         ]);
 
         $sheet = $this->buildPurchaseFileViewData($purchase_file);
 
         $pdf = Pdf::loadView('purchases.files.payment-sheet-pdf', array_merge(
-            ['purchaseFile' => $purchase_file],
+            [
+                'purchaseFile' => $purchase_file,
+                'signatureDetails' => $this->purchaseFileSignatureDetails($purchase_file),
+            ],
             $sheet
         ));
         $pdf->setPaper('a4', 'portrait');
@@ -340,6 +345,7 @@ class PurchaseFileController extends Controller
             'project',
             'dealers',
             'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
+            'projectPartners.party',
         ]);
 
         $data = $this->buildPurchaseFileViewData($purchase_file);
@@ -352,6 +358,7 @@ class PurchaseFileController extends Controller
             'purchaseFile' => $purchase_file,
             'sheetGrid' => $sheetGrid,
             'generatedAt' => now(),
+            'signatureDetails' => $this->purchaseFileSignatureDetails($purchase_file),
         ]);
         $pdf->setPaper('a4', 'landscape');
 
@@ -372,6 +379,7 @@ class PurchaseFileController extends Controller
             'project',
             'dealers',
             'purchaseItems' => fn ($q) => $q->with('party')->orderBy('id'),
+            'projectPartners.party',
         ]);
 
         $data = $this->buildPurchaseFileViewData($purchase_file);
@@ -389,6 +397,48 @@ class PurchaseFileController extends Controller
 
         $section = $block['section'];
         $partySlug = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $section['title'] ?? 'party') ?: 'party';
+        $usePartySelection = $request->boolean('party_selection');
+        $selectedSellerIds = $usePartySelection
+            ? collect($request->query('seller_ids', []))
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all()
+            : null;
+        $selectedBuyerIds = $usePartySelection
+            ? collect($request->query('buyer_ids', []))
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all()
+            : null;
+
+        if ($usePartySelection) {
+            $availableSellerIds = $purchase_file->purchaseItems
+                ->pluck('party_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+            $availableBuyerIds = $purchase_file->projectPartners
+                ->pluck('party_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $selectedSellerIds = $availableSellerIds->intersect($selectedSellerIds)->values()->all();
+            $selectedBuyerIds = $availableBuyerIds->intersect($selectedBuyerIds)->values()->all();
+
+            if ($availableSellerIds->isNotEmpty() && $selectedSellerIds === []) {
+                abort(422, 'Select at least one seller.');
+            }
+            if ($availableBuyerIds->isNotEmpty() && $selectedBuyerIds === []) {
+                abort(422, 'Select at least one buyer.');
+            }
+        }
 
         $pdf = Pdf::loadView('purchases.files.ledger-pdf', [
             'purchaseFile' => $purchase_file,
@@ -396,6 +446,11 @@ class PurchaseFileController extends Controller
             'ledgerSectionsOrdered' => [$block],
             'ledgerPdfSummary' => $this->buildLedgerPdfSummary($purchase_file, $data, $sectionKey, $section),
             'singleParty' => true,
+            'signatureDetails' => $this->purchaseFileSignatureDetails(
+                $purchase_file,
+                $selectedSellerIds,
+                $selectedBuyerIds
+            ),
         ]);
         $pdf->setPaper('a4', 'portrait');
 
@@ -403,6 +458,48 @@ class PurchaseFileController extends Controller
         $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $purchase_file->project?->name ?? 'project') ?: 'project';
 
         return $pdf->download('purchase-ledger-'.$safeProject.'-'.$safeFile.'-'.$partySlug.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * @return array{
+     *     sellers: list<array{name: string, cnic: string}>,
+     *     buyers: list<array{name: string, cnic: string}>,
+     *     accountant: string
+     * }
+     */
+    private function purchaseFileSignatureDetails(
+        PurchaseFile $purchaseFile,
+        ?array $selectedSellerIds = null,
+        ?array $selectedBuyerIds = null
+    ): array
+    {
+        $partyDetails = static function ($parties, ?array $selectedIds): array {
+            $uniqueParties = $parties->filter()->unique('id');
+            if ($selectedIds !== null) {
+                $selectedLookup = array_fill_keys(array_map('intval', $selectedIds), true);
+                $uniqueParties = $uniqueParties->filter(
+                    fn (Party $party) => isset($selectedLookup[$party->id])
+                );
+            }
+
+            return $uniqueParties->values()->map(fn (Party $party) => [
+                'name' => $party->name,
+                'cnic' => trim((string) $party->cnic) !== '' ? $party->cnic : '—',
+            ])
+            ->all();
+        };
+
+        return [
+            'sellers' => $partyDetails(
+                $purchaseFile->purchaseItems->pluck('party'),
+                $selectedSellerIds
+            ),
+            'buyers' => $partyDetails(
+                $purchaseFile->projectPartners->pluck('party'),
+                $selectedBuyerIds
+            ),
+            'accountant' => auth()->user()?->name ?? '—',
+        ];
     }
 
     /**

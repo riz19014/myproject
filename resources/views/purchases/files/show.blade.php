@@ -158,6 +158,17 @@
             </div>
             <div class="card-footer pf-no-print d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-outline-theme" id="pf-ledger-print-btn" disabled>Print</button>
+                <button
+                    type="button"
+                    class="btn btn-outline-theme d-inline-flex align-items-center gap-1"
+                    id="pf-ledger-select-parties-btn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#pf-select-parties-modal"
+                    disabled
+                >
+                    <i class="bi bi-people" aria-hidden="true"></i>
+                    <span>Select Parties</span>
+                </button>
                 <a href="#"
                    class="btn btn-outline-theme pf-ledger-pdf-link d-inline-flex align-items-center gap-1 disabled"
                    id="pf-ledger-pdf-btn"
@@ -185,8 +196,123 @@
 <script type="application/json" id="pf-ledger-json">@json($ledgerJson, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE)</script>
 @endsection
 
+@push('modals')
+@php
+    $pdfSellerOptions = $purchaseFile->purchaseItems
+        ->pluck('party')
+        ->filter()
+        ->unique('id')
+        ->sortBy('name')
+        ->values();
+    $pdfBuyerOptions = $purchaseFile->projectPartners
+        ->pluck('party')
+        ->filter()
+        ->unique('id')
+        ->sortBy('name')
+        ->values();
+@endphp
+<div class="modal fade pf-no-print" id="pf-select-parties-modal" tabindex="-1" aria-labelledby="pf-select-parties-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title h5 mb-1" id="pf-select-parties-title">Select PDF parties</h2>
+                    <p class="small text-muted mb-0">Choose the sellers and buyers to include in the signature section.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <h3 class="h6 mb-0">Seller(s)</h3>
+                            @if($pdfSellerOptions->isNotEmpty())
+                                <button type="button" class="btn btn-link btn-sm p-0 pf-party-toggle-all" data-target=".pf-seller-checkbox">Clear all</button>
+                            @endif
+                        </div>
+                        <div class="pf-party-select-list">
+                            @forelse($pdfSellerOptions as $seller)
+                                <label class="pf-party-select-option">
+                                    <input class="form-check-input pf-seller-checkbox" type="checkbox" value="{{ $seller->id }}" checked>
+                                    <span>
+                                        <strong>{{ $seller->name }}</strong>
+                                        <small>CNIC: {{ $seller->cnic ?: '—' }}</small>
+                                    </span>
+                                </label>
+                            @empty
+                                <p class="small text-muted mb-0">No sellers are recorded on this purchase file.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <h3 class="h6 mb-0">Buyer(s)</h3>
+                            @if($pdfBuyerOptions->isNotEmpty())
+                                <button type="button" class="btn btn-link btn-sm p-0 pf-party-toggle-all" data-target=".pf-buyer-checkbox">Clear all</button>
+                            @endif
+                        </div>
+                        <div class="pf-party-select-list">
+                            @forelse($pdfBuyerOptions as $buyer)
+                                <label class="pf-party-select-option">
+                                    <input class="form-check-input pf-buyer-checkbox" type="checkbox" value="{{ $buyer->id }}" checked>
+                                    <span>
+                                        <strong>{{ $buyer->name }}</strong>
+                                        <small>CNIC: {{ $buyer->cnic ?: '—' }}</small>
+                                    </span>
+                                </label>
+                            @empty
+                                <p class="small text-muted mb-0">No buyers are assigned to this purchase file.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-danger small mt-3 mb-0 d-none" id="pf-party-selection-error"></div>
+                <p class="small text-muted mt-3 mb-0">The accountant will automatically be the currently logged-in user.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-pink d-inline-flex align-items-center gap-1" id="pf-party-selection-download">
+                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                    Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endpush
+
 @push('head')
 <style>
+    .pf-party-select-list {
+        display: grid;
+        gap: .5rem;
+        max-height: 18rem;
+        overflow-y: auto;
+        padding-right: .25rem;
+    }
+    .pf-party-select-option {
+        display: flex;
+        align-items: flex-start;
+        gap: .65rem;
+        padding: .7rem .8rem;
+        border: 1px solid rgba(15, 23, 42, .12);
+        border-radius: .65rem;
+        background: rgba(248, 250, 252, .8);
+        cursor: pointer;
+    }
+    .pf-party-select-option:hover {
+        border-color: rgba(249, 115, 22, .45);
+        background: rgba(249, 115, 22, .05);
+    }
+    .pf-party-select-option small {
+        display: block;
+        margin-top: .15rem;
+        color: #64748b;
+    }
+    .pf-party-select-option .form-check-input {
+        flex: 0 0 auto;
+        margin-top: .2rem;
+    }
     .pf-ledger-nav-card {
         max-height: calc(100vh - 12rem);
         display: flex;
@@ -405,6 +531,10 @@
     var footerLabelEl = document.getElementById('pf-ledger-footer-label');
     var printBtn = document.getElementById('pf-ledger-print-btn');
     var pdfBtn = document.getElementById('pf-ledger-pdf-btn');
+    var selectPartiesBtn = document.getElementById('pf-ledger-select-parties-btn');
+    var partySelectionModalEl = document.getElementById('pf-select-parties-modal');
+    var partySelectionDownloadBtn = document.getElementById('pf-party-selection-download');
+    var partySelectionError = document.getElementById('pf-party-selection-error');
     var partyListEl = document.getElementById('pf-ledger-party-list');
     var partyPanelEl = document.getElementById('pf-ledger-party-panel');
     var subRadios = document.querySelectorAll('.pf-ledger-sub-radio');
@@ -465,6 +595,9 @@
         if (pdfBtn) {
             pdfBtn.classList.toggle('disabled', !enabled);
             pdfBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        }
+        if (selectPartiesBtn) {
+            selectPartiesBtn.disabled = !enabled;
         }
     }
 
@@ -666,31 +799,36 @@
         }
     }
 
-    function bindLedgerPdfDownload(link) {
-        if (!link) {
+    function downloadLedgerPdf(link, partySelection) {
+        if (!link || link.classList.contains('is-loading') || link.classList.contains('disabled')) {
             return;
         }
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (link.classList.contains('is-loading') || link.classList.contains('disabled')) {
-                return;
-            }
+        if (!activeKey) {
+            alert('Select a subcategory, then choose a party or “All parties” to download its ledger PDF.');
+            return;
+        }
 
-            if (!activeKey) {
-                alert('Select a subcategory, then choose a party or “All parties” to download its ledger PDF.');
-                return;
-            }
+        var baseUrl = link.getAttribute('data-pdf-url');
+        if (!baseUrl) {
+            return;
+        }
 
-            var baseUrl = link.getAttribute('data-pdf-url');
-            if (!baseUrl) {
-                return;
-            }
+        var params = new URLSearchParams();
+        params.set('section', activeKey);
+        if (partySelection) {
+            params.set('party_selection', '1');
+            partySelection.sellerIds.forEach(function(id) {
+                params.append('seller_ids[]', id);
+            });
+            partySelection.buyerIds.forEach(function(id) {
+                params.append('buyer_ids[]', id);
+            });
+        }
+        var href = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + params.toString();
 
-            var href = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'section=' + encodeURIComponent(activeKey);
+        setLedgerPdfLinkLoading(link, true);
 
-            setLedgerPdfLinkLoading(link, true);
-
-            fetch(href, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
+        fetch(href, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
                 .then(function(res) {
                     if (!res.ok) {
                         throw new Error('pdf');
@@ -727,8 +865,61 @@
                 .finally(function() {
                     setLedgerPdfLinkLoading(link, false);
                 });
+    }
+
+    function bindLedgerPdfDownload(link) {
+        if (!link) {
+            return;
+        }
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            downloadLedgerPdf(link, null);
         });
     }
+
+    document.querySelectorAll('.pf-party-toggle-all').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var checkboxes = partySelectionModalEl?.querySelectorAll(button.dataset.target) || [];
+            var shouldCheck = Array.from(checkboxes).some(function(checkbox) {
+                return !checkbox.checked;
+            });
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = shouldCheck;
+            });
+            button.textContent = shouldCheck ? 'Clear all' : 'Select all';
+        });
+    });
+
+    partySelectionDownloadBtn?.addEventListener('click', function() {
+        var sellerCheckboxes = Array.from(partySelectionModalEl.querySelectorAll('.pf-seller-checkbox'));
+        var buyerCheckboxes = Array.from(partySelectionModalEl.querySelectorAll('.pf-buyer-checkbox'));
+        var sellerIds = sellerCheckboxes.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
+        var buyerIds = buyerCheckboxes.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
+
+        var errors = [];
+        if (sellerCheckboxes.length && !sellerIds.length) {
+            errors.push('Select at least one seller.');
+        }
+        if (buyerCheckboxes.length && !buyerIds.length) {
+            errors.push('Select at least one buyer.');
+        }
+        if (errors.length) {
+            partySelectionError.textContent = errors.join(' ');
+            partySelectionError.classList.remove('d-none');
+            return;
+        }
+
+        partySelectionError.classList.add('d-none');
+        bootstrap.Modal.getOrCreateInstance(partySelectionModalEl).hide();
+        downloadLedgerPdf(pdfBtn, {
+            sellerIds: sellerIds,
+            buyerIds: buyerIds
+        });
+    });
+
+    partySelectionModalEl?.addEventListener('show.bs.modal', function() {
+        partySelectionError?.classList.add('d-none');
+    });
 
     bindLedgerPdfDownload(pdfBtn);
 })();
