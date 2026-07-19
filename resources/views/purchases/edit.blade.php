@@ -71,6 +71,24 @@
                     </div>
                 </div>
 
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4">
+                        <label for="khewat_no" class="form-label">Khewat #</label>
+                        <input type="text" class="form-control form-control-theme @error('khewat_no') is-invalid @enderror" id="khewat_no" name="khewat_no" value="{{ old('khewat_no', $item->khewat_no) }}" maxlength="255" autocomplete="off">
+                        @error('khewat_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-4">
+                        <label for="khatooni_no" class="form-label">Khatooni #</label>
+                        <input type="text" class="form-control form-control-theme @error('khatooni_no') is-invalid @enderror" id="khatooni_no" name="khatooni_no" value="{{ old('khatooni_no', $item->khatooni_no) }}" maxlength="255" autocomplete="off">
+                        @error('khatooni_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-4">
+                        <label for="intiqal_no" class="form-label">Intiqal #</label>
+                        <input type="text" class="form-control form-control-theme @error('intiqal_no') is-invalid @enderror" id="intiqal_no" name="intiqal_no" value="{{ old('intiqal_no', $item->intiqal_no) }}" maxlength="255" autocomplete="off">
+                        @error('intiqal_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+
                 <div class="mt-3">
                     <div class="fw-semibold small mb-2">Area <span class="text-danger">*</span> <span class="text-muted fw-normal">(whole numbers)</span></div>
                     <div class="row g-3">
@@ -96,7 +114,7 @@
                         </div>
                         <div class="col-md-4">
                             <label for="amount_per_acre" class="form-label">Amount per acre (Rs) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control form-control-theme @error('amount_per_acre') is-invalid @enderror" id="amount_per_acre" name="amount_per_acre" value="{{ old('amount_per_acre', $item->amount_per_acre) }}" min="0" step="0.01" required placeholder="0">
+                            <input type="number" class="form-control form-control-theme @error('amount_per_acre') is-invalid @enderror" id="amount_per_acre" name="amount_per_acre" value="{{ old('amount_per_acre', (float) $item->amount_per_acre) }}" min="0" step="any" inputmode="decimal" required placeholder="0">
                             @error('amount_per_acre')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>

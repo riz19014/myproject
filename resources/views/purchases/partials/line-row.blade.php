@@ -59,6 +59,20 @@
                     <input type="text" class="form-control form-control-theme" data-line-field="khasra" value="{{ $line['khasra'] ?? '' }}" maxlength="255" autocomplete="off" placeholder="Optional">
                 </div>
             </div>
+            <div class="row g-2 mt-1">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Khewat #</label>
+                    <input type="text" class="form-control form-control-theme" data-line-field="khewat_no" value="{{ $line['khewat_no'] ?? '' }}" maxlength="255" autocomplete="off" placeholder="Enter Khewat number">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Khatooni #</label>
+                    <input type="text" class="form-control form-control-theme" data-line-field="khatooni_no" value="{{ $line['khatooni_no'] ?? '' }}" maxlength="255" autocomplete="off" placeholder="Enter Khatooni number">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Intiqal #</label>
+                    <input type="text" class="form-control form-control-theme" data-line-field="intiqal_no" value="{{ $line['intiqal_no'] ?? '' }}" maxlength="255" autocomplete="off" placeholder="Enter Intiqal number">
+                </div>
+            </div>
         </div>
 
         <div class="purchase-line-block__section">
@@ -86,7 +100,7 @@
                         Rs / acre <span class="text-danger">*</span>
                         <span class="js-amount-per-acre-hint d-none"></span>
                     </label>
-                    <input type="text" class="form-control form-control-theme js-line-integer-only" data-line-field="amount_per_acre" value="{{ isset($line['amount_per_acre']) && $line['amount_per_acre'] !== '' ? (int) $line['amount_per_acre'] : '' }}" inputmode="numeric" autocomplete="off" required placeholder="0">
+                    <input type="text" class="form-control form-control-theme js-line-decimal-only" data-line-field="amount_per_acre" value="{{ isset($line['amount_per_acre']) && $line['amount_per_acre'] !== '' ? (float) $line['amount_per_acre'] : '' }}" inputmode="decimal" autocomplete="off" required placeholder="0">
                 </div>
             </div>
         </div>

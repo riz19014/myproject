@@ -4,18 +4,18 @@
         return (Math.round(x * 100) / 100).toFixed(2);
     }
 
-    function compactMainLabel(intPart) {
-        if (intPart < 0) return '';
-        if (intPart >= 10000000) return scale2(intPart / 10000000) + ' cr';
-        if (intPart >= 100000) return scale2(intPart / 100000) + ' lac';
-        if (intPart >= 1000) return scale2(intPart / 1000) + ' k';
-        return intPart > 0 ? String(intPart) : '';
+    function compactMainLabel(amount) {
+        if (amount < 0) return '';
+        if (amount >= 10000000) return scale2(amount / 10000000) + ' cr';
+        if (amount >= 100000) return scale2(amount / 100000) + ' lac';
+        if (amount >= 1000) return scale2(amount / 1000) + ' k';
+        return amount > 0 ? String(amount) : '';
     }
 
     function compactLabel(raw) {
-        var digits = String(raw || '').replace(/\D/g, '');
-        if (!digits) return '';
-        var v = parseInt(digits, 10);
+        var cleaned = String(raw || '').replace(/[^\d.]/g, '');
+        if (!cleaned || cleaned === '.') return '';
+        var v = parseFloat(cleaned);
         if (!isFinite(v) || v <= 0) return '';
         return compactMainLabel(v);
     }

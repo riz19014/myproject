@@ -25,13 +25,16 @@ final class PurchaseLineAttributes
             ]);
         }
         $acres = PurchaseItem::acresFromMarla($marla);
-        $amountPerAcre = (int) $line['amount_per_acre'];
+        $amountPerAcre = round((float) $line['amount_per_acre'], 2);
         $lineTotal = round($acres * $amountPerAcre, 2);
 
         return [
             'party_id' => (int) $line['party_id'],
             'moza' => $line['moza'] ?? null,
             'khasra' => $line['khasra'] ?? null,
+            'khewat_no' => $line['khewat_no'] ?? null,
+            'khatooni_no' => $line['khatooni_no'] ?? null,
+            'intiqal_no' => $line['intiqal_no'] ?? null,
             'area_acre' => (int) $line['area_acre'],
             'area_kanal' => (int) $line['area_kanal'],
             'area_marla' => (int) $line['area_marla'],

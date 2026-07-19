@@ -33,6 +33,7 @@
                             <th>Party</th>
                             <th>Moza</th>
                             <th>Khasra</th>
+                            <th>Land record</th>
                             <th>Area</th>
                             <th class="text-end">Rs / acre</th>
                             <th class="text-end">Land total</th>
@@ -46,6 +47,11 @@
                                 <td class="fw-semibold small">{{ $seller->party?->name ?? '—' }}</td>
                                 <td class="small">{{ $seller->moza ?: '—' }}</td>
                                 <td class="small">{{ $seller->khasra ?: '—' }}</td>
+                                <td class="small">
+                                    <div><span class="text-muted">Khewat:</span> {{ $seller->khewat_no ?: '—' }}</div>
+                                    <div><span class="text-muted">Khatooni:</span> {{ $seller->khatooni_no ?: '—' }}</div>
+                                    <div><span class="text-muted">Intiqal:</span> {{ $seller->intiqal_no ?: '—' }}</div>
+                                </td>
                                 <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $seller->land_area_marla) }}</td>
                                 <td class="text-end small">{{ number_format((float) $seller->amount_per_acre, 0) }}</td>
                                 <td class="text-end fw-semibold">{{ number_format((float) $seller->line_total_rs, 0) }}</td>
@@ -62,7 +68,7 @@
                     </tbody>
                     <tfoot class="table-light">
                         <tr class="fw-semibold">
-                            <td colspan="4" class="text-end">Total</td>
+                            <td colspan="5" class="text-end">Total</td>
                             <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($sellersTotalAreaMarla) }}</td>
                             <td></td>
                             <td class="text-end">{{ number_format($sellersTotalAmountRs, 0) }}</td>

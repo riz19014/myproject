@@ -149,13 +149,14 @@
         <table class="sheet">
             <thead>
                 <tr>
-                    <th style="width:5%;">#</th>
-                    <th style="width:22%;">Party</th>
-                    <th style="width:14%;">Mouza</th>
-                    <th style="width:14%;">Khasra</th>
-                    <th style="width:16%;">Area</th>
+                    <th style="width:4%;">#</th>
+                    <th style="width:18%;">Party</th>
+                    <th style="width:10%;">Mouza</th>
+                    <th style="width:10%;">Khasra</th>
+                    <th style="width:18%;">Land record</th>
+                    <th style="width:14%;">Area</th>
                     <th class="amt" style="width:12%;">Rs / acre</th>
-                    <th class="amt" style="width:17%;">Land total</th>
+                    <th class="amt" style="width:14%;">Land total</th>
                 </tr>
             </thead>
             <tbody>
@@ -165,13 +166,18 @@
                         <td>{{ $seller->party?->name ?? '—' }}</td>
                         <td>{{ $seller->moza ?: '—' }}</td>
                         <td>{{ $seller->khasra ?: '—' }}</td>
+                        <td>
+                            Khewat: {{ $seller->khewat_no ?: '—' }}<br>
+                            Khatooni: {{ $seller->khatooni_no ?: '—' }}<br>
+                            Intiqal: {{ $seller->intiqal_no ?: '—' }}
+                        </td>
                         <td>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $seller->land_area_marla) }}</td>
                         <td class="amt">{{ number_format((float) $seller->amount_per_acre, 0) }}</td>
                         <td class="amt">Rs {{ number_format((float) $seller->line_total_rs, 2) }}</td>
                     </tr>
                 @endforeach
                 <tr class="footer">
-                    <td colspan="4" class="amt">Total</td>
+                    <td colspan="5" class="amt">Total</td>
                     <td>{{ $landAreaLabel }}</td>
                     <td></td>
                     <td class="amt">Rs {{ number_format($landTotalRs, 2) }}</td>

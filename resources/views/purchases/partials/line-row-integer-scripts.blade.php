@@ -27,6 +27,34 @@
         });
     }
 
+    function stripToDecimal(value) {
+        var cleaned = String(value || '').replace(/[^\d.]/g, '');
+        var firstDot = cleaned.indexOf('.');
+        if (firstDot === -1) return cleaned;
+        return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+    }
+
+    function bindDecimalInput(el) {
+        if (!el || el.dataset.lineDecimalBound === '1') return;
+        el.dataset.lineDecimalBound = '1';
+
+        el.addEventListener('input', function () {
+            var cleaned = stripToDecimal(el.value);
+            if (el.value !== cleaned) el.value = cleaned;
+        });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-' || e.key === ',') {
+                e.preventDefault();
+            }
+        });
+        el.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var text = (e.clipboardData || window.clipboardData).getData('text');
+            el.value = stripToDecimal(text);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+
     var areaFields = ['area_acre', 'area_kanal', 'area_marla', 'area_sqft'];
 
     function normalizeAreaZeros(root) {
@@ -114,6 +142,7 @@
     function bindIn(root) {
         if (!root) return;
         root.querySelectorAll('.js-line-integer-only').forEach(bindIntegerInput);
+        root.querySelectorAll('.js-line-decimal-only').forEach(bindDecimalInput);
     }
 
     window.PurchaseLineIntegers = {
