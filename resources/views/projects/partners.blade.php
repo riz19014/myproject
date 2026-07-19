@@ -109,7 +109,7 @@
                     <div class="border rounded-3 p-3 partner-row">
                         <div class="d-flex align-items-start gap-3">
                             <div class="row g-3 flex-grow-1">
-                                <div class="col-md-6">
+                                <div class="col-md-5">
                                     <label class="form-label">Party <span class="text-danger">*</span></label>
                                     <div class="daybook-form-combo partner-searchable @error('partners.'.$i.'.party_id') is-invalid @enderror" data-search-type="party">
                                         <input type="hidden" name="partners[{{ $i }}][party_id]" class="partner-party-id" value="{{ $row['party_id'] ?? '' }}">
@@ -118,7 +118,7 @@
                                     </div>
                                     @error('partners.'.$i.'.party_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label class="form-label d-flex justify-content-between align-items-center">
                                         <span>Investment amount <span class="text-danger">*</span></span>
                                         <span class="partner-amount-words small text-success fw-semibold"></span>
@@ -126,7 +126,14 @@
                                     <input type="number" min="0.01" step="0.01" name="partners[{{ $i }}][investment_amount]" class="form-control form-control-theme partner-investment-input @error('partners.'.$i.'.investment_amount') is-invalid @enderror" value="{{ $row['investment_amount'] ?? '' }}" required>
                                     @error('partners.'.$i.'.investment_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     <div class="partner-investment-limit-error small text-danger d-none">Investment cannot exceed the purchase file total.</div>
-                                    <div class="form-text">Share: <span class="partner-share-preview fw-semibold">0.00%</span></div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Share % <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="text" inputmode="decimal" class="form-control form-control-theme partner-share-input" value="{{ $row['share_percentage'] ?? '' }}" placeholder="e.g. 8.5" autocomplete="off">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <div class="form-text">Synced with amount</div>
                                 </div>
                             </div>
                             <button type="button" class="btn btn-sm btn-danger-theme partner-row-remove mt-4" title="Delete row" aria-label="Delete row">&times;</button>
@@ -168,8 +175,7 @@
                             <th>Partner</th>
                             <th>Purchase file</th>
                             <th class="text-end">File total</th>
-                            <th style="min-width: 220px;">Investment / Update</th>
-                            <th class="text-end">Share %</th>
+                            <th style="min-width: 320px;">Investment / Share / Update</th>
                             <th style="width: 90px;">Action</th>
                         </tr>
                     </thead>
@@ -186,6 +192,9 @@
                                         - (float) $investment->investment_amount
                                 );
                                 $availableForUpdate = max(0, $fileTotal - $otherAllocated);
+                                $availableShare = $fileTotal > 0
+                                    ? round($availableForUpdate / $fileTotal * 100, 2)
+                                    : 0;
                             @endphp
                             <tr>
                                 <td class="fw-semibold">{{ $investment->party?->name ?? '—' }}</td>
@@ -197,23 +206,34 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <form action="{{ route('projects.partner-investments.update', [$project, $investment]) }}" method="POST" class="partner-investment-update" data-file-total="{{ $fileTotal }}" data-available="{{ $availableForUpdate }}">
+                                    <form action="{{ route('projects.partner-investments.update', [$project, $investment]) }}" method="POST" class="partner-investment-update" data-file-total="{{ $fileTotal }}" data-available="{{ $availableForUpdate }}" data-available-share="{{ $availableShare }}">
                                         @csrf
                                         @method('PATCH')
-                                        <div class="input-group input-group-sm">
-                                            <span class="input-group-text">Rs</span>
-                                            <input type="number" min="0.01" max="{{ $availableForUpdate > 0 ? $availableForUpdate : null }}" step="0.01" name="investment_amount" class="form-control form-control-theme investment-amount-input" value="{{ $investment->investment_amount }}" required>
-                                            <button type="submit" class="btn btn-outline-theme">Save</button>
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-sm-6">
+                                                <label class="form-label small mb-1">Investment</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Rs</span>
+                                                    <input type="number" min="0.01" max="{{ $availableForUpdate > 0 ? $availableForUpdate : null }}" step="0.01" name="investment_amount" class="form-control form-control-theme investment-amount-input" value="{{ $investment->investment_amount }}" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <label class="form-label small mb-1">Share %</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" inputmode="decimal" class="form-control form-control-theme investment-share-input" value="{{ number_format((float) $investment->share_percentage, 2, '.', '') }}" placeholder="e.g. 8.5" autocomplete="off">
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-2">
+                                                <button type="submit" class="btn btn-sm btn-outline-theme w-100">Save</button>
+                                            </div>
                                         </div>
                                         <div class="form-text">
                                             Amount: <span class="investment-amount-words fw-semibold text-success">{{ $amountWords((float) $investment->investment_amount) ?: '—' }}</span>
-                                            · Available for this partner: Rs {{ number_format($availableForUpdate, 2) }}{{ $amountWords($availableForUpdate) !== '' ? ' ('.$amountWords($availableForUpdate).')' : '' }}
+                                            · Available: Rs {{ number_format($availableForUpdate, 2) }}{{ $amountWords($availableForUpdate) !== '' ? ' ('.$amountWords($availableForUpdate).')' : '' }} / {{ number_format($availableShare, 2) }}%
                                         </div>
                                         <div class="partner-update-limit-error small text-danger d-none mt-1">Investment cannot exceed the purchase file total.</div>
                                     </form>
-                                </td>
-                                <td class="text-end">
-                                    <span class="share-percentage-display">{{ number_format((float) $investment->share_percentage, 2) }}%</span>
                                 </td>
                                 <td>
                                     <form action="{{ route('projects.partner-investments.destroy', [$project, $investment]) }}" method="POST">
@@ -328,6 +348,28 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function sanitizeDecimalInput(raw) {
+        var value = String(raw ?? '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+        var firstDot = value.indexOf('.');
+        if (firstDot === -1) return value;
+        return value.slice(0, firstDot + 1) + value.slice(firstDot + 1).replace(/\./g, '');
+    }
+
+    function isIncompleteDecimal(raw) {
+        return /^-?\d+\.$/.test(String(raw ?? '').trim());
+    }
+
+    function parseDecimal(raw) {
+        var cleaned = sanitizeDecimalInput(raw);
+        if (cleaned === '' || cleaned === '.') return NaN;
+        return Number(cleaned);
+    }
+
+    function formatShareValue(value) {
+        if (!isFinite(value) || value <= 0) return '';
+        return parseFloat(value.toFixed(2)).toString();
+    }
+
     var partyOptions = @json($partySearchOptions);
     var fileOptions = @json($fileSearchOptions);
 
@@ -419,11 +461,62 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function bindRow(row) {
         var investmentInput = row.querySelector('.partner-investment-input');
+        var shareInput = row.querySelector('.partner-share-input');
         var removeBtn = row.querySelector('.partner-row-remove');
+        var syncing = false;
 
         row.querySelectorAll('.partner-searchable').forEach(bindSearchable);
-        investmentInput.addEventListener('input', refreshAllRows);
-        investmentInput.addEventListener('blur', refreshAllRows);
+
+        investmentInput.addEventListener('input', function () {
+            if (syncing) return;
+            syncing = true;
+            var option = selectedFileOption();
+            var fileTotal = option ? Number(option.total || 0) : 0;
+            var investment = Number(investmentInput.value || 0);
+            if (shareInput) {
+                shareInput.value = fileTotal > 0 && investment > 0
+                    ? formatShareValue(investment / fileTotal * 100)
+                    : '';
+            }
+            syncing = false;
+            refreshAllRows({ preserveShareFocus: false });
+        });
+        shareInput?.addEventListener('input', function () {
+            if (syncing) return;
+            syncing = true;
+            var sanitized = sanitizeDecimalInput(shareInput.value);
+            if (shareInput.value !== sanitized) {
+                shareInput.value = sanitized;
+            }
+            var option = selectedFileOption();
+            var fileTotal = option ? Number(option.total || 0) : 0;
+            if (!isIncompleteDecimal(sanitized)) {
+                var share = parseDecimal(sanitized);
+                investmentInput.value = fileTotal > 0 && isFinite(share) && share > 0
+                    ? (Math.round(fileTotal * share / 100 * 100) / 100).toFixed(2)
+                    : '';
+            }
+            syncing = false;
+            refreshAllRows({ preserveShareFocus: true });
+        });
+        investmentInput.addEventListener('blur', function () {
+            refreshAllRows({ preserveShareFocus: false });
+        });
+        shareInput?.addEventListener('blur', function () {
+            var option = selectedFileOption();
+            var fileTotal = option ? Number(option.total || 0) : 0;
+            var share = parseDecimal(shareInput.value);
+            if (!isFinite(share) || share <= 0) {
+                shareInput.value = '';
+                investmentInput.value = '';
+            } else {
+                shareInput.value = formatShareValue(share);
+                if (fileTotal > 0) {
+                    investmentInput.value = (Math.round(fileTotal * share / 100 * 100) / 100).toFixed(2);
+                }
+            }
+            refreshAllRows({ preserveShareFocus: false });
+        });
         removeBtn.addEventListener('click', function () {
             if (rowsWrap.querySelectorAll('.partner-row').length <= 1) {
                 row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
@@ -462,7 +555,9 @@ document.addEventListener('DOMContentLoaded', function () {
         summaryPanel.classList.remove('d-none');
     }
 
-    function refreshAllRows() {
+    function refreshAllRows(options) {
+        options = options || {};
+        var preserveShareFocus = !!options.preserveShareFocus;
         var option = selectedFileOption();
         var fileTotal = option ? Number(option.total || 0) : 0;
         var usedAmount = option ? Number(option.allocated || 0) : 0;
@@ -470,15 +565,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         rowsWrap.querySelectorAll('.partner-row').forEach(function (row) {
             var investmentInput = row.querySelector('.partner-investment-input');
-            var sharePreview = row.querySelector('.partner-share-preview');
+            var shareInput = row.querySelector('.partner-share-input');
             var amountWords = row.querySelector('.partner-amount-words');
             var limitError = row.querySelector('.partner-investment-limit-error');
+            var shareIsFocused = shareInput && document.activeElement === shareInput;
 
             if (!option || fileTotal <= 0) {
                 investmentInput.removeAttribute('max');
                 investmentInput.classList.remove('is-invalid');
+                shareInput?.classList.remove('is-invalid');
                 limitError?.classList.add('d-none');
-                sharePreview.textContent = '0.00%';
                 if (amountWords) amountWords.textContent = formatAmountWords(Number(investmentInput.value || 0));
                 return;
             }
@@ -491,24 +587,36 @@ document.addEventListener('DOMContentLoaded', function () {
             var wasLimited = investment > allowedAmount + 0.001;
 
             investmentInput.max = String(Math.round(allowedAmount * 100) / 100);
+
             if (wasLimited) {
                 investment = Math.round(allowedAmount * 100) / 100;
                 investmentInput.value = String(investment);
+                if (shareInput && !(preserveShareFocus && shareIsFocused && isIncompleteDecimal(shareInput.value))) {
+                    shareInput.value = formatShareValue(investment / fileTotal * 100);
+                }
                 investmentInput.classList.add('is-invalid');
+                shareInput?.classList.add('is-invalid');
                 if (limitError) {
-                    limitError.textContent = 'Only Rs ' + formatMoney(allowedAmount) + ' (' + (formatAmountWords(allowedAmount) || '0') + ') remains available for this file.';
+                    limitError.textContent = 'Only Rs ' + formatMoney(allowedAmount) + ' (' + (formatAmountWords(allowedAmount) || '0') + ') / ' + formatShare(remainingShare) + '% remains available for this file.';
                     limitError.classList.remove('d-none');
                 }
             } else {
                 investmentInput.classList.remove('is-invalid');
+                shareInput?.classList.remove('is-invalid');
                 limitError?.classList.add('d-none');
+                if (shareInput && !(preserveShareFocus && shareIsFocused)) {
+                    if (investmentInput.value !== '') {
+                        shareInput.value = formatShareValue(investment / fileTotal * 100);
+                    } else {
+                        shareInput.value = '';
+                    }
+                }
             }
 
             var share = fileTotal > 0 ? (investment / fileTotal) * 100 : 0;
             usedAmount += investment;
             usedShare += share;
 
-            sharePreview.textContent = formatShare(share) + '%';
             if (amountWords) amountWords.textContent = formatAmountWords(investment);
         });
 
@@ -550,7 +658,6 @@ document.addEventListener('DOMContentLoaded', function () {
         rowsWrap.appendChild(clone);
         reindexRows();
         bindRow(clone);
-        activeSummaryRow = clone;
         refreshAllRows();
     });
 
@@ -569,7 +676,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 wrapper.classList.add('is-invalid');
             }
         });
-        if (missingSelection || rowsWrap.querySelector('.partner-investment-input.is-invalid')) {
+        if (missingSelection || rowsWrap.querySelector('.partner-investment-input.is-invalid') || rowsWrap.querySelector('.partner-share-input.is-invalid')) {
             e.preventDefault();
             alert(missingSelection
                 ? 'Select a valid party and purchase file from the search results.'
@@ -625,38 +732,107 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('.partner-investment-update').forEach(function (form) {
         var input = form.querySelector('.investment-amount-input');
-        var display = form.closest('tr')?.querySelector('.share-percentage-display');
+        var shareInput = form.querySelector('.investment-share-input');
         var amountWords = form.querySelector('.investment-amount-words');
         var limitError = form.querySelector('.partner-update-limit-error');
         var fileTotal = Number(form.dataset.fileTotal || 0);
         var available = Number(form.dataset.available || 0);
+        var availableShare = Number(form.dataset.availableShare || 0);
+        var syncing = false;
 
-        function updateRowShare() {
-            if (!input || !display) return;
+        function syncFromAmount() {
+            if (!input) return;
             var investment = Number(input.value || 0);
             if (fileTotal > 0 && investment > available) {
                 input.value = String(available);
                 investment = available;
                 if (limitError) {
-                    limitError.textContent = 'Only Rs ' + formatMoney(available) + ' (' + (formatAmountWords(available) || '0') + ') remains available after other partner allocations.';
+                    limitError.textContent = 'Only Rs ' + formatMoney(available) + ' (' + (formatAmountWords(available) || '0') + ') / ' + formatShare(availableShare) + '% remains available after other partner allocations.';
                     limitError.classList.remove('d-none');
                 }
                 input.classList.add('is-invalid');
+                shareInput?.classList.add('is-invalid');
             } else {
                 if (limitError) limitError.classList.add('d-none');
                 input.classList.remove('is-invalid');
+                shareInput?.classList.remove('is-invalid');
             }
-            var share = fileTotal > 0 ? (investment / fileTotal) * 100 : 0;
-            display.textContent = formatShare(share) + '%';
+            if (shareInput) {
+                shareInput.value = fileTotal > 0 && investment > 0
+                    ? formatShareValue(investment / fileTotal * 100)
+                    : '';
+            }
             if (amountWords) amountWords.textContent = formatAmountWords(investment) || '—';
         }
 
-        input?.addEventListener('input', updateRowShare);
+        function syncFromShare(finalize) {
+            if (!shareInput || !input) return;
+            var sanitized = sanitizeDecimalInput(shareInput.value);
+            if (shareInput.value !== sanitized) {
+                shareInput.value = sanitized;
+            }
+            if (!finalize && isIncompleteDecimal(sanitized)) {
+                return;
+            }
+
+            var share = parseDecimal(sanitized);
+            if (!isFinite(share) || share <= 0) {
+                if (finalize) {
+                    shareInput.value = '';
+                    input.value = '';
+                }
+                if (amountWords) amountWords.textContent = '—';
+                return;
+            }
+
+            if (share > availableShare + 0.001) {
+                share = availableShare;
+                shareInput.value = formatShareValue(availableShare);
+                if (limitError) {
+                    limitError.textContent = 'Only ' + formatShare(availableShare) + '% / Rs ' + formatMoney(available) + ' remains available after other partner allocations.';
+                    limitError.classList.remove('d-none');
+                }
+                shareInput.classList.add('is-invalid');
+                input.classList.add('is-invalid');
+            } else {
+                if (limitError) limitError.classList.add('d-none');
+                shareInput.classList.remove('is-invalid');
+                input.classList.remove('is-invalid');
+                if (finalize) {
+                    shareInput.value = formatShareValue(share);
+                }
+            }
+
+            var investment = fileTotal > 0
+                ? Math.round(fileTotal * share / 100 * 100) / 100
+                : 0;
+            input.value = investment > 0 ? String(investment) : '';
+            if (amountWords) amountWords.textContent = formatAmountWords(investment) || '—';
+        }
+
+        input?.addEventListener('input', function () {
+            if (syncing) return;
+            syncing = true;
+            syncFromAmount();
+            syncing = false;
+        });
+        shareInput?.addEventListener('input', function () {
+            if (syncing) return;
+            syncing = true;
+            syncFromShare(false);
+            syncing = false;
+        });
+        shareInput?.addEventListener('blur', function () {
+            if (syncing) return;
+            syncing = true;
+            syncFromShare(true);
+            syncing = false;
+        });
         form.addEventListener('submit', function (e) {
+            syncFromShare(true);
             var investment = Number(input?.value || 0);
             if (fileTotal > 0 && investment > available) {
                 e.preventDefault();
-                updateRowShare();
                 alert('Investment cannot exceed the remaining available amount.');
             }
         });
