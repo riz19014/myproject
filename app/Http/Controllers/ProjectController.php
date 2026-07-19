@@ -8,6 +8,7 @@ use App\Models\LandType;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\ProjectPartner;
 use App\Models\PurchaseFile;
 use App\Models\PurchaseFileSaleLandMozaOverride;
 use App\Models\PurchaseItem;
@@ -962,7 +963,20 @@ class ProjectController extends Controller
 
     public function partners(Project $project)
     {
-        $project->load(['landType', 'parties' => fn ($q) => $q->orderBy('name')]);
+        $project->load([
+            'landType',
+            'parties' => fn ($q) => $q->orderBy('name'),
+            'purchaseFiles' => fn ($q) => $q
+                ->withSum('purchaseItems as purchase_total_rs', 'line_total_rs')
+                ->orderBy('file_name'),
+            'partnerInvestments' => fn ($q) => $q
+                ->with([
+                    'party',
+                    'purchaseFile' => fn ($fileQuery) => $fileQuery
+                        ->withSum('purchaseItems as purchase_total_rs', 'line_total_rs'),
+                ])
+                ->orderByDesc('id'),
+        ]);
         $parties = Party::query()->orderBy('name')->get();
 
         return view('projects.partners', compact('project', 'parties'));
@@ -971,82 +985,259 @@ class ProjectController extends Controller
     public function storePartner(Request $request, Project $project)
     {
         $validated = $request->validate([
-            'party_id' => [
+            'purchase_file_id' => [
+                'required',
+                'integer',
+                Rule::exists('purchase_files', 'id')
+                    ->where(fn ($q) => $q->where('project_id', $project->id)),
+            ],
+            'partners' => ['required', 'array', 'min:1'],
+            'partners.*.party_id' => [
                 'required',
                 'integer',
                 Rule::exists('parties', 'id'),
-                Rule::unique('party_project', 'party_id')->where(fn ($q) => $q->where('project_id', $project->id)),
             ],
-            'area_acre' => ['nullable', 'integer', 'min:0'],
-            'area_kanal' => ['nullable', 'integer', 'min:0'],
-            'area_marla' => ['nullable', 'integer', 'min:0'],
-            'area_sqft' => ['nullable', 'integer', 'min:0'],
-        ], [
-            'party_id.unique' => 'This partner is already on the project.',
+            'partners.*.investment_amount' => ['required', 'numeric', 'gt:0'],
+        ], [], [
+            'purchase_file_id' => 'purchase file',
+            'partners.*.party_id' => 'party',
+            'partners.*.investment_amount' => 'investment amount',
         ]);
 
-        $marla = LandMeasure::marlaFromAkms(
-            (int) ($validated['area_acre'] ?? 0),
-            (int) ($validated['area_kanal'] ?? 0),
-            (int) ($validated['area_marla'] ?? 0),
-            (int) ($validated['area_sqft'] ?? 0)
-        );
+        $rows = array_values($validated['partners']);
+        $fileId = (int) $validated['purchase_file_id'];
 
-        $project->parties()->attach((int) $validated['party_id'], [
-            'land_area' => $marla > 0 ? LandPrecision::forStorage($marla) : null,
-            'land_area_unit' => $marla > 0 ? 'marla' : null,
-        ]);
+        $records = DB::transaction(function () use ($project, $rows, $fileId) {
+            // Lock the file row so concurrent requests cannot over-allocate it.
+            $file = PurchaseFile::query()
+                ->where('project_id', $project->id)
+                ->whereKey($fileId)
+                ->lockForUpdate()
+                ->with('purchaseItems')
+                ->firstOrFail();
+
+            $fileTotal = $file->totalAmountRs();
+            if ($fileTotal <= 0) {
+                throw ValidationException::withMessages([
+                    'purchase_file_id' => 'The selected purchase file has no total amount.',
+                ]);
+            }
+
+            $existing = ProjectPartner::query()
+                ->where('project_id', $project->id)
+                ->where('purchase_file_id', $fileId)
+                ->lockForUpdate()
+                ->get();
+
+            $allocatedAmount = round((float) $existing->sum('investment_amount'), 2);
+            $allocatedShare = round((float) $existing->sum('share_percentage'), 2);
+            $existingPartyIds = $existing->pluck('party_id')->map(fn ($id) => (int) $id)->all();
+
+            $records = [];
+            $seenParties = [];
+
+            foreach ($rows as $i => $row) {
+                $partyId = (int) $row['party_id'];
+
+                if (isset($seenParties[$partyId])) {
+                    throw ValidationException::withMessages([
+                        "partners.$i.party_id" => 'This partner is repeated in the form.',
+                    ]);
+                }
+                $seenParties[$partyId] = true;
+
+                if (in_array($partyId, $existingPartyIds, true)) {
+                    throw ValidationException::withMessages([
+                        "partners.$i.party_id" => 'This purchase file is already assigned to this partner.',
+                    ]);
+                }
+
+                $investmentAmount = round((float) $row['investment_amount'], 2);
+                $remainingAmount = max(0.0, round($fileTotal - $allocatedAmount, 2));
+                $remainingShare = max(0.0, round(100 - $allocatedShare, 2));
+
+                if ($investmentAmount > $remainingAmount + 0.001) {
+                    throw ValidationException::withMessages([
+                        "partners.$i.investment_amount" => 'Only Rs '.number_format($remainingAmount, 2).' remains available in this purchase file.',
+                    ]);
+                }
+
+                $sharePercentage = round($investmentAmount / $fileTotal * 100, 2);
+                if ($sharePercentage > $remainingShare + 0.001) {
+                    throw ValidationException::withMessages([
+                        "partners.$i.investment_amount" => 'Only '.$remainingShare.'% share remains available in this purchase file.',
+                    ]);
+                }
+
+                $records[] = [
+                    'party_id' => $partyId,
+                    'purchase_file_id' => $fileId,
+                    'investment_amount' => $investmentAmount,
+                    'share_percentage' => $sharePercentage,
+                ];
+                $allocatedAmount = round($allocatedAmount + $investmentAmount, 2);
+                $allocatedShare = round($allocatedShare + $sharePercentage, 2);
+            }
+
+            foreach ($records as $record) {
+                if (! $project->parties()->whereKey($record['party_id'])->exists()) {
+                    $project->parties()->attach($record['party_id']);
+                }
+
+                ProjectPartner::create($record + ['project_id' => $project->id]);
+            }
+
+            return $records;
+        });
 
         return redirect()
             ->route('projects.partners', $project)
-            ->with('success', 'Partner added to project.');
+            ->with('success', count($records) === 1 ? 'Partner added to project.' : count($records).' partners added to project.');
     }
 
-    public function updatePartners(Request $request, Project $project)
-    {
+    public function updatePartnerInvestment(
+        Request $request,
+        Project $project,
+        ProjectPartner $projectPartner
+    ) {
+        abort_unless($projectPartner->project_id === $project->id, 404);
+
         $validated = $request->validate([
-            'partners' => ['nullable', 'array'],
-            'partners.*.party_id' => ['required', 'integer', 'exists:parties,id'],
-            'partners.*.area_acre' => ['nullable', 'integer', 'min:0'],
-            'partners.*.area_kanal' => ['nullable', 'integer', 'min:0'],
-            'partners.*.area_marla' => ['nullable', 'integer', 'min:0'],
-            'partners.*.area_sqft' => ['nullable', 'integer', 'min:0'],
+            'investment_amount' => ['required', 'numeric', 'gt:0'],
         ]);
 
-        $rows = $validated['partners'] ?? [];
-        $sync = [];
-        $seen = [];
+        DB::transaction(function () use ($project, $projectPartner, $validated) {
+            $file = PurchaseFile::query()
+                ->whereKey($projectPartner->purchase_file_id)
+                ->where('project_id', $project->id)
+                ->lockForUpdate()
+                ->with('purchaseItems')
+                ->firstOrFail();
+            $fileTotal = $file->totalAmountRs();
 
-        foreach ($rows as $row) {
-            $pid = (int) $row['party_id'];
-            if (isset($seen[$pid])) {
-                continue;
+            if ($fileTotal <= 0) {
+                throw ValidationException::withMessages([
+                    'investment_amount' => 'The purchase file has no total amount.',
+                ]);
             }
-            $seen[$pid] = true;
 
-            $marla = LandMeasure::marlaFromAkms(
-                (int) ($row['area_acre'] ?? 0),
-                (int) ($row['area_kanal'] ?? 0),
-                (int) ($row['area_marla'] ?? 0),
-                (int) ($row['area_sqft'] ?? 0)
-            );
+            $otherAllocations = ProjectPartner::query()
+                ->where('project_id', $project->id)
+                ->where('purchase_file_id', $file->id)
+                ->where('id', '!=', $projectPartner->id)
+                ->lockForUpdate()
+                ->get();
 
-            $sync[$pid] = [
-                'land_area' => $marla > 0 ? LandPrecision::forStorage($marla) : null,
-                'land_area_unit' => $marla > 0 ? 'marla' : null,
-            ];
-        }
+            $remainingAmount = max(0.0, round($fileTotal - (float) $otherAllocations->sum('investment_amount'), 2));
+            $remainingShare = max(0.0, round(100 - (float) $otherAllocations->sum('share_percentage'), 2));
+            $investmentAmount = round((float) $validated['investment_amount'], 2);
+            $sharePercentage = round($investmentAmount / $fileTotal * 100, 2);
 
-        $project->parties()->sync($sync);
+            if ($investmentAmount > $remainingAmount + 0.001) {
+                throw ValidationException::withMessages([
+                    'investment_amount' => 'Only Rs '.number_format($remainingAmount, 2).' remains available in this purchase file.',
+                ]);
+            }
+            if ($sharePercentage > $remainingShare + 0.001) {
+                throw ValidationException::withMessages([
+                    'investment_amount' => 'Only '.$remainingShare.'% share remains available in this purchase file.',
+                ]);
+            }
+
+            $projectPartner->update([
+                'investment_amount' => $investmentAmount,
+                'share_percentage' => $sharePercentage,
+            ]);
+        });
 
         return redirect()
             ->route('projects.partners', $project)
-            ->with('success', 'Partners updated.');
+            ->with('success', 'Partner investment updated.');
+    }
+
+    public function destroyPartnerInvestment(
+        Request $request,
+        Project $project,
+        ProjectPartner $projectPartner
+    )
+    {
+        abort_unless($projectPartner->project_id === $project->id, 404);
+
+        $rebalance = $request->boolean('rebalance');
+
+        DB::transaction(function () use ($project, $projectPartner, $rebalance) {
+            $file = PurchaseFile::query()
+                ->whereKey($projectPartner->purchase_file_id)
+                ->where('project_id', $project->id)
+                ->lockForUpdate()
+                ->with('purchaseItems')
+                ->firstOrFail();
+
+            $investments = ProjectPartner::query()
+                ->where('project_id', $project->id)
+                ->where('purchase_file_id', $file->id)
+                ->lockForUpdate()
+                ->orderBy('id')
+                ->get();
+
+            $investmentToRemove = $investments->firstWhere('id', $projectPartner->id);
+            abort_unless($investmentToRemove, 404);
+            $investmentToRemove->delete();
+
+            if (! $rebalance) {
+                return;
+            }
+
+            $remaining = $investments->where('id', '!=', $projectPartner->id)->values();
+            $fileTotal = $file->totalAmountRs();
+            $currentTotal = (float) $remaining->sum('investment_amount');
+
+            if ($remaining->isEmpty() || $fileTotal <= 0 || $currentTotal <= 0) {
+                return;
+            }
+
+            $remainingAmount = round($fileTotal, 2);
+            $remainingShare = 100.00;
+            $lastIndex = $remaining->count() - 1;
+
+            foreach ($remaining as $index => $investment) {
+                if ($index === $lastIndex) {
+                    $amount = $remainingAmount;
+                    $share = $remainingShare;
+                } else {
+                    $weight = (float) $investment->investment_amount / $currentTotal;
+                    $amount = min($remainingAmount, round($fileTotal * $weight, 2));
+                    $share = min($remainingShare, round($amount / $fileTotal * 100, 2));
+                    $remainingAmount = round($remainingAmount - $amount, 2);
+                    $remainingShare = round($remainingShare - $share, 2);
+                }
+
+                $investment->update([
+                    'investment_amount' => $amount,
+                    'share_percentage' => $share,
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('projects.partners', $project)
+            ->with(
+                'success',
+                $rebalance
+                    ? 'Partner investment removed and remaining partners rebalanced to 100%.'
+                    : 'Purchase file removed from partner.'
+            );
     }
 
     public function destroyPartner(Project $project, Party $party)
     {
-        $project->parties()->detach($party->id);
+        DB::transaction(function () use ($project, $party) {
+            ProjectPartner::query()
+                ->where('project_id', $project->id)
+                ->where('party_id', $party->id)
+                ->delete();
+            $project->parties()->detach($party->id);
+        });
 
         return redirect()
             ->route('projects.partners', $project)

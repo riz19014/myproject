@@ -79,8 +79,9 @@ Route::middleware('auth')->group(function () {
     Route::get('projects/{project}/ledger-pdf', [ProjectController::class, 'ledgerPdf'])->name('projects.ledger.pdf');
     Route::get('projects/{project}/purchase', [ProjectController::class, 'purchase'])->name('projects.purchase');
     Route::get('projects/{project}/partners', [ProjectController::class, 'partners'])->name('projects.partners');
-    Route::put('projects/{project}/partners', [ProjectController::class, 'updatePartners'])->name('projects.partners.update');
     Route::post('projects/{project}/partners', [ProjectController::class, 'storePartner'])->name('projects.partners.store');
+    Route::patch('projects/{project}/partner-investments/{projectPartner}', [ProjectController::class, 'updatePartnerInvestment'])->name('projects.partner-investments.update');
+    Route::delete('projects/{project}/partner-investments/{projectPartner}', [ProjectController::class, 'destroyPartnerInvestment'])->name('projects.partner-investments.destroy');
     Route::delete('projects/{project}/partners/{party}', [ProjectController::class, 'destroyPartner'])->name('projects.partners.destroy');
     Route::get('projects/{project}/sale-land', [ProjectController::class, 'saleLand'])->name('projects.sale-land');
     Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');

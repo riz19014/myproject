@@ -49,6 +49,20 @@ class PurchaseFile extends Model
         return $this->hasMany(PurchaseItem::class);
     }
 
+    public function projectPartners(): HasMany
+    {
+        return $this->hasMany(ProjectPartner::class);
+    }
+
+    public function totalAmountRs(): float
+    {
+        if ($this->relationLoaded('purchaseItems')) {
+            return round((float) $this->purchaseItems->sum('line_total_rs'), 2);
+        }
+
+        return round((float) $this->purchaseItems()->sum('line_total_rs'), 2);
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(PurchaseFileDocument::class);

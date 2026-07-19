@@ -72,6 +72,11 @@ class Project extends Model
         return $this->hasMany(PurchaseFile::class);
     }
 
+    public function partnerInvestments(): HasMany
+    {
+        return $this->hasMany(ProjectPartner::class);
+    }
+
     public function fileSaleLands(): HasMany
     {
         return $this->hasMany(FileSaleLand::class);

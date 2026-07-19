@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Party extends Model
 {
@@ -42,5 +43,8 @@ class Party extends Model
             ->withTimestamps();
     }
 
-    
+    public function projectPartnerRecords(): HasMany
+    {
+        return $this->hasMany(ProjectPartner::class);
+    }
 }
