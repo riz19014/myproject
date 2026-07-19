@@ -97,7 +97,8 @@
         setRow('daybook-modal-date', data.date);
         setRow('daybook-modal-type', data.type_label);
         setRow('daybook-modal-settlement', data.settlement === '—' ? '' : data.settlement);
-        setRow('daybook-modal-paid-by', (!data.paid_by || data.paid_by === '—') ? '' : data.paid_by);
+        // Paid by temporarily hidden from daybook UI
+        // setRow('daybook-modal-paid-by', (!data.paid_by || data.paid_by === '—') ? '' : data.paid_by);
         setRow('daybook-modal-description', data.description === '—' ? '' : data.description);
         setRow('daybook-modal-link', data.link_label);
 

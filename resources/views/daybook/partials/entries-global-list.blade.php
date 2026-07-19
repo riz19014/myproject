@@ -62,9 +62,11 @@
                                 @if($row['settlement'] !== '—')
                                     <div class="text-muted">{{ $row['settlement'] }}</div>
                                 @endif
+                                {{-- Paid by temporarily hidden from daybook UI
                                 @if(($row['paid_by'] ?? '—') !== '—')
                                     <div class="text-muted">Paid by: {{ $row['paid_by'] }}</div>
                                 @endif
+                                --}}
                                 @if(($row['sold_area'] ?? '—') !== '—')
                                     <div class="text-muted">Sold area: {{ $row['sold_area'] }}</div>
                                 @endif
@@ -121,7 +123,9 @@
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Payment</span><span id="daybook-modal-type" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Amount</span><span id="daybook-modal-amount" class="daybook-modal-val font-monospace fw-semibold"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Settlement</span><span id="daybook-modal-settlement" class="daybook-modal-val"></span></div>
+                    {{-- Paid by temporarily hidden from daybook UI
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Paid by</span><span id="daybook-modal-paid-by" class="daybook-modal-val"></span></div>
+                    --}}
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Linked to</span><span id="daybook-modal-link" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Project</span><span id="daybook-modal-project" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Sale file</span><span id="daybook-modal-file" class="daybook-modal-val"></span></div>

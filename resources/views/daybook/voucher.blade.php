@@ -122,12 +122,14 @@
             <th>Settlement</th>
             <td>{{ $entry->getSettlementLabel() }}</td>
         </tr>
+        {{-- Paid by temporarily hidden from daybook UI
         @if($entry->getPaidByLabel() !== '—')
         <tr>
             <th>Paid by</th>
             <td>{{ $entry->getPaidByLabel() }}</td>
         </tr>
         @endif
+        --}}
         <tr>
             <th>Paid to / received from</th>
             <td>{{ $entry->getLinkLabel() }}</td>

@@ -289,7 +289,9 @@
             </div>
         </div>
         @php($daybookPaymentMethodOld = old('payment_method', $daybookPaymentMethodDefault ?? 'cash'))
+        {{-- Paid by temporarily hidden from daybook UI
         @php($daybookPaidByPartyIdOld = old('paid_by_party_id', $daybookPaidByPartyIdDefault ?? ''))
+        --}}
         <div class="row g-4 mt-1 pt-3 border-top border-secondary border-opacity-25">
             <div class="col-md-6 col-xl-3">
                 <label class="form-label daybook-label" for="entry_payment_method">Settlement</label>
@@ -303,6 +305,7 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
+            {{-- Paid by temporarily hidden from daybook UI
             <div class="col-md-6 col-xl-3">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="entry_paid_by_party_search">Paid by <span class="text-muted fw-normal">(optional)</span></label>
@@ -327,6 +330,7 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
+            --}}
             <div class="col-md-6 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
                 <label class="form-label daybook-label" for="entry_payment_bank_search">Bank</label>
                 <div class="daybook-form-combo @error('payment_bank') is-invalid @enderror">

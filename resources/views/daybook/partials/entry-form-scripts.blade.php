@@ -1665,6 +1665,7 @@
     }
 })();
 
+/* Paid by temporarily hidden from daybook UI
 (function () {
     var hidden = document.getElementById('entry_paid_by_party_id');
     var search = document.getElementById('entry_paid_by_party_search');
@@ -1796,7 +1797,7 @@
         hideList();
     });
 })();
-
+*/
 (function () {
     var projectHidden = document.getElementById('daybook_form_project_id');
     var partySubWrap = document.getElementById('daybook_party_sub_category_wrap');

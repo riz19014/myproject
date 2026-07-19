@@ -36,7 +36,9 @@
                 <table class="table table-theme mb-0 align-middle">
                     <tr><th width="180">Date</th><td>{{ $entry->entry_date->format('d M Y') }}</td></tr>
                     <tr><th>Settlement</th><td>{{ $entry->getSettlementLabel() }}</td></tr>
+                    {{-- Paid by temporarily hidden from daybook UI
                     <tr><th>Paid by</th><td>{{ $entry->getPaidByLabel() }}</td></tr>
+                    --}}
                     <tr><th>Description</th><td>{{ $entry->description ?: '—' }}</td></tr>
                     <tr><th>Linked To</th><td>{{ $entry->getLinkLabel() }}</td></tr>
                     <tr>

@@ -198,9 +198,11 @@
                                     <span class="daybook-pill daybook-pill--out">Payment out</span>
                                 @endif
                                 <div class="small text-muted mt-1">{{ $e->getSettlementLabel() }}</div>
+                                {{-- Paid by temporarily hidden from daybook UI
                                 @if($e->getPaidByLabel() !== '—')
                                     <div class="small text-muted">Paid by: {{ $e->getPaidByLabel() }}</div>
                                 @endif
+                                --}}
                                 @if($e->getSoldAreaLabel() !== '—')
                                     <div class="small text-muted">Sold area: {{ $e->getSoldAreaLabel() }}</div>
                                 @endif
