@@ -1,3 +1,11 @@
+@php
+    $partyColumns = $signatureDetails['columns'] ?? [];
+    $accountant = $signatureDetails['accountant'] ?? null;
+    $totalColumns = count($partyColumns) + ($accountant ? 1 : 0);
+    $cellWidth = $totalColumns > 0 ? round(100 / $totalColumns, 4) : 100;
+@endphp
+
+@if($totalColumns > 0)
 <style>
     .signature-details {
         margin-top: 4mm;
@@ -18,7 +26,6 @@
         table-layout: fixed;
     }
     .signature-details__cell {
-        width: 33.333%;
         padding: 1.5mm 2mm;
         border: 0.5pt solid #555;
         vertical-align: top;
@@ -42,11 +49,6 @@
     .signature-details__cnic {
         color: #444;
     }
-    .signature-details__empty {
-        font-size: 7.5pt;
-        color: #666;
-        font-style: italic;
-    }
     .signature-details__line {
         margin-top: 6mm;
         padding-top: 0.8mm;
@@ -61,37 +63,29 @@
     <div class="signature-details__title">Parties &amp; Signatures</div>
     <table class="signature-details__table">
         <tr>
-            <td class="signature-details__cell">
-                <div class="signature-details__role">Seller(s)</div>
-                @forelse($signatureDetails['sellers'] as $seller)
+            @foreach($partyColumns as $column)
+                <td class="signature-details__cell" style="width: {{ $cellWidth }}%;">
+                    <div class="signature-details__role">{{ $column['role'] }}</div>
+                    @foreach($column['people'] as $person)
+                        <div class="signature-details__person">
+                            <span class="signature-details__name">{{ $person['name'] }}</span>
+                            <span class="signature-details__cnic">· CNIC: {{ $person['cnic'] }}</span>
+                        </div>
+                    @endforeach
+                    <div class="signature-details__line">{{ $column['signature_line'] }}</div>
+                </td>
+            @endforeach
+            @if($accountant)
+                <td class="signature-details__cell" style="width: {{ $cellWidth }}%;">
+                    <div class="signature-details__role">Accountant</div>
                     <div class="signature-details__person">
-                        <span class="signature-details__name">{{ $seller['name'] }}</span>
-                        <span class="signature-details__cnic">· CNIC: {{ $seller['cnic'] }}</span>
+                        <span class="signature-details__name">{{ $accountant['name'] }}</span>
+                        <span class="signature-details__cnic">· CNIC: {{ $accountant['cnic'] }}</span>
                     </div>
-                @empty
-                    <div class="signature-details__empty">No seller recorded</div>
-                @endforelse
-                <div class="signature-details__line">Seller signature(s)</div>
-            </td>
-            <td class="signature-details__cell">
-                <div class="signature-details__role">Buyer(s)</div>
-                @forelse($signatureDetails['buyers'] as $buyer)
-                    <div class="signature-details__person">
-                        <span class="signature-details__name">{{ $buyer['name'] }}</span>
-                        <span class="signature-details__cnic">· CNIC: {{ $buyer['cnic'] }}</span>
-                    </div>
-                @empty
-                    <div class="signature-details__empty">No buyer recorded</div>
-                @endforelse
-                <div class="signature-details__line">Buyer signature(s)</div>
-            </td>
-            <td class="signature-details__cell">
-                <div class="signature-details__role">Accountant</div>
-                <div class="signature-details__person">
-                    <span class="signature-details__name">{{ $signatureDetails['accountant'] }}</span>
-                </div>
-                <div class="signature-details__line">Accountant signature</div>
-            </td>
+                    <div class="signature-details__line">Accountant signature</div>
+                </td>
+            @endif
         </tr>
     </table>
 </div>
+@endif

@@ -12,6 +12,16 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
+    public const TYPE_ACCOUNTANT = 'accountant';
+
+    public const TYPE_USER = 'user';
+
+    public const TYPE_ADMIN = 'admin';
+
+    public const TYPE_OWNER = 'owner';
+
+    public const TYPE_SUPER_ADMIN = 'super-admin';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -20,9 +30,45 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'cnic',
+        'type',
         'password',
         'is_active',
     ];
+
+    /**
+     * @return list<string>
+     */
+    public static function types(): array
+    {
+        return [
+            self::TYPE_ACCOUNTANT,
+            self::TYPE_USER,
+            self::TYPE_ADMIN,
+            self::TYPE_OWNER,
+            self::TYPE_SUPER_ADMIN,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function typeLabels(): array
+    {
+        return [
+            self::TYPE_ACCOUNTANT => 'Accountant',
+            self::TYPE_USER => 'User',
+            self::TYPE_ADMIN => 'Admin',
+            self::TYPE_OWNER => 'Owner',
+            self::TYPE_SUPER_ADMIN => 'Super Admin',
+        ];
+    }
+
+    public function typeLabel(): string
+    {
+        return self::typeLabels()[$this->type] ?? ucfirst((string) $this->type);
+    }
 
     /**
      * The attributes that should be hidden for serialization.

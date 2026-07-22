@@ -9,7 +9,9 @@ use App\Models\Project;
 use App\Models\PurchaseFile;
 use App\Models\PurchaseFileDocument;
 use App\Models\PurchaseItem;
+use App\Models\User;
 use Illuminate\Support\Facades\Storage;
+use App\Support\CnicFormat;
 use App\Support\LandMeasure;
 use App\Support\PartyPurchaseDefaults;
 use App\Support\PurchaseFileSheetGrid;
@@ -458,9 +460,8 @@ class PurchaseFileController extends Controller
 
     /**
      * @return array{
-     *     sellers: list<array{name: string, cnic: string}>,
-     *     buyers: list<array{name: string, cnic: string}>,
-     *     accountant: string
+     *     columns: list<array{role: string, people: list<array{name: string, cnic: string}>, signature_line: string}>,
+     *     accountant: array{name: string, cnic: string}|null
      * }
      */
     private function purchaseFileSignatureDetails(
@@ -480,21 +481,75 @@ class PurchaseFileController extends Controller
 
             return $uniqueParties->values()->map(fn (Party $party) => [
                 'name' => $party->name,
-                'cnic' => trim((string) $party->cnic) !== '' ? $party->cnic : '—',
+                'cnic' => trim((string) $party->cnic) !== '' ? CnicFormat::display($party->cnic) : '—',
             ])
             ->all();
         };
 
+        $sellers = $partyDetails(
+            $purchaseFile->purchaseItems->pluck('party'),
+            $selectedSellerIds
+        );
+        $buyers = $partyDetails(
+            $purchaseFile->projectPartners->pluck('party'),
+            $selectedBuyerIds
+        );
+
         return [
-            'sellers' => $partyDetails(
-                $purchaseFile->purchaseItems->pluck('party'),
-                $selectedSellerIds
-            ),
-            'buyers' => $partyDetails(
-                $purchaseFile->projectPartners->pluck('party'),
-                $selectedBuyerIds
-            ),
-            'accountant' => auth()->user()?->name ?? '—',
+            'columns' => $this->buildPurchaseFileSignatureColumns($sellers, $buyers),
+            'accountant' => $this->purchaseFileSignatureAccountant(),
+        ];
+    }
+
+    /**
+     * First column: sellers when selected; otherwise buyers. Second column: buyers only when sellers occupy the first.
+     *
+     * @param  list<array{name: string, cnic: string}>  $sellers
+     * @param  list<array{name: string, cnic: string}>  $buyers
+     * @return list<array{role: string, people: list<array{name: string, cnic: string}>, signature_line: string}>
+     */
+    private function buildPurchaseFileSignatureColumns(array $sellers, array $buyers): array
+    {
+        $columns = [];
+
+        if ($sellers !== []) {
+            $columns[] = [
+                'role' => 'Seller(s)',
+                'people' => $sellers,
+                'signature_line' => 'Seller signature(s)',
+            ];
+
+            if ($buyers !== []) {
+                $columns[] = [
+                    'role' => 'Buyer(s)',
+                    'people' => $buyers,
+                    'signature_line' => 'Buyer signature(s)',
+                ];
+            }
+        } elseif ($buyers !== []) {
+            $columns[] = [
+                'role' => 'Buyer(s)',
+                'people' => $buyers,
+                'signature_line' => 'Buyer signature(s)',
+            ];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @return array{name: string, cnic: string}|null
+     */
+    private function purchaseFileSignatureAccountant(): ?array
+    {
+        $user = auth()->user();
+        if (! $user instanceof User || $user->type !== User::TYPE_ACCOUNTANT) {
+            return null;
+        }
+
+        return [
+            'name' => $user->name,
+            'cnic' => trim((string) $user->cnic) !== '' ? CnicFormat::display($user->cnic) : '—',
         ];
     }
 

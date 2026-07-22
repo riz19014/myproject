@@ -17,16 +17,55 @@
                 <div class="col-md-4 mb-3">
                     <label for="name" class="form-label">Name</label>
                     <input type="text" class="form-control form-control-theme @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name') }}" required>
+                    @error('name')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label for="email" class="form-label">Email</label>
                     <input type="email" class="form-control form-control-theme @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email') }}" required>
+                    @error('email')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label for="password" class="form-label">Password</label>
                     <input type="password" class="form-control form-control-theme @error('password') is-invalid @enderror" id="password" name="password" required>
+                    @error('password')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label for="phone" class="form-label">Phone <small class="text-muted">(optional)</small></label>
+                    <input type="text" class="form-control form-control-theme @error('phone') is-invalid @enderror" id="phone" name="phone" value="{{ old('phone') }}" maxlength="11" inputmode="numeric" placeholder="11 digits e.g. 03001234567">
+                    @error('phone')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label for="cnic" class="form-label">CNIC <small class="text-muted">(optional)</small></label>
+                    <input type="text" class="form-control form-control-theme @error('cnic') is-invalid @enderror" id="cnic" name="cnic" value="{{ \App\Support\CnicFormat::display(old('cnic')) }}" maxlength="15" inputmode="numeric" placeholder="23012-2321373-1">
+                    @error('cnic')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label for="type" class="form-label">Type</label>
+                    <select class="form-select form-select-theme @error('type') is-invalid @enderror" id="type" name="type" required>
+                        @foreach($userTypes as $value => $label)
+                            <option value="{{ $value }}" @selected(old('type', \App\Models\User::TYPE_ACCOUNTANT) === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('type')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
                 </div>
             </div>
 
@@ -44,4 +83,13 @@
         </form>
     </div>
 </div>
+@include('partials.party-form-field-scripts')
+<script>
+(function () {
+    var PF = window.PartyFormFields;
+    if (!PF) return;
+    PF.bindCnicInput(document.getElementById('cnic'));
+    PF.bindPhoneInput(document.getElementById('phone'), 11);
+})();
+</script>
 @endsection

@@ -16,6 +16,9 @@
                     <th>ID</th>
                     <th>Name</th>
                     <th>Email</th>
+                    <th>Phone</th>
+                    <th>CNIC</th>
+                    <th>Type</th>
                     <th>Status</th>
                     <th width="200">Actions</th>
                 </tr>
@@ -26,6 +29,9 @@
                         <td>{{ $user->id }}</td>
                         <td>{{ $user->name }}</td>
                         <td>{{ $user->email }}</td>
+                        <td>{{ $user->phone ?: '—' }}</td>
+                        <td>{{ $user->cnic ? \App\Support\CnicFormat::display($user->cnic) : '—' }}</td>
+                        <td>{{ $user->typeLabel() }}</td>
                         <td>
                             @if($user->is_active)
                                 <span class="badge badge-pink">Active</span>
@@ -45,7 +51,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="text-center">No users found.</td>
+                        <td colspan="8" class="text-center">No users found.</td>
                     </tr>
                 @endforelse
             </tbody>

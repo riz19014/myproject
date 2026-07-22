@@ -27,6 +27,18 @@
                 <td>{{ $user->email }}</td>
             </tr>
             <tr>
+                <th>Phone</th>
+                <td>{{ $user->phone ?: '—' }}</td>
+            </tr>
+            <tr>
+                <th>CNIC</th>
+                <td>{{ $user->cnic ? \App\Support\CnicFormat::display($user->cnic) : '—' }}</td>
+            </tr>
+            <tr>
+                <th>Type</th>
+                <td>{{ $user->typeLabel() }}</td>
+            </tr>
+            <tr>
                 <th>Status</th>
                 <td>
                     @if($user->is_active)
