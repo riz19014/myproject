@@ -55,7 +55,7 @@
     @include('pdf.partials.company-header')
     <h1>{{ $purchaseFile->file_name }}</h1>
     <div class="meta">
-        <strong>Project:</strong> {{ $purchaseFile->project?->name ?? '—' }}
+        <strong>Project:</strong> {{ $purchaseFile->project?->labeledName() ?? '—' }}
         · <strong>Date:</strong> {{ $purchaseFile->file_date?->format('d M Y') ?? '—' }}
         · <strong>Generated:</strong> {{ $generatedAt->format('d M Y, g:i A') }}
     </div>

@@ -93,7 +93,7 @@
 </div>
 
 <header class="project-hub-hero text-center text-md-start">
-    <h1 class="mb-0">{{ $project->name }}</h1>
+    <h1 class="mb-0"><x-project-name :project="$project" /></h1>
     @if($project->landType)
         <p class="project-hub-meta mb-0 mt-1">
             <i class="bi bi-geo-alt me-1" aria-hidden="true"></i>{{ $project->landType->name }}

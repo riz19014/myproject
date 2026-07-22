@@ -70,7 +70,7 @@
                             @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
-                                <td class="fw-semibold">{{ $project->name }}</td>
+                                <td class="fw-semibold"><x-project-name :project="$project" /></td>
                                 <td class="small text-muted">{{ $project->landType?->name ?? '—' }}</td>
                                 <td class="text-center">
                                     @if($partnerCount > 0)

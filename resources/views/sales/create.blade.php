@@ -22,7 +22,7 @@
     <div>
         <h1 class="mb-1">Sale</h1>
         <p class="text-muted small mb-0">
-            Project: <strong>{{ $project->name }}</strong>
+            Project: <strong><x-project-name :project="$project" /></strong>
             · File: <strong>{{ $projectFile->file_number }}</strong>
             · Total: <strong>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileMarla) }}</strong>
             · Remaining (direct): <strong>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($remainingDirect) }}</strong>

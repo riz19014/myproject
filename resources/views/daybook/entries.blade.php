@@ -103,6 +103,9 @@
         setRow('daybook-modal-link', data.link_label);
 
         var projectText = data.project_name || '';
+        if (projectText) {
+            projectText = (data.project_is_dha ? '🟢 ' : '🟡 ') + projectText;
+        }
         if (projectText && data.land_type) projectText += ' (' + data.land_type + ')';
         setRow('daybook-modal-project', projectText);
 

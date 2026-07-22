@@ -116,7 +116,7 @@
                     <tr>
                         <td class="cen">{{ $item->id }}</td>
                         <td class="small">{{ e($item->purchaseFile?->file_name ?? '—') }}</td>
-                        <td>{{ e($item->project?->name ?? '—') }}</td>
+                        <td>{{ e($item->project?->labeledName() ?? '—') }}</td>
                         <td>{{ e($item->party?->name ?? '—') }}</td>
                         <td>{{ e($item->moza ?? '') ?: '—' }}</td>
                         <td>{{ e($item->khasra ?? '') ?: '—' }}</td>

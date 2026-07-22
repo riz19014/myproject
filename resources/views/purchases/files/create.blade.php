@@ -17,7 +17,7 @@
                 <select name="project_id" id="project_id" class="form-select form-select-theme @error('project_id') is-invalid @enderror" required>
                     <option value="" disabled @if(!old('project_id', $projectId)) selected @endif>— Select project —</option>
                     @foreach($projects as $p)
-                        <option value="{{ $p->id }}" @selected((int) old('project_id', $projectId) === (int) $p->id)>{{ $p->name }}</option>
+                        <option value="{{ $p->id }}" @selected((int) old('project_id', $projectId) === (int) $p->id)>{{ $p->labeledName() }}</option>
                     @endforeach
                 </select>
                 @error('project_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror

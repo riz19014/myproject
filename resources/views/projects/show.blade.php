@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-    <h1 class="mb-0">{{ $project->name }}</h1>
+    <h1 class="mb-0"><x-project-name :project="$project" /></h1>
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-pink">Download ledger PDF</a>
         <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-theme">Edit</a>
@@ -94,7 +94,7 @@
     <div class="card-body">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div>
-                <h5 class="mb-1">DayBook — {{ $project->name }}</h5>
+                <h5 class="mb-1">DayBook — <x-project-name :project="$project" /></h5>
                 <p class="text-muted small mb-0">Grouped by party. Land total is from purchase file sellers; payments from DayBook. Balance payable = land total minus total paid (amounts shown without minus signs).</p>
             </div>
             <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-sm btn-outline-theme">Ledger PDF</a>

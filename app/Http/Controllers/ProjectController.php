@@ -182,6 +182,7 @@ class ProjectController extends Controller
             return response()->json(array_merge([
                 'id' => $project->id,
                 'name' => $project->name,
+                'is_dha' => $project->isDha(),
             ], LandMeasure::projectPartyAreaPayload($project)));
         }
 
@@ -223,6 +224,7 @@ class ProjectController extends Controller
             return response()->json(array_merge([
                 'id' => $project->id,
                 'name' => $project->name,
+                'is_dha' => $project->isDha(),
             ], LandMeasure::projectPartyAreaPayload($project)));
         }
 
@@ -308,6 +310,7 @@ class ProjectController extends Controller
         return response()->json(array_merge([
             'id' => $project->id,
             'name' => $project->name,
+            'is_dha' => $project->isDha(),
         ], LandMeasure::projectPartyAreaPayload($project)));
     }
 
@@ -1256,7 +1259,9 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'land_type_id' => ['nullable', 'integer', 'exists:land_types,id'],
+            'is_dha' => ['sometimes', 'boolean'],
         ]);
+        $validated['is_dha'] = $request->boolean('is_dha');
         $project->update($validated);
 
         return redirect()->route('projects.index')->with('success', 'Project updated successfully.');

@@ -9,7 +9,7 @@
         <div class="text-muted small">
             Sale #{{ $sale->id }}
             @if($sale->project)
-                · Project: <strong>{{ $sale->project->name }}</strong>
+                · Project: <strong><x-project-name :project="$sale->project" /></strong>
             @endif
         </div>
     </div>

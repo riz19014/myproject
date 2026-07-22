@@ -363,6 +363,10 @@ main {
     z-index: 5;
 }
 
+.daybook-form-combo.is-open {
+    z-index: 50;
+}
+
 .daybook-form-combo.is-invalid .form-control {
     border-color: var(--bs-form-invalid-border-color, #dc3545);
 }
@@ -372,7 +376,7 @@ main {
     left: 0;
     right: 0;
     top: calc(100% + 4px);
-    z-index: 20;
+    z-index: 60;
     max-height: min(260px, 45vh);
     overflow-y: auto;
     margin: 0;
@@ -406,6 +410,43 @@ main {
     padding: 0.65rem 1rem;
     color: #64748b;
     font-size: 0.9375rem;
+}
+
+/* Project DHA / non-DHA indicator */
+.project-name-with-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.project-dha-dot {
+    flex: 0 0 auto;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.project-dha-dot.is-dha {
+    background: #22c55e;
+}
+
+.project-dha-dot.is-not-dha {
+    background: #eab308;
+}
+
+.project-name-with-dot__text {
+    min-width: 0;
+}
+
+.daybook-form-combo-list button .project-name-with-dot {
+    width: 100%;
+}
+
+.daybook-form-combo-list button .project-dha-dot {
+    margin-top: 0.1rem;
 }
 
 /* Daybook heading date controls (calendar-like) */

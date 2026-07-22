@@ -7,7 +7,7 @@
     <div>
         <h1 class="mb-1">Partners</h1>
         <p class="text-muted small mb-0">
-            Project: <strong>{{ $project->name }}</strong>
+            Project: <strong><x-project-name :project="$project" /></strong>
             @if($project->landType)
                 <span class="text-muted">· {{ $project->landType->name }}</span>
             @endif

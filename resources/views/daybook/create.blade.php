@@ -53,7 +53,7 @@
                     <select id="link_id" name="link_id" class="form-select form-select-theme">
                         <option value="">—</option>
                         @foreach($projects as $p)
-                            <option value="{{ $p->id }}" data-type="project" {{ old('link_type') === 'project' && old('link_id') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
+                            <option value="{{ $p->id }}" data-type="project" {{ old('link_type') === 'project' && old('link_id') == $p->id ? 'selected' : '' }}>{{ $p->labeledName() }}</option>
                         @endforeach
                         @foreach($lands as $l)
                             <option value="{{ $l->id }}" data-type="land" {{ old('link_type') === 'land' && old('link_id') == $l->id ? 'selected' : '' }}>{{ $l->name }}</option>

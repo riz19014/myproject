@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
         <h1 class="mb-1">Add purchase</h1>
-        <div class="text-muted small">Project: <strong>{{ $project->name }}</strong></div>
+        <div class="text-muted small">Project: <strong><x-project-name :project="$project" /></strong></div>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('purchase.records.create') }}" class="btn btn-outline-theme">Change project</a>

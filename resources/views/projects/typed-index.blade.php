@@ -68,7 +68,7 @@
                                 @endphp
                                 <tr>
                                     <td>{{ $sale->id }}</td>
-                                    <td class="fw-semibold">{{ $sale->project?->name ?? '—' }}</td>
+                                    <td class="fw-semibold">@if($sale->project)<x-project-name :project="$sale->project" />@else—@endif</td>
                                     <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $sale->land_area_marla) }}</td>
                                     <td class="text-end small">{{ $cutMarla > 0 ? \App\Support\LandMeasure::formatAkmsLabelFromMarla($cutMarla) : '—' }}</td>
                                     <td class="text-end small fw-semibold {{ $netMarla < 0 ? 'text-danger' : '' }}">
@@ -118,7 +118,7 @@
                     <div class="d-flex flex-wrap gap-2">
                         @foreach($projects->sortBy('name') as $purchaseProject)
                             <a href="{{ route('purchase.records.create', ['project' => $purchaseProject->id]) }}" class="btn btn-sm btn-outline-theme d-inline-flex align-items-center gap-1" title="Add purchase lines for {{ $purchaseProject->name }}">
-                                <span class="text-truncate" style="max-width: 14rem;">{{ $purchaseProject->name }}</span>
+                                <span class="text-truncate" style="max-width: 14rem;"><x-project-name :project="$purchaseProject" /></span>
                                 <i class="bi bi-plus-lg flex-shrink-0" aria-hidden="true"></i>
                             </a>
                         @endforeach
@@ -134,7 +134,7 @@
                         @foreach($projects->sortBy('name') as $purchaseProject)
                             <a href="{{ route('purchase.files.index', ['project' => $purchaseProject->id]) }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2" title="Purchase files for {{ $purchaseProject->name }}">
                                 <i class="bi bi-folder2-open flex-shrink-0" aria-hidden="true"></i>
-                                <span class="text-truncate" style="max-width: 11rem;">{{ $purchaseProject->name }}</span>
+                                <span class="text-truncate" style="max-width: 11rem;"><x-project-name :project="$purchaseProject" /></span>
                                 <span class="badge rounded-pill bg-secondary bg-opacity-25 text-dark border">{{ $purchaseProject->purchase_files_count }} {{ $purchaseProject->purchase_files_count === 1 ? 'file' : 'files' }}</span>
                             </a>
                         @endforeach
@@ -170,7 +170,7 @@
                             @foreach($purchaseItems as $item)
                                 <tr>
                                     <td>{{ $loop->iteration }}</td>
-                                    <td class="fw-semibold">{{ $item->project?->name ?? '—' }}</td>
+                                    <td class="fw-semibold">@if($item->project)<x-project-name :project="$item->project" />@else—@endif</td>
                                     <td class="small">{{ $item->purchaseFile?->file_name ?: '—' }}</td>
                                     <td class="small">{{ $item->party?->name ?? '—' }}</td>
                                     <td class="small">{{ $item->moza ?: '—' }}</td>
@@ -289,7 +289,7 @@
                         @foreach($rows as $project)
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
-                                <td class="fw-semibold">{{ $project->name }}</td>
+                                <td class="fw-semibold"><x-project-name :project="$project" /></td>
                                 <td class="small">
                                     @php $partyMarla = \App\Support\LandMeasure::partiesTotalMarla($project->parties); @endphp
                                     @if($partyMarla > 0)

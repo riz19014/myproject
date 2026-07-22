@@ -42,7 +42,7 @@
                         @foreach($files as $file)
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
-                                <td class="small">{{ $file->project->name }}</td>
+                                <td class="small">@if($file->project)<x-project-name :project="$file->project" />@else—@endif</td>
                                 <td class="fw-semibold">{{ $file->file_number }}</td>
                                 <td class="small">
                                     @if((float) $file->land_area_marla > 0)

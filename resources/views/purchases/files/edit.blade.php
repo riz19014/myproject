@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
         <h1 class="mb-1">Edit purchase file</h1>
-        <p class="text-muted small mb-0">Project: <strong>{{ $file->project->name }}</strong></p>
+        <p class="text-muted small mb-0">Project: <strong><x-project-name :project="$file->project" /></strong></p>
     </div>
     <a href="{{ route('purchase.files.index', ['project' => $file->project_id]) }}" class="btn btn-outline-theme">Back</a>
 </div>

@@ -271,7 +271,7 @@
             </tbody>
             <tfoot>
                 <tr class="footer">
-                    <td colspan="5"></td>
+                    <td colspan="5">{{ $footer['label'] ?? 'Total' }}</td>
                     <td class="amt">{{ $pfPdfAmount($footer['debit'] ?? null) }}</td>
                     <td class="amt">{{ $pfPdfAmount($footer['credit'] ?? null) }}</td>
                     <td class="amt">{{ $pfPdfAmount($footer['running_balance'] ?? null) }}</td>

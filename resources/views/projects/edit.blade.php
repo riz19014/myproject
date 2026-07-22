@@ -29,6 +29,13 @@
                 </select>
                 @error('land_type_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
             </div>
+            <div class="mb-4">
+                <div class="form-check">
+                    <input class="form-check-input @error('is_dha') is-invalid @enderror" type="checkbox" id="is_dha" name="is_dha" value="1" {{ old('is_dha', $project->is_dha) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="is_dha">DHA project</label>
+                </div>
+                @error('is_dha')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+            </div>
             <button type="submit" class="btn btn-pink">Update Project</button>
         </form>
     </div>

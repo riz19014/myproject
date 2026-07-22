@@ -45,7 +45,7 @@
                         <th>Project</th>
                         <td>
                             @if($entry->project)
-                                {{ $entry->project->name }}
+                                <x-project-name :project="$entry->project" />
                                 @if($entry->project->landType)
                                     <span class="badge text-bg-light border ms-1">{{ $entry->project->landType->name }}</span>
                                 @endif

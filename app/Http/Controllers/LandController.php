@@ -173,6 +173,7 @@ class LandController extends Controller
                     'file_name' => $file?->file_name ?? ('File #'.$first->purchase_file_id),
                     'project_id' => $project?->id,
                     'project_name' => $project?->name ?? '—',
+                    'project_is_dha' => $project?->isDha() ?? false,
                     'entries_count' => $group->count(),
                     'sold_marla' => $soldMarla,
                     'sold_label' => LandMeasure::formatAkmsLabelFromMarla($soldMarla),

@@ -153,7 +153,7 @@
 
 <div class="doc-title">Sale Estimation</div>
 <div class="doc-subtitle">
-    {{ $project->name }} · File {{ $projectFile->file_number }}
+    {{ $project->labeledName() }} · File {{ $projectFile->file_number }}
     · Generated {{ $generatedAt->format('d M Y, h:i A') }}
 </div>
 

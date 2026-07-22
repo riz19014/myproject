@@ -5,6 +5,12 @@
         box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
         overflow: visible;
     }
+    #daybookCreatePurchaseFileModal .modal-content {
+        border-radius: 16px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+        overflow: visible;
+    }
     #daybookCreatePartyModal .modal-content {
         border-radius: 16px;
         border: 1px solid rgba(15, 23, 42, 0.12);
@@ -12,18 +18,21 @@
         overflow: visible;
     }
     #daybookCreateProjectModal .modal-header,
+    #daybookCreatePurchaseFileModal .modal-header,
     #daybookCreatePartyModal .modal-header {
         background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
         border-bottom: 1px solid rgba(15, 23, 42, 0.08);
         padding: 1.1rem 1.25rem;
     }
     #daybookCreateProjectModal .modal-title,
+    #daybookCreatePurchaseFileModal .modal-title,
     #daybookCreatePartyModal .modal-title {
         font-weight: 700;
         color: #0f172a;
         font-size: 1.15rem;
     }
     #daybookCreateProjectModal .modal-body,
+    #daybookCreatePurchaseFileModal .modal-body,
     #daybookCreatePartyModal .modal-body {
         padding: 1.35rem 1.25rem 1.25rem;
     }
@@ -127,13 +136,15 @@
         color: #64748b;
         font-size: 0.9375rem;
     }
-    #daybookCreateProjectModal .daybook-project-modal-panel {
+    #daybookCreateProjectModal .daybook-project-modal-panel,
+    #daybookCreatePurchaseFileModal .daybook-project-modal-panel {
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
         padding: 1.25rem 1.35rem 1.35rem;
     }
-    #daybookCreateProjectModal .daybook-modal-label {
+    #daybookCreateProjectModal .daybook-modal-label,
+    #daybookCreatePurchaseFileModal .daybook-modal-label {
         font-size: 0.8125rem;
         font-weight: 600;
         color: #334155;
@@ -141,6 +152,7 @@
         display: block;
     }
     #daybookCreateProjectModal .modal-footer,
+    #daybookCreatePurchaseFileModal .modal-footer,
     #daybookCreatePartyModal .modal-footer {
         padding: 1rem 1.25rem 1.25rem;
         border-top: 1px solid rgba(15, 23, 42, 0.08);
@@ -466,6 +478,22 @@
         border-radius: 12px;
         padding: 1.25rem 1.35rem 1.35rem;
         margin-bottom: 1.25rem;
+        overflow: visible;
+    }
+    .daybook-page #daybook_form_file_wrap {
+        position: relative;
+        z-index: 1;
+    }
+    .daybook-page .daybook-panel .daybook-form-combo {
+        position: relative;
+        z-index: 2;
+    }
+    .daybook-page .daybook-panel .daybook-form-combo.is-open {
+        z-index: 80;
+    }
+    .daybook-page .daybook-panel.is-combo-open {
+        position: relative;
+        z-index: 30;
     }
     @media (min-width: 768px) {
         .daybook-page .daybook-panel {
@@ -759,7 +787,8 @@
         }
     }
     #daybookCreateProjectModal .form-control.form-control-theme,
-    #daybookCreateProjectModal .form-select.form-select-theme {
+    #daybookCreateProjectModal .form-select.form-select-theme,
+    #daybookCreatePurchaseFileModal .form-control.form-control-theme {
         min-height: 3.125rem;
         padding: 0.65rem 1.1rem;
         font-size: 1.0625rem;
@@ -770,11 +799,13 @@
         transition: border-color 0.15s ease, box-shadow 0.2s ease;
     }
     #daybookCreateProjectModal .form-control.form-control-theme:hover,
-    #daybookCreateProjectModal .form-select.form-select-theme:hover {
+    #daybookCreateProjectModal .form-select.form-select-theme:hover,
+    #daybookCreatePurchaseFileModal .form-control.form-control-theme:hover {
         border-color: #94a3b8;
     }
     #daybookCreateProjectModal .form-control.form-control-theme:focus,
-    #daybookCreateProjectModal .form-select.form-select-theme:focus {
+    #daybookCreateProjectModal .form-select.form-select-theme:focus,
+    #daybookCreatePurchaseFileModal .form-control.form-control-theme:focus {
         border-color: #f97316;
         box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.2);
     }

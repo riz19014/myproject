@@ -7,7 +7,7 @@
     <div>
         <h1 class="mb-1">{{ $purchaseFile->file_name }}</h1>
         <p class="text-muted small mb-1">
-            Project: <strong>{{ $purchaseFile->project?->name ?? '—' }}</strong>
+            Project: <strong>@if($purchaseFile->project)<x-project-name :project="$purchaseFile->project" />@else—@endif</strong>
             · Date: <strong>{{ $purchaseFile->file_date?->format('d M Y') ?? '—' }}</strong>
             @if($purchaseFile->isSaleLand())
                 · <span class="text-success">Sale land ({{ $purchaseFile->sale_land_at->format('d M Y') }})</span>
@@ -122,7 +122,7 @@
                     <div class="pf-ledger-print-header d-none d-print-block mb-3">
                         <h1 class="h5 mb-1">{{ $purchaseFile->file_name }}</h1>
                         <p class="text-muted small mb-0">
-                            Project: {{ $purchaseFile->project?->name ?? '—' }}
+                            Project: @if($purchaseFile->project)<x-project-name :project="$purchaseFile->project" />@else—@endif
                             · File date: {{ $purchaseFile->file_date?->format('d M Y') ?? '—' }}
                         </p>
                     </div>
@@ -146,7 +146,7 @@
                             <tbody id="pf-ledger-rows"></tbody>
                             <tfoot class="table-light">
                                 <tr class="fw-semibold">
-                                    <td colspan="4" id="pf-ledger-footer-label">Balance Payable</td>
+                                    <td colspan="4" id="pf-ledger-footer-label">Total</td>
                                     <td class="text-end font-monospace" id="pf-ledger-total-debit"></td>
                                     <td class="text-end font-monospace" id="pf-ledger-total-credit"></td>
                                     <td class="text-end font-monospace" id="pf-ledger-total-balance"></td>
@@ -764,7 +764,7 @@
         }
 
         var footer = section.footer || {};
-        footerLabelEl.textContent = footer.label || 'Balance Payable';
+        footerLabelEl.textContent = footer.label || 'Total';
         totalDebitEl.textContent = formatLedgerAmount(footer.debit);
         totalCreditEl.textContent = formatLedgerAmount(footer.credit);
         totalBalanceEl.textContent = formatLedgerAmount(footer.running_balance);

@@ -109,7 +109,7 @@
     <div class="meta">
         <div><strong>File:</strong> {{ $purchaseFile->file_name }}</div>
         <div><strong>File date:</strong> {{ $purchaseFile->file_date?->format('d M Y') ?? '—' }}</div>
-        <div><strong>Project:</strong> {{ $purchaseFile->project?->name ?? '—' }}</div>
+        <div><strong>Project:</strong> {{ $purchaseFile->project?->labeledName() ?? '—' }}</div>
         @if($purchaseFile->dealers->isNotEmpty())
             <div><strong>Dealers:</strong> {{ $purchaseFile->dealers->pluck('name')->implode(', ') }}</div>
         @endif

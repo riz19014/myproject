@@ -51,10 +51,10 @@
                                 <div class="fw-medium">{{ \Illuminate\Support\Str::limit($row['description'] ?: '—', 64) }}</div>
                                 <div class="text-muted">{{ $row['link_label'] }}</div>
                                 @if($row['linked_project_name'] !== '' && $row['linked_project_name'] !== $row['project_name'])
-                                    <div class="text-muted">{{ $row['linked_project_name'] }}@if($row['linked_project_area'] !== '')<span class="d-block">{{ $row['linked_project_area'] }}</span>@endif</div>
+                                    <div class="text-muted"><x-project-name :name="$row['linked_project_name']" :is-dha="$row['linked_project_is_dha'] ?? false" />@if($row['linked_project_area'] !== '')<span class="d-block">{{ $row['linked_project_area'] }}</span>@endif</div>
                                 @endif
                                 @if($row['project_name'] !== '')
-                                    <div class="text-muted">{{ $row['project_name'] }}@if($row['project_area'] !== '')<span class="d-block">{{ $row['project_area'] }}</span>@endif</div>
+                                    <div class="text-muted"><x-project-name :name="$row['project_name']" :is-dha="$row['project_is_dha'] ?? false" />@if($row['project_area'] !== '')<span class="d-block">{{ $row['project_area'] }}</span>@endif</div>
                                 @endif
                                 @if($row['category'] !== '' || $row['sub_category'] !== '—')
                                     <div class="text-muted">{{ $row['category'] !== '' ? $row['category'].' · ' : '' }}{{ $row['sub_category'] }}</div>
@@ -85,6 +85,7 @@
                                     'description' => $row['description'] ?: '—',
                                     'link_label' => $row['link_label'],
                                     'project_name' => $row['project_name'],
+                                    'project_is_dha' => $row['project_is_dha'] ?? false,
                                     'land_type' => $row['land_type'],
                                     'purchase_file' => $row['purchase_file_name'],
                                     'sold_area' => $row['sold_area'] ?? '—',

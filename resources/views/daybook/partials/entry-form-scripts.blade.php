@@ -58,9 +58,14 @@
     var projectWrap = projectSearch ? projectSearch.closest('.daybook-form-combo') : null;
     var projectJsonEl = document.getElementById('daybook-form-projects-json');
     var projectResetBtn = document.getElementById('daybook_form_project_reset');
-    var purchaseFileSelect = document.getElementById('daybook_form_purchase_file_id');
+    var purchaseFileHidden = document.getElementById('daybook_form_purchase_file_id');
+    var purchaseFileSearch = document.getElementById('daybook_form_purchase_file_search');
+    var purchaseFileList = document.getElementById('daybook_form_purchase_file_listbox');
+    var purchaseFileWrap = purchaseFileSearch ? purchaseFileSearch.closest('.daybook-form-combo') : null;
     var fileResetBtn = document.getElementById('daybook_form_file_reset');
+    var fileCreateBtn = document.getElementById('daybook_form_file_create');
     var purchaseFileDefaultEl = document.getElementById('daybook-form-purchase-file-default');
+    var currentSaleFileRows = [];
 
     var partyHidden = document.getElementById('daybook_form_party_id');
     var partySearch = document.getElementById('daybook_form_party_search');
@@ -96,10 +101,18 @@
     }
 
     function syncFileResetVisibility() {
-        if (!fileResetBtn || !purchaseFileSelect) return;
+        if (!fileResetBtn || !purchaseFileHidden) return;
         var hasProject = projectHidden && String(projectHidden.value || '').trim() !== '';
-        var hasFile = hasProject && !purchaseFileSelect.disabled && String(purchaseFileSelect.value || '').trim() !== '';
+        var hasFile = hasProject && purchaseFileSearch && !purchaseFileSearch.disabled && String(purchaseFileHidden.value || '').trim() !== '';
         toggleResetBtn(fileResetBtn, hasFile);
+    }
+
+    function syncFileCreateVisibility() {
+        if (!fileCreateBtn) return;
+        var hasProject = projectHidden && String(projectHidden.value || '').trim() !== '';
+        fileCreateBtn.classList.toggle('d-none', !hasProject);
+        fileCreateBtn.disabled = !hasProject;
+        fileCreateBtn.setAttribute('aria-hidden', hasProject ? 'false' : 'true');
     }
 
     function syncSubResetVisibility() {
@@ -111,6 +124,7 @@
         syncProjectResetVisibility();
         syncPartyResetVisibility();
         syncFileResetVisibility();
+        syncFileCreateVisibility();
         syncSubResetVisibility();
     }
 
@@ -154,61 +168,143 @@
         }
     }
 
-    function syncPurchaseFileSelect(projectId, selectedFileId) {
-        if (!purchaseFileSelect) return;
-        var pid = String(projectId || '').trim();
-        var selected = String(selectedFileId != null ? selectedFileId : '').trim();
-        purchaseFileSelect.innerHTML = '';
-        if (!pid) {
-            var opt0 = document.createElement('option');
-            opt0.value = '';
-            opt0.textContent = '— Select project first —';
-            purchaseFileSelect.appendChild(opt0);
-            purchaseFileSelect.value = '';
-            purchaseFileSelect.disabled = true;
-            syncSaleFileMeta(null);
-            syncFileResetVisibility();
+    function saleFileLabel(file) {
+        if (!file) return '';
+        var label = file.label || file.file_name || ('File #' + file.id);
+        if (file.is_fully_sold) {
+            label += ' — Fully Sold';
+        } else if (file.remaining_label && file.remaining_label !== '—') {
+            label += ' (Avail: ' + file.remaining_label + ')';
+        }
+        return label;
+    }
+
+    function hidePurchaseFileList() {
+        if (!purchaseFileList || !purchaseFileSearch) return;
+        purchaseFileList.classList.add('d-none');
+        purchaseFileList.setAttribute('hidden', '');
+        purchaseFileSearch.setAttribute('aria-expanded', 'false');
+        setComboOpen(purchaseFileWrap, false);
+    }
+
+    function showPurchaseFileList() {
+        if (!purchaseFileList || !purchaseFileSearch) return;
+        purchaseFileList.classList.remove('d-none');
+        purchaseFileList.removeAttribute('hidden');
+        purchaseFileSearch.setAttribute('aria-expanded', 'true');
+        setComboOpen(purchaseFileWrap, true);
+    }
+
+    function filterSaleFileRows(q) {
+        var nq = (q || '').toLowerCase();
+        if (!nq) return currentSaleFileRows.slice();
+        return currentSaleFileRows.filter(function (row) {
+            return saleFileLabel(row).toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderPurchaseFileList(rows) {
+        if (!purchaseFileList || !purchaseFileSearch || !purchaseFileHidden) return;
+        purchaseFileList.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = currentSaleFileRows.length ? 'No sale files match.' : 'No sale files for this project.';
+            purchaseFileList.appendChild(li0);
+            showPurchaseFileList();
             return;
         }
-        var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
-        var files = (project && (project.sale_files || project.purchase_files)) ? (project.sale_files || project.purchase_files) : [];
-        var optBlank = document.createElement('option');
-        optBlank.value = '';
-        optBlank.textContent = files.length ? '— No sale file —' : '— No sale files for this project —';
-        purchaseFileSelect.appendChild(optBlank);
-        files.forEach(function (f) {
-            var opt = document.createElement('option');
-            opt.value = String(f.id);
-            var label = f.label || f.file_name || ('File #' + f.id);
-            if (f.is_fully_sold) {
-                label += ' — Fully Sold';
-            } else if (f.remaining_label && f.remaining_label !== '—') {
-                label += ' (Avail: ' + f.remaining_label + ')';
+        rows.forEach(function (row) {
+            var selectedId = String(purchaseFileHidden.value || '').trim();
+            var isFullySold = !!row.is_fully_sold;
+            var isSelected = selectedId !== '' && String(row.id) === selectedId;
+            if (isFullySold && !isSelected) {
+                var liDisabled = document.createElement('li');
+                liDisabled.setAttribute('role', 'presentation');
+                liDisabled.className = 'daybook-form-combo-empty';
+                liDisabled.textContent = saleFileLabel(row);
+                purchaseFileList.appendChild(liDisabled);
+                return;
             }
-            opt.textContent = label;
-            if (f.is_fully_sold && String(f.id) !== selected) {
-                opt.disabled = true;
-            }
-            purchaseFileSelect.appendChild(opt);
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.dataset.id = String(row.id);
+            btn.textContent = saleFileLabel(row);
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                purchaseFileHidden.value = String(row.id);
+                purchaseFileSearch.value = saleFileLabel(row);
+                clearSoldAreaInputs();
+                syncSaleFileMeta(currentSaleFile());
+                hidePurchaseFileList();
+                syncFileResetVisibility();
+            });
+            li.appendChild(btn);
+            purchaseFileList.appendChild(li);
         });
-        purchaseFileSelect.disabled = false;
-        if (selected && files.some(function (f) { return String(f.id) === selected; })) {
-            purchaseFileSelect.value = selected;
-        } else {
-            purchaseFileSelect.value = '';
+        showPurchaseFileList();
+    }
+
+    function openFilteredPurchaseFileList() {
+        if (!purchaseFileSearch || purchaseFileSearch.disabled) return;
+        renderPurchaseFileList(filterSaleFileRows(purchaseFileSearch.value));
+    }
+
+    function syncPurchaseFileSelect(projectId, selectedFileId) {
+        if (!purchaseFileHidden || !purchaseFileSearch) return;
+        var pid = String(projectId || '').trim();
+        var selected = String(selectedFileId != null ? selectedFileId : '').trim();
+        hidePurchaseFileList();
+
+        if (!pid) {
+            currentSaleFileRows = [];
+            purchaseFileHidden.value = '';
+            purchaseFileSearch.value = '';
+            purchaseFileSearch.placeholder = 'Select project first…';
+            purchaseFileSearch.disabled = true;
+            syncSaleFileMeta(null);
+            syncFileResetVisibility();
+            syncFileCreateVisibility();
+            return;
         }
+
+        var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
+        currentSaleFileRows = (project && (project.sale_files || project.purchase_files))
+            ? (project.sale_files || project.purchase_files).slice()
+            : [];
+
+        purchaseFileSearch.disabled = false;
+        purchaseFileSearch.placeholder = currentSaleFileRows.length ? 'Search sale file…' : 'No sale files for this project';
+
+        var match = selected
+            ? currentSaleFileRows.find(function (f) { return String(f.id) === selected; })
+            : null;
+
+        if (match) {
+            purchaseFileHidden.value = String(match.id);
+            purchaseFileSearch.value = saleFileLabel(match);
+        } else {
+            purchaseFileHidden.value = '';
+            purchaseFileSearch.value = '';
+        }
+
         syncSaleFileMeta(currentSaleFile());
         syncFileResetVisibility();
+        syncFileCreateVisibility();
     }
 
     function currentSaleFile() {
-        if (!purchaseFileSelect || !projectHidden) return null;
+        if (!purchaseFileHidden || !projectHidden) return null;
         var pid = String(projectHidden.value || '').trim();
-        var fid = String(purchaseFileSelect.value || '').trim();
+        var fid = String(purchaseFileHidden.value || '').trim();
         if (!pid || !fid) return null;
-        var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
-        var files = (project && (project.sale_files || project.purchase_files)) ? (project.sale_files || project.purchase_files) : [];
-        return files.find(function (f) { return String(f.id) === fid; }) || null;
+        return currentSaleFileRows.find(function (f) { return String(f.id) === fid; }) || null;
     }
 
     function syncSaleFileMeta(file) {
@@ -266,20 +362,59 @@
 
     window.__daybookSyncPurchaseFileSelect = syncPurchaseFileSelect;
 
+    function setComboOpen(wrap, open) {
+        if (!wrap) return;
+        wrap.classList.toggle('is-open', !!open);
+        var panel = wrap.closest('.daybook-panel');
+        if (!panel) return;
+        if (open) {
+            panel.classList.add('is-combo-open');
+            return;
+        }
+        if (!panel.querySelector('.daybook-form-combo.is-open')) {
+            panel.classList.remove('is-combo-open');
+        }
+    }
+
     function hideProjectList() {
         projectList.classList.add('d-none');
         projectList.setAttribute('hidden', '');
         projectSearch.setAttribute('aria-expanded', 'false');
+        setComboOpen(projectWrap, false);
     }
 
     function showProjectList() {
         projectList.classList.remove('d-none');
         projectList.removeAttribute('hidden');
         projectSearch.setAttribute('aria-expanded', 'true');
+        setComboOpen(projectWrap, true);
+    }
+
+    function projectIsDha(row) {
+        return !!(row && (row.is_dha === true || row.is_dha === 1 || row.is_dha === '1'));
+    }
+
+    function projectLabeledName(row) {
+        if (!row) return '';
+        return (projectIsDha(row) ? '🟢 ' : '🟡 ') + (row.label || '');
+    }
+
+    function appendProjectNameNode(parent, row) {
+        var wrap = document.createElement('span');
+        wrap.className = 'project-name-with-dot';
+        var dot = document.createElement('span');
+        dot.className = 'project-dha-dot ' + (projectIsDha(row) ? 'is-dha' : 'is-not-dha');
+        dot.setAttribute('aria-hidden', 'true');
+        var text = document.createElement('span');
+        text.className = 'project-name-with-dot__text';
+        text.textContent = row.label || '';
+        wrap.appendChild(dot);
+        wrap.appendChild(text);
+        parent.appendChild(wrap);
     }
 
     function filterProjectRows(q) {
-        var nq = (q || '').toLowerCase();
+        var nq = (q || '').toLowerCase().replace(/[🟢🟡]/g, '').trim();
         if (!nq) return formProjectRows.slice();
         return formProjectRows.filter(function (row) {
             return (row.label || '').toLowerCase().indexOf(nq) !== -1;
@@ -304,13 +439,13 @@
             btn.type = 'button';
             btn.setAttribute('role', 'option');
             btn.dataset.id = String(row.id);
-            btn.textContent = row.label;
+            appendProjectNameNode(btn, row);
             btn.addEventListener('mousedown', function (e) {
                 e.preventDefault();
             });
             btn.addEventListener('click', function () {
                 projectHidden.value = String(row.id);
-                projectSearch.value = row.label;
+                projectSearch.value = projectLabeledName(row);
                 clearSoldAreaInputs();
                 syncPurchaseFileSelect(row.id, '');
                 hideProjectList();
@@ -331,12 +466,14 @@
         partyList.classList.add('d-none');
         partyList.setAttribute('hidden', '');
         partySearch.setAttribute('aria-expanded', 'false');
+        setComboOpen(partyWrap, false);
     }
 
     function showPartyFormList() {
         partyList.classList.remove('d-none');
         partyList.removeAttribute('hidden');
         partySearch.setAttribute('aria-expanded', 'true');
+        setComboOpen(partyWrap, true);
     }
 
     function filterPartyFormRows(q) {
@@ -406,6 +543,7 @@
         subList.classList.add('d-none');
         subList.setAttribute('hidden', '');
         subSearch.setAttribute('aria-expanded', 'false');
+        setComboOpen(subWrap, false);
     }
 
     function showSubFormList() {
@@ -413,6 +551,7 @@
         subList.classList.remove('d-none');
         subList.removeAttribute('hidden');
         subSearch.setAttribute('aria-expanded', 'true');
+        setComboOpen(subWrap, true);
     }
 
     function filterSubFormRows(q) {
@@ -465,7 +604,7 @@
     (function syncOldValues() {
         if (projectHidden.value) {
             var pr = formProjectRows.find(function (r) { return String(r.id) === String(projectHidden.value); });
-            if (pr) projectSearch.value = pr.label;
+            if (pr) projectSearch.value = projectLabeledName(pr);
             syncPurchaseFileSelect(projectHidden.value, purchaseFileDefault);
         } else {
             syncPurchaseFileSelect('', '');
@@ -482,11 +621,22 @@
         if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
     })();
 
-    if (purchaseFileSelect) {
-        purchaseFileSelect.addEventListener('change', function () {
+    if (purchaseFileHidden && purchaseFileSearch && purchaseFileList) {
+        purchaseFileSearch.addEventListener('focus', function () {
+            openFilteredPurchaseFileList();
+        });
+        purchaseFileSearch.addEventListener('input', function () {
+            purchaseFileHidden.value = '';
             clearSoldAreaInputs();
-            syncSaleFileMeta(currentSaleFile());
+            syncSaleFileMeta(null);
             syncFileResetVisibility();
+            openFilteredPurchaseFileList();
+        });
+        purchaseFileSearch.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hidePurchaseFileList();
+            }
         });
     }
 
@@ -610,15 +760,17 @@
         });
     }
 
-    if (fileResetBtn && purchaseFileSelect) {
+    if (fileResetBtn && purchaseFileHidden && purchaseFileSearch) {
         fileResetBtn.addEventListener('click', function () {
-            if (!purchaseFileSelect.disabled) {
-                purchaseFileSelect.value = '';
+            if (!purchaseFileSearch.disabled) {
+                purchaseFileHidden.value = '';
+                purchaseFileSearch.value = '';
             }
             clearSoldAreaInputs();
             syncSaleFileMeta(null);
+            hidePurchaseFileList();
             syncFileResetVisibility();
-            purchaseFileSelect.focus();
+            purchaseFileSearch.focus();
         });
     }
 
@@ -626,6 +778,7 @@
         if (projectWrap && !projectWrap.contains(e.target)) hideProjectList();
         if (partyWrap && !partyWrap.contains(e.target)) hidePartyFormList();
         if (subWrap && !subWrap.contains(e.target)) hideSubFormList();
+        if (purchaseFileWrap && !purchaseFileWrap.contains(e.target)) hidePurchaseFileList();
     });
 
     window.__daybookPushPartySubCategory = function (row) {
@@ -889,7 +1042,9 @@
                         var row = {
                             id: result.data.id,
                             label: result.data.name,
+                            is_dha: result.data.is_dha !== undefined ? !!result.data.is_dha : true,
                             purchase_files: [],
+                            sale_files: [],
                             party_areas: result.data.party_areas || {},
                             parties_total_marla: result.data.parties_total_marla || 0,
                             parties_total_label: result.data.parties_total_label || ''
@@ -900,6 +1055,7 @@
                             rows.forEach(function (r) {
                                 if (String(r.id) === nid) {
                                     r.label = result.data.name;
+                                    r.is_dha = row.is_dha;
                                     r.party_areas = row.party_areas;
                                     r.parties_total_marla = row.parties_total_marla;
                                     r.parties_total_label = row.parties_total_label;
@@ -907,7 +1063,7 @@
                             });
                         }
                         projectFormHidden.value = nid;
-                        projectFormSearch.value = result.data.name;
+                        projectFormSearch.value = (row.is_dha ? '🟢 ' : '🟡 ') + result.data.name;
                         if (typeof window.__daybookSyncPurchaseFileSelect === 'function') {
                             window.__daybookSyncPurchaseFileSelect(nid, '');
                         }
@@ -936,6 +1092,195 @@
                 });
         });
     }
+})();
+
+(function () {
+    var projectHidden = document.getElementById('daybook_form_project_id');
+    var projectSearch = document.getElementById('daybook_form_project_search');
+    var fileCreateBtn = document.getElementById('daybook_form_file_create');
+    var modalEl = document.getElementById('daybookCreatePurchaseFileModal');
+    var projectIdInput = document.getElementById('daybook_modal_file_project_id');
+    var projectNameInput = document.getElementById('daybook_modal_file_project_name');
+    var nameInput = document.getElementById('daybook_modal_file_name');
+    var dateInput = document.getElementById('daybook_modal_file_date');
+    var primaryBtn = document.getElementById('daybook_modal_file_primary');
+    var errEl = document.getElementById('daybook_modal_file_error');
+    var token = document.querySelector('meta[name="csrf-token"]');
+    if (!projectHidden || !fileCreateBtn || !modalEl || !nameInput || !dateInput || !primaryBtn || !token || typeof bootstrap === 'undefined') return;
+
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
+
+    function showModalErr(msg) {
+        if (!errEl) return;
+        errEl.textContent = msg || '';
+        errEl.classList.toggle('d-none', !msg);
+    }
+
+    function resetFileModalFields() {
+        if (nameInput) nameInput.value = '';
+        if (dateInput) dateInput.value = "{{ now()->toDateString() }}";
+        if (projectIdInput) projectIdInput.value = '';
+        if (projectNameInput) projectNameInput.value = '';
+    }
+
+    function clearPrimaryLoading() {
+        primaryBtn.classList.remove('is-loading');
+        primaryBtn.disabled = false;
+        primaryBtn.removeAttribute('aria-busy');
+        primaryBtn.setAttribute('aria-label', 'Create sale file');
+    }
+
+    function setPrimaryLoading(loading) {
+        if (loading) {
+            primaryBtn.classList.add('is-loading');
+            primaryBtn.disabled = true;
+            primaryBtn.setAttribute('aria-busy', 'true');
+            primaryBtn.setAttribute('aria-label', 'Saving…');
+        } else {
+            clearPrimaryLoading();
+        }
+    }
+
+    function validateModal() {
+        var projectId = (projectIdInput && (projectIdInput.value || '').trim()) || '';
+        if (!projectId) {
+            showModalErr('Select a project first.');
+            return false;
+        }
+        var name = (nameInput.value || '').trim();
+        if (!name) {
+            showModalErr('Please enter a file name.');
+            if (window.daybookModalFocusText) window.daybookModalFocusText(nameInput);
+            else nameInput.focus();
+            return false;
+        }
+        if (!(dateInput.value || '').trim()) {
+            showModalErr('Please select a file date.');
+            dateInput.focus();
+            return false;
+        }
+        return true;
+    }
+
+    function pushSaleFileToProject(projectId, filePayload) {
+        var rows = window.__daybookFormProjectRows || [];
+        var project = rows.find(function (r) { return String(r.id) === String(projectId); });
+        if (!project || !filePayload || filePayload.id == null) return;
+        if (!Array.isArray(project.sale_files)) project.sale_files = [];
+        if (!Array.isArray(project.purchase_files)) project.purchase_files = [];
+        var fid = String(filePayload.id);
+        if (!project.sale_files.some(function (f) { return String(f.id) === fid; })) {
+            project.sale_files.push(filePayload);
+        }
+        if (!project.purchase_files.some(function (f) { return String(f.id) === fid; })) {
+            project.purchase_files.push({
+                id: filePayload.id,
+                label: filePayload.label || filePayload.file_name || ('File #' + filePayload.id)
+            });
+        }
+    }
+
+    fileCreateBtn.addEventListener('click', function () {
+        showModalErr('');
+        var pid = String(projectHidden.value || '').trim();
+        if (!pid) {
+            showModalErr('Select a project first.');
+            return;
+        }
+        var rows = window.__daybookFormProjectRows || [];
+        var project = rows.find(function (r) { return String(r.id) === pid; });
+        if (!project) {
+            showModalErr('Select a valid project first.');
+            return;
+        }
+        resetFileModalFields();
+        if (projectIdInput) projectIdInput.value = pid;
+        if (projectNameInput) projectNameInput.value = project.label || (projectSearch ? projectSearch.value : '') || ('Project #' + pid);
+        fileCreateBtn.blur();
+        modal.show();
+    });
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+        if (nameInput && window.daybookModalFocusText) {
+            window.daybookModalFocusText(nameInput, { scheduleEnsure: true });
+        } else if (nameInput) {
+            nameInput.focus();
+        }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        showModalErr('');
+        resetFileModalFields();
+        clearPrimaryLoading();
+    });
+
+    modalEl.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        if (e.target && e.target.closest && e.target.closest('a')) return;
+        if (primaryBtn && !primaryBtn.disabled) primaryBtn.click();
+    });
+
+    primaryBtn.addEventListener('click', function () {
+        if (primaryBtn.classList.contains('is-loading')) return;
+        showModalErr('');
+        if (!validateModal()) return;
+
+        var payload = {
+            project_id: parseInt(projectIdInput.value, 10),
+            file_name: (nameInput.value || '').trim(),
+            file_date: (dateInput.value || '').trim()
+        };
+
+        setPrimaryLoading(true);
+        fetch(@json(route('purchase.files.quick-store')), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': token.getAttribute('content'),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    return { ok: res.ok, data: data };
+                }).catch(function () {
+                    return { ok: false, data: {} };
+                });
+            })
+            .then(function (result) {
+                setPrimaryLoading(false);
+                if (result.ok && result.data && result.data.id) {
+                    var pid = String(payload.project_id);
+                    pushSaleFileToProject(pid, result.data);
+                    if (typeof window.__daybookSyncPurchaseFileSelect === 'function') {
+                        window.__daybookSyncPurchaseFileSelect(pid, result.data.id);
+                    }
+                    if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') {
+                        window.__daybookSyncAllFieldResetVisibility();
+                    }
+                    resetFileModalFields();
+                    showModalErr('');
+                    modal.hide();
+                } else {
+                    var msg = 'Could not create sale file.';
+                    if (result.data && result.data.errors) {
+                        var keys = Object.keys(result.data.errors);
+                        if (keys.length && result.data.errors[keys[0]] && result.data.errors[keys[0]][0]) {
+                            msg = result.data.errors[keys[0]][0];
+                        }
+                    } else if (result.data && result.data.message) {
+                        msg = result.data.message;
+                    }
+                    showModalErr(msg);
+                }
+            })
+            .catch(function () {
+                setPrimaryLoading(false);
+                showModalErr('Something went wrong. Try again.');
+            });
+    });
 })();
 
 (function () {
@@ -1570,12 +1915,24 @@
         list.classList.add('d-none');
         list.setAttribute('hidden', '');
         search.setAttribute('aria-expanded', 'false');
+        if (wrap) {
+            wrap.classList.remove('is-open');
+            var panel = wrap.closest('.daybook-panel');
+            if (panel && !panel.querySelector('.daybook-form-combo.is-open')) {
+                panel.classList.remove('is-combo-open');
+            }
+        }
     }
 
     function showBankList() {
         list.classList.remove('d-none');
         list.removeAttribute('hidden');
         search.setAttribute('aria-expanded', 'true');
+        if (wrap) {
+            wrap.classList.add('is-open');
+            var panel = wrap.closest('.daybook-panel');
+            if (panel) panel.classList.add('is-combo-open');
+        }
     }
 
     function filterBankRows(q) {
@@ -1802,7 +2159,10 @@
     var projectHidden = document.getElementById('daybook_form_project_id');
     var partySubWrap = document.getElementById('daybook_party_sub_category_wrap');
     var factoryWrap = document.getElementById('daybook_factory_fields');
-    var subSelect = document.getElementById('daybook_factory_sub_category_id');
+    var subHidden = document.getElementById('daybook_factory_sub_category_id');
+    var subSearch = document.getElementById('daybook_factory_sub_search');
+    var subList = document.getElementById('daybook_factory_sub_listbox');
+    var subWrap = subSearch ? subSearch.closest('.daybook-form-combo') : null;
     var unitInput = document.getElementById('daybook_factory_unit');
     var unitList = document.getElementById('daybook_factory_unit_listbox');
     var unitWrap = unitInput ? unitInput.closest('.daybook-form-combo') : null;
@@ -1811,7 +2171,7 @@
     var priceInput = document.getElementById('daybook_factory_unit_price');
     var amountInput = document.getElementById('entry_amount');
     var factoryJsonEl = document.getElementById('daybook-form-factory-sub-json');
-    if (!projectHidden || !factoryWrap || !subSelect || !qtyInput || !priceInput || !amountInput) return;
+    if (!projectHidden || !factoryWrap || !subHidden || !subSearch || !subList || !qtyInput || !priceInput || !amountInput) return;
 
     var factorySubRows = [];
     if (factoryJsonEl) {
@@ -1831,6 +2191,20 @@
         }
     }
 
+    function setFactoryComboOpen(wrap, open) {
+        if (!wrap) return;
+        wrap.classList.toggle('is-open', !!open);
+        var panel = wrap.closest('.daybook-panel');
+        if (!panel) return;
+        if (open) {
+            panel.classList.add('is-combo-open');
+            return;
+        }
+        if (!panel.querySelector('.daybook-form-combo.is-open')) {
+            panel.classList.remove('is-combo-open');
+        }
+    }
+
     function getSelectedProject() {
         var pid = String(projectHidden.value || '').trim();
         if (!pid) return null;
@@ -1846,23 +2220,77 @@
         return lt === 'factory';
     }
 
+    function hideFactorySubList() {
+        subList.classList.add('d-none');
+        subList.setAttribute('hidden', '');
+        subSearch.setAttribute('aria-expanded', 'false');
+        setFactoryComboOpen(subWrap, false);
+    }
+
+    function showFactorySubList() {
+        subList.classList.remove('d-none');
+        subList.removeAttribute('hidden');
+        subSearch.setAttribute('aria-expanded', 'true');
+        setFactoryComboOpen(subWrap, true);
+    }
+
+    function filterFactorySubRows(q) {
+        var nq = (q || '').toLowerCase().trim();
+        if (!nq) return factorySubRows.slice();
+        return factorySubRows.filter(function (row) {
+            return String(row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function renderFactorySubList(rows) {
+        subList.innerHTML = '';
+        if (!rows.length) {
+            var li0 = document.createElement('li');
+            li0.className = 'daybook-form-combo-empty';
+            li0.setAttribute('role', 'presentation');
+            li0.textContent = factorySubRows.length ? 'No sub categories match.' : 'No sub categories yet.';
+            subList.appendChild(li0);
+            showFactorySubList();
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.dataset.id = String(row.id);
+            btn.textContent = row.label || ('#' + row.id);
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+            });
+            btn.addEventListener('click', function () {
+                subHidden.value = String(row.id);
+                subSearch.value = row.label || ('#' + row.id);
+                hideFactorySubList();
+                setUnitFromSubCategoryId(row.id, true);
+            });
+            li.appendChild(btn);
+            subList.appendChild(li);
+        });
+        showFactorySubList();
+    }
+
+    function openFilteredFactorySubList() {
+        renderFactorySubList(filterFactorySubRows(subSearch.value));
+    }
+
     function syncFactoryOptionList(selectedId) {
         var selected = String(selectedId || '').trim();
-        subSelect.innerHTML = '';
-        var opt0 = document.createElement('option');
-        opt0.value = '';
-        opt0.textContent = '— Select sub category —';
-        subSelect.appendChild(opt0);
-        factorySubRows.forEach(function (r) {
-            var opt = document.createElement('option');
-            opt.value = String(r.id);
-            opt.textContent = r.label || ('#' + r.id);
-            subSelect.appendChild(opt);
-        });
-        if (selected && factorySubRows.some(function (r) { return String(r.id) === selected; })) {
-            subSelect.value = selected;
+        var match = selected
+            ? factorySubRows.find(function (r) { return String(r.id) === selected; })
+            : null;
+        if (match) {
+            subHidden.value = String(match.id);
+            subSearch.value = match.label || ('#' + match.id);
         } else {
-            subSelect.value = '';
+            subHidden.value = '';
+            subSearch.value = '';
         }
     }
 
@@ -1934,6 +2362,7 @@
         unitList.classList.add('d-none');
         unitList.setAttribute('hidden', '');
         unitInput.setAttribute('aria-expanded', 'false');
+        setFactoryComboOpen(unitWrap, false);
     }
 
     function showUnitList() {
@@ -1941,6 +2370,7 @@
         unitList.classList.remove('d-none');
         unitList.removeAttribute('hidden');
         unitInput.setAttribute('aria-expanded', 'true');
+        setFactoryComboOpen(unitWrap, true);
     }
 
     function filterUnitOptions(q) {
@@ -1992,13 +2422,16 @@
         factoryWrap.classList.toggle('d-none', !on);
         if (partySubWrap) partySubWrap.classList.toggle('d-none', on);
 
-        setRequired(subSelect, on);
+        setRequired(subHidden, on);
         setRequired(qtyInput, on);
         setRequired(priceInput, on);
         setReadOnly(amountInput, on);
+        subSearch.disabled = !on;
 
         if (!on) {
-            if (subSelect) subSelect.value = '';
+            hideFactorySubList();
+            if (subHidden) subHidden.value = '';
+            if (subSearch) subSearch.value = '';
             if (qtyInput) qtyInput.value = '';
             if (priceInput) priceInput.value = '';
             if (unitInput) unitInput.value = '';
@@ -2015,12 +2448,12 @@
         var oldQty = "{{ old('quantity', $daybookFactoryQuantityDefault ?? '') }}";
         var oldPrice = "{{ old('unit_price', $daybookFactoryUnitPriceDefault ?? '') }}";
 
-        var keepSelected = String(subSelect.value || '').trim() || oldSelected;
+        var keepSelected = String(subHidden.value || '').trim() || oldSelected;
         syncFactoryOptionList(keepSelected);
         if (String(qtyInput.value || '').trim() === '' && oldQty !== '') qtyInput.value = oldQty;
         if (String(priceInput.value || '').trim() === '' && oldPrice !== '') priceInput.value = oldPrice;
         // On init keep any existing/old unit; only fill from default when empty.
-        setUnitFromSubCategoryId(subSelect.value, false);
+        setUnitFromSubCategoryId(subHidden.value, false);
         updateAmountFromQtyPrice();
     }
 
@@ -2028,9 +2461,19 @@
 
     syncMode();
 
-    // Picking a sub category overwrites the unit with its default; the user can still edit it afterwards.
-    subSelect.addEventListener('change', function () {
-        setUnitFromSubCategoryId(subSelect.value, true);
+    subSearch.addEventListener('focus', function () {
+        if (subSearch.disabled) return;
+        openFilteredFactorySubList();
+    });
+    subSearch.addEventListener('input', function () {
+        subHidden.value = '';
+        openFilteredFactorySubList();
+    });
+    subSearch.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            hideFactorySubList();
+        }
     });
 
     if (unitInput && unitList) {
@@ -2046,10 +2489,12 @@
                 hideUnitList();
             }
         });
-        document.addEventListener('click', function (e) {
-            if (unitWrap && !unitWrap.contains(e.target)) hideUnitList();
-        });
     }
+
+    document.addEventListener('click', function (e) {
+        if (subWrap && !subWrap.contains(e.target)) hideFactorySubList();
+        if (unitWrap && !unitWrap.contains(e.target)) hideUnitList();
+    });
 
     qtyInput.addEventListener('input', function () {
         enforceQtyInput();

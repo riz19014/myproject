@@ -191,7 +191,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
         <h1 class="mb-1">File Sale</h1>
-        <p class="text-muted small mb-0">Project: <strong>{{ $project->name }}</strong></p>
+        <p class="text-muted small mb-0">Project: <strong><x-project-name :project="$project" /></strong></p>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('sale.projects.exemption.edit', $project) }}" class="btn btn-outline-theme">Exemption setup</a>

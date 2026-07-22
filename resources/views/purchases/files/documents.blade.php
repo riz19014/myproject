@@ -11,7 +11,7 @@
             @if($purchase_file->file_date)
                 · Date: <strong>{{ $purchase_file->file_date->format('d M Y') }}</strong>
             @endif
-            · Project: <strong>{{ $purchase_file->project->name }}</strong>
+            · Project: <strong><x-project-name :project="$purchase_file->project" /></strong>
         </p>
     </div>
     <a href="{{ route('purchase.files.index') }}" class="btn btn-outline-theme">Back to files</a>

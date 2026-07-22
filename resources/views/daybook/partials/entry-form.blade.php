@@ -38,17 +38,28 @@
                 @enderror
                 <div class="mt-2" id="daybook_form_file_wrap">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                        <label class="form-label daybook-label mb-0" for="daybook_form_purchase_file_id">Sale file <span class="text-muted fw-normal">(optional)</span></label>
-                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_file_reset" aria-label="Clear sale file">Reset</button>
+                        <label class="form-label daybook-label mb-0" for="daybook_form_purchase_file_search">Sale file <span class="text-muted fw-normal">(optional)</span></label>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-theme daybook-field-add-btn px-2 py-0 d-none" id="daybook_form_file_create" aria-label="Create sale file" title="Create sale file" disabled><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_file_reset" aria-label="Clear sale file">Reset</button>
+                        </div>
                     </div>
-                    <select
-                        name="purchase_file_id"
-                        id="daybook_form_purchase_file_id"
-                        class="form-select form-select-theme @error('purchase_file_id') is-invalid @enderror"
-                        disabled
-                    >
-                        <option value="">— Select project first —</option>
-                    </select>
+                    <div class="daybook-form-combo @error('purchase_file_id') is-invalid @enderror">
+                        <input type="hidden" name="purchase_file_id" id="daybook_form_purchase_file_id" value="{{ old('purchase_file_id', $daybookPurchaseFileIdDefault ?? '') }}">
+                        <input
+                            type="text"
+                            class="form-control form-control-theme @error('purchase_file_id') is-invalid @enderror"
+                            id="daybook_form_purchase_file_search"
+                            placeholder="Select project first…"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-controls="daybook_form_purchase_file_listbox"
+                            aria-autocomplete="list"
+                            disabled
+                        >
+                        <ul class="daybook-form-combo-list d-none" id="daybook_form_purchase_file_listbox" role="listbox" hidden></ul>
+                    </div>
                     @error('purchase_file_id')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
@@ -218,14 +229,22 @@
         {{-- Factory-only: Construction & Material expense fields (hidden unless selected project is Factory) --}}
         <div class="row g-4 mt-1 pt-3 border-top border-secondary border-opacity-25 d-none" id="daybook_factory_fields">
             <div class="col-md-6">
-                <label class="form-label daybook-label" for="daybook_factory_sub_category_id">Sub Category</label>
-                <select
-                    id="daybook_factory_sub_category_id"
-                    name="sub_category_id"
-                    class="form-select form-select-theme @error('sub_category_id') is-invalid @enderror"
-                >
-                    <option value="">— Select sub category —</option>
-                </select>
+                <label class="form-label daybook-label" for="daybook_factory_sub_search">Sub Category</label>
+                <div class="daybook-form-combo @error('sub_category_id') is-invalid @enderror">
+                    <input type="hidden" name="sub_category_id" id="daybook_factory_sub_category_id" value="{{ old('sub_category_id', $daybookFactorySubCategoryIdDefault ?? '') }}">
+                    <input
+                        type="text"
+                        class="form-control form-control-theme @error('sub_category_id') is-invalid @enderror"
+                        id="daybook_factory_sub_search"
+                        placeholder="Search sub category…"
+                        autocomplete="off"
+                        role="combobox"
+                        aria-expanded="false"
+                        aria-controls="daybook_factory_sub_listbox"
+                        aria-autocomplete="list"
+                    >
+                    <ul class="daybook-form-combo-list d-none" id="daybook_factory_sub_listbox" role="listbox" hidden></ul>
+                </div>
                 @error('sub_category_id')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror

@@ -17,7 +17,7 @@
     <div>
         <h1 class="mb-1">Sale land</h1>
         <p class="text-muted small mb-1">
-            Project: <strong>{{ $project->name }}</strong>
+            Project: <strong><x-project-name :project="$project" /></strong>
             @if($scopedPurchaseFiles->isNotEmpty())
                 · File: <strong>{{ $scopedPurchaseFiles->pluck('file_name')->implode(', ') }}</strong>
                 · <a href="{{ route('projects.sale-land', $project) }}">View all</a>
@@ -292,7 +292,7 @@
                             </div>
                         @endif
                         <p class="text-muted small mb-3" id="sale-land-sale-modal-meta">
-                            Project: <strong>{{ $project->name }}</strong>
+                            Project: <strong><x-project-name :project="$project" /></strong>
                             · Total land: <strong id="sale-land-sale-total-land">—</strong>
                         </p>
 

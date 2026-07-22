@@ -147,3 +147,43 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="daybookCreatePurchaseFileModal" tabindex="-1" aria-labelledby="daybookCreatePurchaseFileModalLabel" aria-hidden="true" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="daybookCreatePurchaseFileModalLabel">Create sale file</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="daybook-project-modal-panel mb-0">
+                    <label class="daybook-modal-label" for="daybook_modal_file_project_name">Project</label>
+                    <input type="text" class="form-control form-control-theme" id="daybook_modal_file_project_name" readonly tabindex="-1">
+                    <input type="hidden" id="daybook_modal_file_project_id" value="">
+                </div>
+                <div class="daybook-project-modal-panel mt-3 mb-0">
+                    <label class="daybook-modal-label" for="daybook_modal_file_name">File name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-theme" id="daybook_modal_file_name" placeholder="e.g. 23 kanal 5 marla, DHA block A" autocomplete="off" maxlength="255">
+                </div>
+                <div class="daybook-project-modal-panel mt-3 mb-0">
+                    <label class="daybook-modal-label" for="daybook_modal_file_date">File date <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control form-control-theme" id="daybook_modal_file_date" value="{{ now()->toDateString() }}">
+                </div>
+                <p class="text-muted small mt-3 mb-0">Dealers can be added later from Purchase files.</p>
+                <p class="text-danger small mt-2 mb-0 d-none" id="daybook_modal_file_error" role="alert"></p>
+            </div>
+            <div class="modal-footer flex-nowrap gap-2 align-items-center">
+                <button type="button" class="btn btn-outline-theme flex-grow-1 flex-sm-grow-0" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="daybook-save-record text-nowrap ms-sm-auto" id="daybook_modal_file_primary" aria-label="Create sale file">
+                    <span class="daybook-save-record__idle">
+                        <span id="daybook_modal_file_primary_label">Create file</span>
+                    </span>
+                    <span class="daybook-save-record__busy" aria-hidden="true">
+                        <span class="daybook-save-spinner" role="status" aria-hidden="true"></span>
+                        <span>Saving…</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

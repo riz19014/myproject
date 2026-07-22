@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/files', [PurchaseFileController::class, 'index'])->name('purchase.files.index');
     Route::get('purchase/files/create', [PurchaseFileController::class, 'create'])->name('purchase.files.create');
     Route::post('purchase/files', [PurchaseFileController::class, 'store'])->name('purchase.files.store');
+    Route::post('purchase/files/quick-store', [PurchaseFileController::class, 'quickStore'])->name('purchase.files.quick-store');
     Route::get('purchase/files/{purchase_file}', [PurchaseFileController::class, 'show'])->name('purchase.files.show');
     Route::get('purchase/files/{purchase_file}/ledger-pdf', [PurchaseFileController::class, 'ledgerPdf'])->name('purchase.files.ledger-pdf');
     Route::get('purchase/files/{purchase_file}/payment-sheet-pdf', [PurchaseFileController::class, 'paymentSheetPdf'])->name('purchase.files.payment-sheet-pdf');

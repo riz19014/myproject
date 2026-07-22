@@ -13,6 +13,7 @@ class Project extends Model
         'name',
         'sort_order',
         'land_type_id',
+        'is_dha',
         'marla_per_acre',
     ];
 
@@ -32,12 +33,30 @@ class Project extends Model
     {
         return [
             'marla_per_acre' => 'decimal:4',
+            'is_dha' => 'boolean',
         ];
     }
 
     public function landType(): BelongsTo
     {
         return $this->belongsTo(LandType::class);
+    }
+
+    public function isDha(): bool
+    {
+        return (bool) $this->is_dha;
+    }
+
+    /** Green (DHA) / yellow (non-DHA) emoji for plain-text selects and labels. */
+    public function dhaIndicatorEmoji(): string
+    {
+        return $this->isDha() ? '🟢' : '🟡';
+    }
+
+    /** Project name with DHA indicator prefix (for <option> labels, JSON, etc.). */
+    public function labeledName(): string
+    {
+        return $this->dhaIndicatorEmoji().' '.$this->name;
     }
 
     public function projectFiles(): HasMany

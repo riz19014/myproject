@@ -21,7 +21,7 @@
                     <select class="form-select form-select-theme" id="project" name="project" required>
                         <option value="" disabled selected>— Select project —</option>
                         @foreach($purchaseProjects as $p)
-                            <option value="{{ $p->id }}">{{ $p->name }}@if($p->landType) — {{ $p->landType->name }}@endif</option>
+                            <option value="{{ $p->id }}">{{ $p->labeledName() }}@if($p->landType) — {{ $p->landType->name }}@endif</option>
                         @endforeach
                     </select>
                 </div>

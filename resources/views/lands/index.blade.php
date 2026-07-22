@@ -69,9 +69,9 @@
                                 </td>
                                 <td class="small">
                                     @if($file['project_id'])
-                                        <a href="{{ route('sale.files.index', $file['project_id']) }}" class="text-decoration-none">{{ $file['project_name'] }}</a>
+                                        <a href="{{ route('sale.files.index', $file['project_id']) }}" class="text-decoration-none"><x-project-name :name="$file['project_name']" :is-dha="$file['project_is_dha'] ?? false" /></a>
                                     @else
-                                        {{ $file['project_name'] }}
+                                        <x-project-name :name="$file['project_name']" :is-dha="$file['project_is_dha'] ?? false" />
                                     @endif
                                 </td>
                                 <td class="small">{{ $file['total_label'] }}</td>

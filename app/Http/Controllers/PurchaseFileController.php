@@ -109,6 +109,32 @@ class PurchaseFileController extends Controller
             ->with('success', 'Purchase file "'.$file->file_name.'" created.');
     }
 
+    public function quickStore(Request $request)
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'file_name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('purchase_files', 'file_name')->where(fn ($q) => $q->where('project_id', (int) $request->input('project_id'))),
+            ],
+            'file_date' => ['required', 'date'],
+        ], [
+            'file_name.unique' => 'A file with this name already exists for the selected project.',
+        ]);
+
+        $file = PurchaseFile::create([
+            'project_id' => (int) $validated['project_id'],
+            'file_name' => trim($validated['file_name']),
+            'file_date' => $validated['file_date'],
+        ]);
+
+        $file->load(['purchaseItems.party', 'fileSaleLand', 'sales']);
+
+        return response()->json($file->daybookSaleFilePayload());
+    }
+
     public function sellers(PurchaseFile $purchase_file)
     {
         $purchase_file->load('project');
@@ -609,7 +635,7 @@ class PurchaseFileController extends Controller
 
         return [
             'headline' => $headline,
-            'project_name' => $file->project?->name ?? '—',
+            'project_name' => $file->project?->labeledName() ?? '—',
             'file_date' => $file->file_date?->format('d M Y') ?? '—',
             'dealers' => $file->dealers->pluck('name')->filter()->implode(', ') ?: null,
             'owner_names' => $ownerNames->implode(', ') ?: null,
@@ -1278,15 +1304,16 @@ class PurchaseFileController extends Controller
         }
 
         $finalBalance = $openingAmount - $paidRunning;
+        $totals = $this->fileLedgerRowTotals($rows);
 
         return [
             'title' => $title,
             'subtitle' => $subtitle,
             'rows' => $rows,
             'footer' => [
-                'label' => 'Balance Payable',
-                'debit' => null,
-                'credit' => $paidRunning > 0 ? $paidRunning : null,
+                'label' => 'Total',
+                'debit' => $totals['debit'],
+                'credit' => $totals['credit'],
                 'running_balance' => $finalBalance,
             ],
         ];
@@ -1418,14 +1445,16 @@ class PurchaseFileController extends Controller
             );
         }
 
+        $totals = $this->fileLedgerRowTotals($rows);
+
         return [
             'title' => $subCategoryName,
             'subtitle' => 'All parties · '.$categoryName,
             'rows' => $rows,
             'footer' => [
-                'label' => 'Combined balance payable',
-                'debit' => null,
-                'credit' => $totalPaid > 0 ? $totalPaid : null,
+                'label' => 'Total',
+                'debit' => $totals['debit'],
+                'credit' => $totals['credit'],
                 'running_balance' => $combinedRunning,
             ],
         ];
@@ -1491,16 +1520,46 @@ class PurchaseFileController extends Controller
             );
         }
 
+        $totals = $this->fileLedgerRowTotals($rows);
+
         return [
             'title' => $title,
             'subtitle' => $subtitle,
             'rows' => $rows,
             'footer' => [
-                'label' => 'Balance Payable',
-                'debit' => null,
-                'credit' => $paidRunning > 0 ? $paidRunning : null,
+                'label' => 'Total',
+                'debit' => $totals['debit'],
+                'credit' => $totals['credit'],
                 'running_balance' => max(0.0, $totalAmount - $paidRunning),
             ],
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{debit: float|null, credit: float|null}
+     */
+    private function fileLedgerRowTotals(array $rows): array
+    {
+        $debit = 0.0;
+        $credit = 0.0;
+        $hasDebit = false;
+        $hasCredit = false;
+
+        foreach ($rows as $row) {
+            if ($row['debit'] !== null && $row['debit'] !== '') {
+                $debit += (float) $row['debit'];
+                $hasDebit = true;
+            }
+            if ($row['credit'] !== null && $row['credit'] !== '') {
+                $credit += (float) $row['credit'];
+                $hasCredit = true;
+            }
+        }
+
+        return [
+            'debit' => $hasDebit ? $debit : null,
+            'credit' => $hasCredit ? $credit : null,
         ];
     }
 

@@ -141,7 +141,7 @@
     <div class="doc-header">
         <h1>Sale land report</h1>
         <div class="project-name">
-            {{ $project->name }}@if(($scopedPurchaseFiles ?? collect())->isNotEmpty()) — {{ ($scopedPurchaseFiles ?? collect())->pluck('file_name')->implode(', ') }}@endif
+            {{ $project->labeledName() }}@if(($scopedPurchaseFiles ?? collect())->isNotEmpty()) — {{ ($scopedPurchaseFiles ?? collect())->pluck('file_name')->implode(', ') }}@endif
         </div>
         <div class="generated">Generated {{ $generatedAt->format('d M Y, H:i') }}</div>
     </div>

@@ -860,8 +860,10 @@ class DayBookController extends Controller
                 'paid_by' => $e->getPaidByLabel(),
                 'link_label' => $linkLabel,
                 'linked_project_name' => $linkProject?->name ?? '',
+                'linked_project_is_dha' => $linkProject?->isDha(),
                 'linked_project_area' => $linkedProjectAreaLine,
                 'project_name' => $projectName,
+                'project_is_dha' => $ctxProject?->isDha(),
                 'project_area' => $projectArea,
                 'sub_category' => $subCat,
                 'category' => $categoryName,
@@ -966,6 +968,7 @@ class DayBookController extends Controller
                     [
                         'id' => $p->id,
                         'label' => $p->name,
+                        'is_dha' => $p->isDha(),
                         'land_type' => $landTypeName,
                         'is_factory' => $isFactory,
                         'sale_files' => $saleFiles,

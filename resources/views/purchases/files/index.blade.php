@@ -25,7 +25,7 @@
                 <select name="project" id="project" class="form-select form-select-theme">
                     <option value="">All projects</option>
                     @foreach($projects as $p)
-                        <option value="{{ $p->id }}" @selected((string) $projectId === (string) $p->id)>{{ $p->name }}</option>
+                        <option value="{{ $p->id }}" @selected((string) $projectId === (string) $p->id)>{{ $p->labeledName() }}</option>
                     @endforeach
                 </select>
             </div>
@@ -95,7 +95,7 @@
                                     <a href="{{ route('purchase.files.show', $file) }}" class="text-decoration-none">{{ $file->file_name }}</a>
                                 </td>
                                 <td class="small text-nowrap">{{ $file->file_date?->format('d M Y') ?? '—' }}</td>
-                                <td class="small">{{ $file->project?->name ?? '—' }}</td>
+                                <td class="small">@if($file->project)<x-project-name :project="$file->project" />@else—@endif</td>
                                 <td class="text-center">
                                     <a href="{{ route('purchase.files.sellers', $file) }}" class="purchase-sellers-badge" title="View or add sellers for this file">
                                         <i class="bi bi-people" aria-hidden="true"></i>
@@ -122,7 +122,7 @@
                                         data-form-id="sale-land-form-{{ $file->id }}"
                                         data-file-name="{{ $file->file_name }}"
                                         data-file-date="{{ $file->file_date?->format('d M Y') ?? '—' }}"
-                                        data-project-name="{{ $file->project?->name ?? '—' }}"
+                                        data-project-name="{{ $file->project?->labeledName() ?? '—' }}"
                                         data-sellers-count="{{ $file->purchase_items_count }}"
                                         data-land-area="{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($fileTotalMarla) }}"
                                         data-total-rs="{{ number_format($fileTotalRs, 0) }}"

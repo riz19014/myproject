@@ -117,7 +117,7 @@
                                     </td>
                                 @endif
                                 <td class="project-row-num">{{ $loop->iteration }}</td>
-                                <td class="fw-semibold">{{ $project->name }}</td>
+                                <td class="fw-semibold"><x-project-name :project="$project" /></td>
                                 <td class="small text-muted">{{ $project->landType?->name ?? '—' }}</td>
                                 <td class="text-center">
                                     <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="badge badge-pink rounded-pill text-decoration-none fw-semibold px-3 py-2" title="Purchase files">

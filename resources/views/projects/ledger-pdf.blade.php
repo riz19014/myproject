@@ -95,7 +95,7 @@
 <body>
     @include('pdf.partials.company-header')
     <h1>Ledger</h1>
-    <div class="project-name">{{ $project->name }}</div>
+    <div class="project-name">{{ $project->labeledName() }}</div>
 
     @if($entries->isEmpty())
         <p class="empty-note">No daybook entries linked to this project.</p>
