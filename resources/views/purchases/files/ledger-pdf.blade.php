@@ -181,13 +181,13 @@
             color: #444;
         }
         .signature-details {
-            margin-top: 2.5mm !important;
+            margin-top: 2mm !important;
         }
-        .signature-details__sign-block {
-            margin-top: 6mm !important;
+        .signature-details__sign {
+            margin-top: 2.8mm !important;
         }
         .signature-details__sign-label {
-            margin-bottom: 2.5mm !important;
+            margin-bottom: 1.4mm !important;
         }
     </style>
 </head>

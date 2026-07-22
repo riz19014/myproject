@@ -267,7 +267,7 @@
                     </div>
                 </div>
                 <div class="alert alert-danger small mt-3 mb-0 d-none" id="pf-party-selection-error"></div>
-                <p class="small text-muted mt-3 mb-0">If no seller is selected, selected buyer(s) appear in the first signature column. The accountant appears only when the logged-in user has type Accountant.</p>
+                <p class="small text-muted mt-3 mb-0">Each selected seller and buyer gets a separate signature block. The logged-in user’s role, name, and signature are always included.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Cancel</button>

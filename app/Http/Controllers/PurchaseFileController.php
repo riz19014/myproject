@@ -460,16 +460,14 @@ class PurchaseFileController extends Controller
 
     /**
      * @return array{
-     *     columns: list<array{role: string, people: list<array{name: string, cnic: string}>, signature_line: string}>,
-     *     accountant: array{name: string, cnic: string}|null
+     *     blocks: list<array{role: string, name: string, cnic: string}>
      * }
      */
     private function purchaseFileSignatureDetails(
         PurchaseFile $purchaseFile,
         ?array $selectedSellerIds = null,
         ?array $selectedBuyerIds = null
-    ): array
-    {
+    ): array {
         $partyDetails = static function ($parties, ?array $selectedIds): array {
             $uniqueParties = $parties->filter()->unique('id');
             if ($selectedIds !== null) {
@@ -495,61 +493,52 @@ class PurchaseFileController extends Controller
             $selectedBuyerIds
         );
 
+        $blocks = [];
+
+        foreach ($sellers as $index => $seller) {
+            $blocks[] = [
+                'role' => count($sellers) > 1 ? 'Seller '.($index + 1) : 'Seller',
+                'name' => $seller['name'],
+                'cnic' => $seller['cnic'],
+            ];
+        }
+
+        foreach ($buyers as $index => $buyer) {
+            $blocks[] = [
+                'role' => count($buyers) > 1 ? 'Buyer '.($index + 1) : 'Buyer',
+                'name' => $buyer['name'],
+                'cnic' => $buyer['cnic'],
+            ];
+        }
+
+        $blocks[] = $this->purchaseFileSignatureCurrentUserBlock();
+
         return [
-            'columns' => $this->buildPurchaseFileSignatureColumns($sellers, $buyers),
-            'accountant' => $this->purchaseFileSignatureAccountant(),
+            'blocks' => $blocks,
         ];
     }
 
     /**
-     * First column: sellers when selected; otherwise buyers. Second column: buyers only when sellers occupy the first.
+     * Logged-in user is always included (role, name, signature required).
      *
-     * @param  list<array{name: string, cnic: string}>  $sellers
-     * @param  list<array{name: string, cnic: string}>  $buyers
-     * @return list<array{role: string, people: list<array{name: string, cnic: string}>, signature_line: string}>
+     * @return array{role: string, name: string, cnic: string}
      */
-    private function buildPurchaseFileSignatureColumns(array $sellers, array $buyers): array
-    {
-        $columns = [];
-
-        if ($sellers !== []) {
-            $columns[] = [
-                'role' => 'Seller(s)',
-                'people' => $sellers,
-                'signature_line' => 'Seller signature(s)',
-            ];
-
-            if ($buyers !== []) {
-                $columns[] = [
-                    'role' => 'Buyer(s)',
-                    'people' => $buyers,
-                    'signature_line' => 'Buyer signature(s)',
-                ];
-            }
-        } elseif ($buyers !== []) {
-            $columns[] = [
-                'role' => 'Buyer(s)',
-                'people' => $buyers,
-                'signature_line' => 'Buyer signature(s)',
-            ];
-        }
-
-        return $columns;
-    }
-
-    /**
-     * @return array{name: string, cnic: string}|null
-     */
-    private function purchaseFileSignatureAccountant(): ?array
+    private function purchaseFileSignatureCurrentUserBlock(): array
     {
         $user = auth()->user();
-        if (! $user instanceof User || $user->type !== User::TYPE_ACCOUNTANT) {
-            return null;
+
+        if ($user instanceof User) {
+            return [
+                'role' => $user->typeLabel(),
+                'name' => trim((string) $user->name) !== '' ? $user->name : '—',
+                'cnic' => trim((string) $user->cnic) !== '' ? CnicFormat::display($user->cnic) : '—',
+            ];
         }
 
         return [
-            'name' => $user->name,
-            'cnic' => trim((string) $user->cnic) !== '' ? CnicFormat::display($user->cnic) : '—',
+            'role' => User::typeLabels()[User::TYPE_ACCOUNTANT],
+            'name' => '—',
+            'cnic' => '—',
         ];
     }
 
