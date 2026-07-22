@@ -26,9 +26,12 @@
         table-layout: fixed;
     }
     .signature-details__cell {
-        padding: 1.5mm 2mm;
-        border: 0.5pt solid #555;
+        padding: 1.5mm 3mm 1.5mm 0;
+        border: 0;
         vertical-align: top;
+    }
+    .signature-details__cell:last-child {
+        padding-right: 0;
     }
     .signature-details__role {
         margin-bottom: 1mm;
@@ -49,13 +52,21 @@
     .signature-details__cnic {
         color: #444;
     }
-    .signature-details__line {
-        margin-top: 6mm;
-        padding-top: 0.8mm;
-        border-top: 0.5pt solid #333;
+    .signature-details__sign-block {
+        margin-top: 8mm;
+        text-align: left;
+    }
+    .signature-details__sign-label {
+        margin: 0 0 3.5mm;
         font-size: 7pt;
         color: #444;
-        text-align: center;
+        text-align: left;
+    }
+    .signature-details__line {
+        margin: 0;
+        width: 88%;
+        border-top: 0.5pt solid #333;
+        height: 0;
     }
 </style>
 
@@ -72,7 +83,10 @@
                             <span class="signature-details__cnic">· CNIC: {{ $person['cnic'] }}</span>
                         </div>
                     @endforeach
-                    <div class="signature-details__line">{{ $column['signature_line'] }}</div>
+                    <div class="signature-details__sign-block">
+                        <div class="signature-details__sign-label">{{ $column['signature_line'] }}</div>
+                        <div class="signature-details__line"></div>
+                    </div>
                 </td>
             @endforeach
             @if($accountant)
@@ -82,7 +96,10 @@
                         <span class="signature-details__name">{{ $accountant['name'] }}</span>
                         <span class="signature-details__cnic">· CNIC: {{ $accountant['cnic'] }}</span>
                     </div>
-                    <div class="signature-details__line">Accountant signature</div>
+                    <div class="signature-details__sign-block">
+                        <div class="signature-details__sign-label">Accountant signature</div>
+                        <div class="signature-details__line"></div>
+                    </div>
                 </td>
             @endif
         </tr>

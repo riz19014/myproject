@@ -4,33 +4,73 @@
     <meta charset="utf-8">
     <title>Purchase ledger</title>
     <style>
-        @include('pdf.partials.page-setup')
+        @page { margin: 4mm 7mm 8mm 7mm; }
         * { box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 9pt;
+            font-size: 8pt;
             color: #111;
             margin: 0;
-            line-height: 1.35;
+            line-height: 1.15;
         }
         @include('pdf.partials.company-header-styles')
+        .pdf-co-header-wrap {
+            margin: 0 0 1.5mm 0;
+        }
+        .pdf-co-logo-cell {
+            width: 22mm;
+            padding-right: 1.5mm;
+        }
+        .pdf-co-logo-img {
+            width: 20mm;
+            max-width: 20mm;
+            max-height: 18mm;
+        }
+        .pdf-co-logo-fallback {
+            font-size: 12pt;
+        }
+        .pdf-co-name-primary {
+            font-size: 13pt;
+            line-height: 1;
+        }
+        .pdf-co-name-secondary {
+            font-size: 9pt;
+            margin-top: 0.3mm;
+            line-height: 1;
+        }
+        .pdf-co-contact-cell {
+            font-size: 7pt;
+            line-height: 1.2;
+            padding-left: 2.5mm;
+        }
+        .pdf-co-contact-name {
+            font-size: 8pt;
+            margin-bottom: 0.4mm;
+        }
+        .pdf-co-address-bar {
+            margin-top: 1mm;
+            font-size: 7pt;
+            padding: 1mm 2mm;
+            line-height: 1.15;
+        }
         table.ledger {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8pt;
-            margin-bottom: 1mm;
+            font-size: 7pt;
+            margin: 0.5mm 0 0 0;
         }
         table.ledger th {
-            border: 0.5pt solid #000;
+            border: 0.4pt solid #000;
             background: #eee;
-            padding: 1.5mm 2mm;
+            padding: 0.7mm 1mm;
             text-align: left;
             font-weight: bold;
             vertical-align: middle;
+            line-height: 1.1;
         }
         table.ledger th .ledger-th-line {
             display: block;
-            line-height: 1.15;
+            line-height: 1.05;
         }
         table.ledger th.amt,
         table.ledger td.amt {
@@ -38,14 +78,15 @@
             white-space: nowrap;
         }
         table.ledger td {
-            border: 0.5pt solid #333;
-            padding: 1.8mm 2mm;
+            border: 0.4pt solid #333;
+            padding: 0.6mm 1mm;
             vertical-align: top;
+            line-height: 1.1;
         }
         table.ledger td.payment-cell {
-            font-size: 7pt;
-            line-height: 1.2;
-            padding: 1.2mm 1.5mm;
+            font-size: 6pt;
+            line-height: 1.1;
+            padding: 0.5mm 0.8mm;
         }
         .payment-detail span {
             display: block;
@@ -58,24 +99,25 @@
         }
         .payment-detail__desc {
             color: #444;
-            font-size: 6.5pt;
+            font-size: 5.5pt;
         }
         table.ledger tr.opening td { background: #f5f5f5; }
         table.ledger tr.footer td {
             background: #f0f0f0;
             font-weight: bold;
+            padding: 0.7mm 1mm;
         }
         .empty-note {
-            font-size: 8.5pt;
+            font-size: 7.5pt;
             color: #444;
-            margin: 0 0 3mm 0;
+            margin: 0 0 1.5mm 0;
         }
         .ledger-file-summary {
             width: 100%;
             border-collapse: collapse;
-            margin: 0 0 2mm 0;
-            font-size: 7.5pt;
-            line-height: 1.25;
+            margin: 0 0 1mm 0;
+            font-size: 6.5pt;
+            line-height: 1.15;
             color: #222;
         }
         .ledger-file-summary td {
@@ -85,36 +127,36 @@
         }
         .ledger-file-summary__left {
             width: 58%;
-            padding-right: 3mm;
+            padding-right: 2mm;
         }
         .ledger-file-summary__right {
             width: 42%;
         }
         .ledger-file-summary__headline {
-            font-size: 9pt;
+            font-size: 8pt;
             font-weight: bold;
-            margin-bottom: 0.5mm;
+            margin-bottom: 0.2mm;
         }
         .ledger-file-summary__line {
             color: #333;
         }
         .ledger-file-summary__land-label {
             font-weight: bold;
-            font-size: 7pt;
+            font-size: 6pt;
             color: #444;
         }
         .ledger-file-summary__land-rs {
             font-weight: bold;
-            font-size: 8.5pt;
-            margin-top: 0.2mm;
+            font-size: 7.5pt;
+            margin-top: 0;
         }
         .ledger-file-summary__land-area {
-            font-size: 7pt;
+            font-size: 6pt;
             color: #444;
-            margin-top: 0.2mm;
+            margin-top: 0;
         }
         .ledger-file-summary__meta-row {
-            padding-top: 0.6mm;
+            padding-top: 0.3mm;
         }
         .ledger-file-summary__meta-table {
             width: 100%;
@@ -127,19 +169,25 @@
         }
         .ledger-file-summary__meta-cell {
             width: 50%;
-            padding-right: 2mm;
+            padding-right: 1.5mm;
             color: #333;
         }
         .ledger-file-summary__meta-cell:last-child {
             padding-right: 0;
-            padding-left: 2mm;
+            padding-left: 1.5mm;
         }
         .ledger-file-summary__meta-label {
             font-weight: bold;
             color: #444;
         }
-        table.ledger {
-            margin-top: 1mm;
+        .signature-details {
+            margin-top: 2.5mm !important;
+        }
+        .signature-details__sign-block {
+            margin-top: 6mm !important;
+        }
+        .signature-details__sign-label {
+            margin-bottom: 2.5mm !important;
         }
     </style>
 </head>
@@ -170,35 +218,23 @@
         <table class="ledger">
             <thead>
                 <tr>
-                    <th style="width:6%;">
-                        <span class="ledger-th-line">#Sr</span>
-                        <span class="ledger-th-line">&nbsp;</span>
-                    </th>
-                    <th style="width:11%;">
-                        <span class="ledger-th-line">Date</span>
-                        <span class="ledger-th-line">&nbsp;</span>
-                    </th>
-                    <th style="width:10%;">
-                        <span class="ledger-th-line">#Voucher</span>
-                        <span class="ledger-th-line">&nbsp;</span>
-                    </th>
-                    <th>
-                        <span class="ledger-th-line">Party</span>
-                        <span class="ledger-th-line">&nbsp;</span>
-                    </th>
+                    <th style="width:5%;">#Sr</th>
+                    <th style="width:10%;">Date</th>
+                    <th style="width:9%;">#Voucher</th>
+                    <th>Party</th>
                     <th style="width:14%;">
                         <span class="ledger-th-line">Payment</span>
                         <span class="ledger-th-line">Method</span>
                     </th>
-                    <th class="amt" style="width:13%;">
+                    <th class="amt" style="width:12%;">
                         <span class="ledger-th-line">Debit</span>
                         <span class="ledger-th-line">(Payable)</span>
                     </th>
-                    <th class="amt" style="width:13%;">
+                    <th class="amt" style="width:12%;">
                         <span class="ledger-th-line">Credit</span>
                         <span class="ledger-th-line">(Paid)</span>
                     </th>
-                    <th class="amt" style="width:14%;">
+                    <th class="amt" style="width:13%;">
                         <span class="ledger-th-line">Running</span>
                         <span class="ledger-th-line">Balance</span>
                     </th>
