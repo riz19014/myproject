@@ -434,13 +434,6 @@ class PurchaseFileController extends Controller
 
             $selectedSellerIds = $availableSellerIds->intersect($selectedSellerIds)->values()->all();
             $selectedBuyerIds = $availableBuyerIds->intersect($selectedBuyerIds)->values()->all();
-
-            if ($availableSellerIds->isNotEmpty() && $selectedSellerIds === []) {
-                abort(422, 'Select at least one seller.');
-            }
-            if ($availableBuyerIds->isNotEmpty() && $selectedBuyerIds === []) {
-                abort(422, 'Select at least one buyer.');
-            }
         }
 
         $pdf = Pdf::loadView('purchases.files.ledger-pdf', [
@@ -847,16 +840,12 @@ class PurchaseFileController extends Controller
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{ledgerTree: list<array<string, mixed>>, ledgerSections: array<string, array<string, mixed>>}
+     * @param  \Illuminate\Support\Collection<int, DayBookEntry>  $allEntries
+     * @return \Illuminate\Support\Collection<int, int>
      */
-    private function buildPurchaseFileLedger(PurchaseFile $file, array $data): array
+    private function collectPurchaseFileLedgerPartyIds(PurchaseFile $file, array $data, $allEntries)
     {
-        $allEntries = DayBookEntry::query()
-            ->where('purchase_file_id', $file->id)
-            ->with(['partySubCategory.category', 'paidByParty'])
-            ->orderBy('entry_date')
-            ->orderBy('id')
-            ->get();
+        $file->loadMissing(['dealers', 'projectPartners']);
 
         $partyIds = collect();
         foreach ($data['sellers'] as $seller) {
@@ -867,12 +856,60 @@ class PurchaseFileController extends Controller
         foreach ($file->dealers as $dealer) {
             $partyIds->push((int) $dealer->id);
         }
+        foreach ($file->projectPartners as $partner) {
+            if ($partner->party_id) {
+                $partyIds->push((int) $partner->party_id);
+            }
+        }
         foreach ($allEntries as $entry) {
             if ($entry->link_type === DayBookEntry::LINK_PARTY && $entry->link_id) {
                 $partyIds->push((int) $entry->link_id);
             }
         }
-        $partyIds = $partyIds->unique()->sort()->values();
+
+        return $partyIds->unique()->sort()->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{land_total: float, commission: float, investment: float, share_percentage: float, opening: float}
+     */
+    private function purchaseFilePartyOpeningBreakdown(PurchaseFile $file, array $data, int $partyId): array
+    {
+        $file->loadMissing(['dealers', 'projectPartners']);
+
+        $landTotal = (float) $data['sellers']->where('party_id', $partyId)->sum('line_total_rs');
+        $dealer = $file->dealers->firstWhere('id', $partyId);
+        $commission = $dealer ? (float) ($dealer->pivot->commission_rs ?? 0) : 0.0;
+        $partner = $file->projectPartners->firstWhere('party_id', $partyId);
+        $investment = $partner ? (float) ($partner->investment_amount ?? 0) : 0.0;
+        $sharePercentage = $partner ? (float) ($partner->share_percentage ?? 0) : 0.0;
+
+        return [
+            'land_total' => $landTotal,
+            'commission' => $commission,
+            'investment' => $investment,
+            'share_percentage' => $sharePercentage,
+            'opening' => $landTotal + $commission + $investment,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{ledgerTree: list<array<string, mixed>>, ledgerSections: array<string, array<string, mixed>>}
+     */
+    private function buildPurchaseFileLedger(PurchaseFile $file, array $data): array
+    {
+        $file->loadMissing(['dealers', 'projectPartners']);
+
+        $allEntries = DayBookEntry::query()
+            ->where('purchase_file_id', $file->id)
+            ->with(['partySubCategory.category', 'paidByParty'])
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        $partyIds = $this->collectPurchaseFileLedgerPartyIds($file, $data, $allEntries);
 
         $parties = Party::query()
             ->with(['subCategory.category', 'category'])
@@ -884,10 +921,8 @@ class PurchaseFileController extends Controller
 
         foreach ($partyIds as $partyId) {
             $party = $parties->get($partyId);
-            $landTotal = (float) $data['sellers']->where('party_id', $partyId)->sum('line_total_rs');
-            $dealer = $file->dealers->firstWhere('id', $partyId);
-            $commission = $dealer ? (float) ($dealer->pivot->commission_rs ?? 0) : 0.0;
-            $openingAmount = $landTotal + $commission;
+            $breakdown = $this->purchaseFilePartyOpeningBreakdown($file, $data, (int) $partyId);
+            $openingAmount = $breakdown['opening'];
 
             $paymentEntries = $allEntries
                 ->where('link_type', DayBookEntry::LINK_PARTY)
@@ -905,10 +940,10 @@ class PurchaseFileController extends Controller
                 : null;
             $sections[$key] = $this->buildFileLedgerPaymentSection(
                 $party?->name ?? ('Party #'.$partyId),
-                $this->fileLedgerPartySubtitle($party, $landTotal, $commission),
+                $this->fileLedgerPartySubtitle($party, $breakdown),
                 $openingAmount,
-                $landTotal,
-                $commission,
+                $breakdown['land_total'],
+                $breakdown['commission'],
                 $landAreaSpoken,
                 $paymentEntries,
                 $parties,
@@ -1009,6 +1044,8 @@ class PurchaseFileController extends Controller
      */
     private function buildPurchaseFileLedgerTree(PurchaseFile $file, array $data, $allEntries, $parties): array
     {
+        $file->loadMissing(['dealers', 'projectPartners']);
+
         $subCategoryPartyIds = [];
 
         foreach ($data['sellers'] as $seller) {
@@ -1026,6 +1063,18 @@ class PurchaseFileController extends Controller
             $subId = (int) ($dealer->sub_category_id ?? 0);
             if ($subId > 0) {
                 $subCategoryPartyIds[$subId][(int) $dealer->id] = true;
+            }
+        }
+
+        foreach ($file->projectPartners as $partner) {
+            if (! $partner->party_id) {
+                continue;
+            }
+            $partyId = (int) $partner->party_id;
+            $party = $parties->get($partyId) ?? $partner->party;
+            $subId = (int) ($party?->sub_category_id ?? 0);
+            if ($subId > 0) {
+                $subCategoryPartyIds[$subId][$partyId] = true;
             }
         }
 
@@ -1066,14 +1115,12 @@ class PurchaseFileController extends Controller
                     continue;
                 }
 
-                $landTotal = (float) $data['sellers']->where('party_id', $partyId)->sum('line_total_rs');
-                $dealer = $file->dealers->firstWhere('id', $partyId);
-                $commission = $dealer ? (float) ($dealer->pivot->commission_rs ?? 0) : 0.0;
+                $breakdown = $this->purchaseFilePartyOpeningBreakdown($file, $data, $partyId);
                 $paymentEntries = $allEntries
                     ->where('link_type', DayBookEntry::LINK_PARTY)
                     ->where('link_id', $partyId);
 
-                if ($landTotal <= 0 && $commission <= 0 && $paymentEntries->isEmpty()) {
+                if ($breakdown['opening'] <= 0 && $paymentEntries->isEmpty()) {
                     continue;
                 }
 
@@ -1081,7 +1128,7 @@ class PurchaseFileController extends Controller
                     'party_id' => $partyId,
                     'key' => 'party_'.$partyId,
                     'label' => $party->name,
-                    'meta' => $this->fileLedgerPartyMeta($party, $landTotal, $commission),
+                    'meta' => $this->fileLedgerPartyMeta($party, $breakdown),
                 ];
             }
 
@@ -1182,11 +1229,11 @@ class PurchaseFileController extends Controller
                 paymentMethodLines: $entry->ledgerPaymentDetailLines(),
                 debit: $debit,
                 credit: $credit,
-                runningBalance: $openingAmount > 0 ? $openingAmount - $paidRunning : null,
+                runningBalance: $openingAmount - $paidRunning,
             );
         }
 
-        $finalBalance = $openingAmount > 0 ? $openingAmount - $paidRunning : null;
+        $finalBalance = $openingAmount - $paidRunning;
 
         return [
             'title' => $title,
@@ -1228,10 +1275,8 @@ class PurchaseFileController extends Controller
             }
 
             $party = $parties->get($partyId);
-            $landTotal = (float) $data['sellers']->where('party_id', $partyId)->sum('line_total_rs');
-            $dealer = $file->dealers->firstWhere('id', $partyId);
-            $commission = $dealer ? (float) ($dealer->pivot->commission_rs ?? 0) : 0.0;
-            $openingAmount = $landTotal + $commission;
+            $breakdown = $this->purchaseFilePartyOpeningBreakdown($file, $data, $partyId);
+            $openingAmount = $breakdown['opening'];
             $landAreaMarla = (float) $data['sellers']->where('party_id', $partyId)->sum('land_area_marla');
             $landAreaSpoken = $landAreaMarla > 0
                 ? LandMeasure::formatSpokenKanalMarlaFromMarla($landAreaMarla)
@@ -1454,14 +1499,23 @@ class PurchaseFileController extends Controller
         };
     }
 
-    private function fileLedgerPartySubtitle(?Party $party, float $landTotal, float $commission): ?string
+    /**
+     * @param  array{land_total: float, commission: float, investment: float, share_percentage: float, opening: float}  $breakdown
+     */
+    private function fileLedgerPartySubtitle(?Party $party, array $breakdown): ?string
     {
         $roles = [];
-        if ($landTotal > 0) {
+        if ($breakdown['land_total'] > 0) {
             $roles[] = 'Seller';
         }
-        if ($commission > 0) {
+        if ($breakdown['commission'] > 0) {
             $roles[] = 'Dealer';
+        }
+        if ($breakdown['investment'] > 0) {
+            $shareLabel = $breakdown['share_percentage'] > 0
+                ? 'Partner · '.number_format($breakdown['share_percentage'], 2).'% share'
+                : 'Partner';
+            $roles[] = $shareLabel;
         }
         if ($party && $party->relationLoaded('subCategory') && $party->subCategory) {
             $cat = $party->subCategory->relationLoaded('category') && $party->subCategory->category
@@ -1474,14 +1528,22 @@ class PurchaseFileController extends Controller
         return $roles !== [] ? implode(' · ', $roles) : null;
     }
 
-    private function fileLedgerPartyMeta(?Party $party, float $landTotal, float $commission): string
+    /**
+     * @param  array{land_total: float, commission: float, investment: float, share_percentage: float, opening: float}  $breakdown
+     */
+    private function fileLedgerPartyMeta(?Party $party, array $breakdown): string
     {
         $parts = [];
-        if ($landTotal > 0) {
+        if ($breakdown['land_total'] > 0) {
             $parts[] = 'Seller';
         }
-        if ($commission > 0) {
+        if ($breakdown['commission'] > 0) {
             $parts[] = 'Dealer';
+        }
+        if ($breakdown['investment'] > 0) {
+            $parts[] = $breakdown['share_percentage'] > 0
+                ? 'Partner · '.number_format($breakdown['share_percentage'], 2).'%'
+                : 'Partner';
         }
         if ($parts === [] && $party && $party->relationLoaded('category') && $party->category) {
             $parts[] = $party->category->name;

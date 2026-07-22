@@ -896,20 +896,7 @@
         var sellerIds = sellerCheckboxes.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
         var buyerIds = buyerCheckboxes.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
 
-        var errors = [];
-        if (sellerCheckboxes.length && !sellerIds.length) {
-            errors.push('Select at least one seller.');
-        }
-        if (buyerCheckboxes.length && !buyerIds.length) {
-            errors.push('Select at least one buyer.');
-        }
-        if (errors.length) {
-            partySelectionError.textContent = errors.join(' ');
-            partySelectionError.classList.remove('d-none');
-            return;
-        }
-
-        partySelectionError.classList.add('d-none');
+        partySelectionError?.classList.add('d-none');
         bootstrap.Modal.getOrCreateInstance(partySelectionModalEl).hide();
         downloadLedgerPdf(pdfBtn, {
             sellerIds: sellerIds,
