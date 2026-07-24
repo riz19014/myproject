@@ -298,6 +298,54 @@
         syncFileResetVisibility();
         syncFileCreateVisibility();
     }
+    window.__daybookSyncPurchaseFileSelect = syncPurchaseFileSelect;
+
+    /**
+     * Apply Sale wizard result onto the New Entry form
+     * (project, optional file + sold area, amount, description, type).
+     */
+    window.__daybookApplySaleToForm = function (payload) {
+        payload = payload || {};
+        var project = formProjectRows.find(function (r) { return String(r.id) === String(payload.projectId); });
+        if (!project || !projectHidden || !projectSearch) return false;
+
+        projectHidden.value = String(project.id);
+        projectSearch.value = projectLabeledName(project);
+        clearSoldAreaInputs();
+        syncPurchaseFileSelect(project.id, payload.purchaseFileId || '');
+        syncProjectResetVisibility();
+        if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
+        if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') window.__daybookSyncAllFieldResetVisibility();
+
+        var typeSelect = document.getElementById('entry_type');
+        if (typeSelect) {
+            typeSelect.value = payload.type || 'cash_in';
+            typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (payload.soldAreaQty != null && payload.soldAreaQty !== '') {
+            var qtyEl = document.getElementById('daybook_sold_area_qty');
+            var unitEl = document.getElementById('daybook_sold_area_unit');
+            if (qtyEl) qtyEl.value = String(payload.soldAreaQty);
+            if (unitEl && payload.soldAreaUnit) unitEl.value = String(payload.soldAreaUnit);
+            syncSaleFileMeta(currentSaleFile());
+        }
+
+        if (payload.amount != null && payload.amount !== '') {
+            var amountEl = document.getElementById('entry_amount');
+            if (amountEl) {
+                amountEl.value = String(payload.amount);
+                amountEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+
+        if (payload.description != null && payload.description !== '') {
+            var descEl = document.getElementById('entry_description');
+            if (descEl) descEl.value = String(payload.description);
+        }
+
+        return true;
+    };
 
     function currentSaleFile() {
         if (!purchaseFileHidden || !projectHidden) return null;
@@ -359,8 +407,6 @@
             qtyInput.placeholder = '0';
         }
     }
-
-    window.__daybookSyncPurchaseFileSelect = syncPurchaseFileSelect;
 
     function setComboOpen(wrap, open) {
         if (!wrap) return;
@@ -1879,15 +1925,27 @@
 
     function sync() {
         var m = methodEl.value;
-        var showBank = m === 'online' || m === 'cheque' || m === 'payorder';
-        var showRef = m === 'cheque' || m === 'payorder';
+        var showBank = m === 'online' || m === 'cheque' || m === 'payorder' || m === 'cash_deposit';
+        var showRef = m === 'cheque' || m === 'payorder' || m === 'cash_deposit';
         bankRow.classList.toggle('d-none', !showBank);
         refRow.classList.toggle('d-none', !showRef);
         if (refLabel) {
-            refLabel.textContent = m === 'payorder' ? 'Pay order reference #' : 'Cheque #';
+            if (m === 'payorder') {
+                refLabel.textContent = 'Pay order reference #';
+            } else if (m === 'cash_deposit') {
+                refLabel.textContent = 'Deposit reference #';
+            } else {
+                refLabel.textContent = 'Cheque #';
+            }
         }
         if (refInput) {
-            refInput.placeholder = m === 'payorder' ? 'Reference number' : 'Cheque number';
+            if (m === 'payorder') {
+                refInput.placeholder = 'Reference number';
+            } else if (m === 'cash_deposit') {
+                refInput.placeholder = 'Deposit slip / reference number';
+            } else {
+                refInput.placeholder = 'Cheque number';
+            }
         }
     }
 
@@ -2502,6 +2560,643 @@
     });
     priceInput.addEventListener('input', function () {
         updateAmountFromQtyPrice();
+    });
+})();
+
+(function () {
+    var openBtn = document.getElementById('daybook_form_sale_open');
+    var modalEl = document.getElementById('daybookSaleWizardModal');
+    if (!openBtn || !modalEl || typeof bootstrap === 'undefined') return;
+
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
+    var csrf = document.querySelector('meta[name="csrf-token"]');
+    var csrfToken = csrf ? csrf.getAttribute('content') : '';
+
+    var step = 1;
+    var selectedProject = null;
+    var selectedItem = null;
+    var itemRows = [];
+    var busy = false;
+
+    var projectHidden = document.getElementById('daybook_sale_project_id');
+    var projectSearch = document.getElementById('daybook_sale_project_search');
+    var projectList = document.getElementById('daybook_sale_project_listbox');
+    var projectWrap = projectSearch ? projectSearch.closest('.daybook-form-combo') : null;
+
+    var itemHidden = document.getElementById('daybook_sale_item_id');
+    var itemSearch = document.getElementById('daybook_sale_item_search');
+    var itemList = document.getElementById('daybook_sale_item_listbox');
+    var itemWrap = itemSearch ? itemSearch.closest('.daybook-form-combo') : null;
+
+    var errEl = document.getElementById('daybook_sale_wizard_error');
+    var subtitleEl = document.getElementById('daybook_sale_wizard_subtitle');
+    var step2Label = document.getElementById('daybook_sale_step2_label');
+    var itemLabel = document.getElementById('daybook_sale_item_label');
+    var modeBadge = document.getElementById('daybook_sale_mode_badge');
+    var backBtn = document.getElementById('daybook_sale_wizard_back');
+    var primaryBtn = document.getElementById('daybook_sale_wizard_primary');
+    var primaryLabel = document.getElementById('daybook_sale_wizard_primary_label');
+
+    function projectRows() {
+        return Array.isArray(window.__daybookFormProjectRows) ? window.__daybookFormProjectRows : [];
+    }
+
+    function isDha(row) {
+        return !!(row && (row.is_dha === true || row.is_dha === 1 || row.is_dha === '1'));
+    }
+
+    function projectLabeledName(row) {
+        if (!row) return '';
+        return (isDha(row) ? '🟢 ' : '🟡 ') + (row.label || '');
+    }
+
+    function appendProjectNameNode(parent, row) {
+        var wrap = document.createElement('span');
+        wrap.className = 'project-name-with-dot';
+        var dot = document.createElement('span');
+        dot.className = 'project-dha-dot ' + (isDha(row) ? 'is-dha' : 'is-not-dha');
+        dot.setAttribute('aria-hidden', 'true');
+        var text = document.createElement('span');
+        text.className = 'project-name-with-dot__text';
+        text.textContent = row.label || '';
+        wrap.appendChild(dot);
+        wrap.appendChild(text);
+        parent.appendChild(wrap);
+    }
+
+    function setBusy(on) {
+        busy = !!on;
+        modalEl.classList.toggle('is-busy', busy);
+        if (primaryBtn) primaryBtn.disabled = busy;
+        if (backBtn) backBtn.disabled = busy || step <= 1;
+    }
+
+    function showError(msg) {
+        if (!errEl) return;
+        if (!msg) {
+            errEl.textContent = '';
+            errEl.classList.add('d-none');
+            return;
+        }
+        errEl.textContent = msg;
+        errEl.classList.remove('d-none');
+    }
+
+    function setComboOpen(wrap, open) {
+        if (!wrap) return;
+        wrap.classList.toggle('is-open', !!open);
+    }
+
+    function hideList(list, search, wrap) {
+        if (!list || !search) return;
+        list.classList.add('d-none');
+        list.setAttribute('hidden', '');
+        search.setAttribute('aria-expanded', 'false');
+        setComboOpen(wrap, false);
+    }
+
+    function showList(list, search, wrap) {
+        if (!list || !search) return;
+        list.classList.remove('d-none');
+        list.removeAttribute('hidden');
+        search.setAttribute('aria-expanded', 'true');
+        setComboOpen(wrap, true);
+    }
+
+    function resetWizard() {
+        step = 1;
+        selectedProject = null;
+        selectedItem = null;
+        itemRows = [];
+        if (projectHidden) projectHidden.value = '';
+        if (projectSearch) projectSearch.value = '';
+        if (itemHidden) itemHidden.value = '';
+        if (itemSearch) itemSearch.value = '';
+        var soldQty = document.getElementById('daybook_sale_sold_qty');
+        var soldUnit = document.getElementById('daybook_sale_sold_unit');
+        var fileAmount = document.getElementById('daybook_sale_file_amount');
+        var fileNote = document.getElementById('daybook_sale_file_note');
+        var customer = document.getElementById('daybook_sale_customer_id');
+        var acre = document.getElementById('daybook_sale_plot_acre');
+        var kanal = document.getElementById('daybook_sale_plot_kanal');
+        var marla = document.getElementById('daybook_sale_plot_marla');
+        var sqft = document.getElementById('daybook_sale_plot_sqft');
+        var plotAmount = document.getElementById('daybook_sale_plot_amount');
+        if (soldQty) soldQty.value = '';
+        if (soldUnit) soldUnit.value = 'marla';
+        if (fileAmount) fileAmount.value = '';
+        if (fileNote) fileNote.value = '';
+        if (customer) customer.value = '';
+        if (acre) acre.value = '0';
+        if (kanal) kanal.value = '0';
+        if (marla) marla.value = '0';
+        if (sqft) sqft.value = '0';
+        if (plotAmount) plotAmount.value = '';
+        hideList(projectList, projectSearch, projectWrap);
+        hideList(itemList, itemSearch, itemWrap);
+        showError('');
+        renderStep();
+    }
+
+    function syncModeLabels() {
+        var dha = isDha(selectedProject);
+        if (step2Label) step2Label.textContent = dha ? 'File' : 'Plot';
+        if (itemLabel) itemLabel.textContent = dha ? 'Sale file' : 'Plot file';
+        if (modeBadge) {
+            modeBadge.textContent = dha ? 'File sale (DHA)' : 'Plot sale';
+            modeBadge.className = 'daybook-sale-mode-badge ' + (dha ? 'is-dha' : 'is-plot');
+        }
+        if (itemSearch) {
+            itemSearch.placeholder = dha ? 'Search sale file…' : 'Search plot file…';
+        }
+    }
+
+    function loadItemRows() {
+        if (!selectedProject) {
+            itemRows = [];
+            return;
+        }
+        if (isDha(selectedProject)) {
+            itemRows = (selectedProject.sale_files || selectedProject.purchase_files || []).slice();
+        } else {
+            itemRows = (selectedProject.plot_files || []).slice();
+        }
+    }
+
+    function currentItem() {
+        if (!itemHidden) return null;
+        var id = String(itemHidden.value || '').trim();
+        if (!id) return null;
+        return itemRows.find(function (r) { return String(r.id) === id; }) || null;
+    }
+
+    function itemLabelText(row) {
+        if (!row) return '';
+        var base = row.label || row.file_name || row.file_number || ('#' + row.id);
+        if (row.is_fully_sold) return base + ' · Fully sold';
+        if (isDha(selectedProject) && row.is_file_sale === false) return base + ' · Not in File Sale';
+        return base;
+    }
+
+    function syncItemMeta(row) {
+        var meta = document.getElementById('daybook_sale_item_meta');
+        var remainingEl = document.getElementById('daybook_sale_item_remaining');
+        var totalsEl = document.getElementById('daybook_sale_item_totals');
+        var statusWrap = document.getElementById('daybook_sale_item_status_wrap');
+        var statusEl = document.getElementById('daybook_sale_item_status');
+        if (!meta) return;
+        if (!row) {
+            meta.classList.add('d-none');
+            return;
+        }
+        meta.classList.remove('d-none');
+        if (remainingEl) remainingEl.textContent = row.remaining_label || '—';
+        if (totalsEl) totalsEl.textContent = (row.total_label || '—') + ' / ' + (row.sold_label || '—');
+        if (statusWrap && statusEl) {
+            if (row.status) {
+                statusWrap.classList.remove('d-none');
+                statusEl.textContent = row.status;
+            } else if (isDha(selectedProject)) {
+                statusWrap.classList.remove('d-none');
+                statusEl.textContent = row.is_file_sale ? 'In File Sale' : 'Not moved to File Sale';
+            } else {
+                statusWrap.classList.add('d-none');
+                statusEl.textContent = '—';
+            }
+        }
+    }
+
+    function syncDetailsSummaries() {
+        var fileSum = document.getElementById('daybook_sale_file_summary');
+        var plotSum = document.getElementById('daybook_sale_plot_summary');
+        var filePanel = document.getElementById('daybook_sale_details_file');
+        var plotPanel = document.getElementById('daybook_sale_details_plot');
+        var dha = isDha(selectedProject);
+        if (filePanel) filePanel.classList.toggle('d-none', !dha);
+        if (plotPanel) plotPanel.classList.toggle('d-none', dha);
+        var projName = selectedProject ? (selectedProject.label || '') : '—';
+        var itemName = selectedItem ? (selectedItem.label || selectedItem.file_name || selectedItem.file_number || '') : '—';
+        var avail = selectedItem ? (selectedItem.remaining_label || '—') : '—';
+        if (fileSum) {
+            fileSum.innerHTML = 'Project: <strong></strong> · File: <strong></strong> · Available: <strong></strong>';
+            var strongs = fileSum.querySelectorAll('strong');
+            if (strongs[0]) strongs[0].textContent = projName;
+            if (strongs[1]) strongs[1].textContent = itemName;
+            if (strongs[2]) strongs[2].textContent = avail;
+        }
+        if (plotSum) {
+            plotSum.innerHTML = 'Project: <strong></strong> · Plot file: <strong></strong> · Available: <strong></strong>';
+            var ps = plotSum.querySelectorAll('strong');
+            if (ps[0]) ps[0].textContent = projName;
+            if (ps[1]) ps[1].textContent = itemName;
+            if (ps[2]) ps[2].textContent = avail;
+        }
+    }
+
+    function renderStep() {
+        modalEl.querySelectorAll('[data-sale-panel]').forEach(function (panel) {
+            var n = parseInt(panel.getAttribute('data-sale-panel'), 10);
+            panel.classList.toggle('d-none', n !== step);
+        });
+        modalEl.querySelectorAll('.daybook-sale-steps__item').forEach(function (el) {
+            var n = parseInt(el.getAttribute('data-step'), 10);
+            el.classList.toggle('is-active', n === step);
+            el.classList.toggle('is-done', n < step);
+        });
+        if (backBtn) backBtn.disabled = busy || step <= 1;
+        if (primaryLabel) {
+            primaryLabel.textContent = step < 3 ? 'Next' : (isDha(selectedProject) ? 'Apply to entry' : 'Save plot sale');
+        }
+        if (subtitleEl) {
+            if (step === 1) subtitleEl.textContent = 'Select a project to begin.';
+            else if (step === 2) subtitleEl.textContent = isDha(selectedProject)
+                ? 'Choose a sale file for this DHA project.'
+                : 'Choose a plot file for this non-DHA project.';
+            else subtitleEl.textContent = isDha(selectedProject)
+                ? 'Enter sold area and amount for the file sale.'
+                : 'Enter customer, plot size, and amount.';
+        }
+        syncModeLabels();
+        syncItemMeta(selectedItem);
+        syncDetailsSummaries();
+    }
+
+    function filterProjects(q) {
+        var nq = (q || '').toLowerCase().replace(/[🟢🟡]/g, '').trim();
+        var rows = projectRows();
+        if (!nq) return rows.slice();
+        return rows.filter(function (row) {
+            return (row.label || '').toLowerCase().indexOf(nq) !== -1;
+        });
+    }
+
+    function filterItems(q) {
+        var nq = (q || '').toLowerCase().trim();
+        if (!nq) return itemRows.slice();
+        return itemRows.filter(function (row) {
+            var label = (row.label || row.file_name || row.file_number || '').toLowerCase();
+            return label.indexOf(nq) !== -1;
+        });
+    }
+
+    function renderProjectList(rows) {
+        if (!projectList) return;
+        projectList.innerHTML = '';
+        if (!rows.length) {
+            var empty = document.createElement('li');
+            empty.className = 'daybook-form-combo-empty';
+            empty.setAttribute('role', 'presentation');
+            empty.textContent = projectRows().length ? 'No projects match.' : 'No projects yet.';
+            projectList.appendChild(empty);
+            showList(projectList, projectSearch, projectWrap);
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            appendProjectNameNode(btn, row);
+            var hint = document.createElement('span');
+            hint.className = 'daybook-sale-option-hint';
+            hint.textContent = isDha(row) ? 'File sale' : 'Plot sale';
+            btn.appendChild(hint);
+            btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            btn.addEventListener('click', function () {
+                selectedProject = row;
+                selectedItem = null;
+                if (projectHidden) projectHidden.value = String(row.id);
+                if (projectSearch) projectSearch.value = projectLabeledName(row);
+                if (itemHidden) itemHidden.value = '';
+                if (itemSearch) itemSearch.value = '';
+                loadItemRows();
+                hideList(projectList, projectSearch, projectWrap);
+                showError('');
+                syncModeLabels();
+            });
+            li.appendChild(btn);
+            projectList.appendChild(li);
+        });
+        showList(projectList, projectSearch, projectWrap);
+    }
+
+    function renderItemList(rows) {
+        if (!itemList) return;
+        itemList.innerHTML = '';
+        if (!rows.length) {
+            var empty = document.createElement('li');
+            empty.className = 'daybook-form-combo-empty';
+            empty.setAttribute('role', 'presentation');
+            empty.textContent = itemRows.length
+                ? 'No matches.'
+                : (isDha(selectedProject) ? 'No purchase files on this project.' : 'No plot files on this project.');
+            itemList.appendChild(empty);
+            showList(itemList, itemSearch, itemWrap);
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            var disabled = !!row.is_fully_sold || (isDha(selectedProject) && row.is_file_sale === false);
+            if (disabled) btn.classList.add('is-disabled');
+            btn.textContent = itemLabelText(row);
+            btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            btn.addEventListener('click', function () {
+                if (row.is_fully_sold) {
+                    showError('This item is fully sold.');
+                    return;
+                }
+                if (isDha(selectedProject) && row.is_file_sale === false) {
+                    showError('Move this file to File Sale first before recording a file sale here.');
+                    return;
+                }
+                selectedItem = row;
+                if (itemHidden) itemHidden.value = String(row.id);
+                if (itemSearch) itemSearch.value = row.label || row.file_name || row.file_number || '';
+                hideList(itemList, itemSearch, itemWrap);
+                showError('');
+                syncItemMeta(row);
+            });
+            li.appendChild(btn);
+            itemList.appendChild(li);
+        });
+        showList(itemList, itemSearch, itemWrap);
+    }
+
+    function goNext() {
+        showError('');
+        if (step === 1) {
+            if (!selectedProject && projectHidden && projectHidden.value) {
+                selectedProject = projectRows().find(function (r) { return String(r.id) === String(projectHidden.value); }) || null;
+            }
+            if (!selectedProject) {
+                showError('Select a project first.');
+                return;
+            }
+            loadItemRows();
+            selectedItem = null;
+            if (itemHidden) itemHidden.value = '';
+            if (itemSearch) itemSearch.value = '';
+            syncItemMeta(null);
+            step = 2;
+            renderStep();
+            return;
+        }
+        if (step === 2) {
+            selectedItem = currentItem() || selectedItem;
+            if (!selectedItem) {
+                showError(isDha(selectedProject) ? 'Select a sale file.' : 'Select a plot file.');
+                return;
+            }
+            if (selectedItem.is_fully_sold) {
+                showError('This item is fully sold.');
+                return;
+            }
+            if (isDha(selectedProject) && selectedItem.is_file_sale === false) {
+                showError('Move this file to File Sale first before recording a file sale here.');
+                return;
+            }
+            step = 3;
+            renderStep();
+            return;
+        }
+        if (step === 3) {
+            if (isDha(selectedProject)) {
+                applyFileSale();
+            } else {
+                savePlotSale();
+            }
+        }
+    }
+
+    function goBack() {
+        showError('');
+        if (step <= 1) return;
+        step -= 1;
+        renderStep();
+    }
+
+    function applyFileSale() {
+        var qtyEl = document.getElementById('daybook_sale_sold_qty');
+        var unitEl = document.getElementById('daybook_sale_sold_unit');
+        var amountEl = document.getElementById('daybook_sale_file_amount');
+        var noteEl = document.getElementById('daybook_sale_file_note');
+        var qty = qtyEl ? parseFloat(qtyEl.value) : 0;
+        var unit = unitEl ? unitEl.value : 'marla';
+        var amount = amountEl ? parseFloat(amountEl.value) : 0;
+        if (!(qty > 0)) {
+            showError('Enter area sold greater than zero.');
+            return;
+        }
+        if (!(amount > 0)) {
+            showError('Enter a sale amount greater than zero.');
+            return;
+        }
+        var remaining = selectedItem && selectedItem.remaining_marla != null ? Number(selectedItem.remaining_marla) : null;
+        // Soft check in marla approx for marla unit only; server validates on save.
+        if (unit === 'marla' && remaining != null && qty > remaining + 0.0001) {
+            showError('Area sold exceeds available balance (' + (selectedItem.remaining_label || remaining) + ').');
+            return;
+        }
+        var note = noteEl && noteEl.value ? noteEl.value.trim() : '';
+        var ok = typeof window.__daybookApplySaleToForm === 'function' && window.__daybookApplySaleToForm({
+            projectId: selectedProject.id,
+            purchaseFileId: selectedItem.id,
+            soldAreaQty: qty,
+            soldAreaUnit: unit,
+            amount: amount.toFixed(2),
+            description: note || ('File sale — ' + (selectedItem.label || selectedItem.file_name || '')),
+            type: 'cash_in'
+        });
+        if (!ok) {
+            showError('Could not apply sale to the entry form.');
+            return;
+        }
+        modal.hide();
+        var amountField = document.getElementById('entry_amount');
+        if (amountField) amountField.focus();
+    }
+
+    function savePlotSale() {
+        var customerEl = document.getElementById('daybook_sale_customer_id');
+        var acreEl = document.getElementById('daybook_sale_plot_acre');
+        var kanalEl = document.getElementById('daybook_sale_plot_kanal');
+        var marlaEl = document.getElementById('daybook_sale_plot_marla');
+        var sqftEl = document.getElementById('daybook_sale_plot_sqft');
+        var amountEl = document.getElementById('daybook_sale_plot_amount');
+        var customerId = customerEl ? customerEl.value : '';
+        var acre = acreEl ? parseInt(acreEl.value, 10) || 0 : 0;
+        var kanal = kanalEl ? parseInt(kanalEl.value, 10) || 0 : 0;
+        var marla = marlaEl ? parseInt(marlaEl.value, 10) || 0 : 0;
+        var sqft = sqftEl ? parseInt(sqftEl.value, 10) || 0 : 0;
+        var amount = amountEl ? parseFloat(amountEl.value) : 0;
+        if (!customerId) {
+            showError('Select a customer.');
+            return;
+        }
+        if (acre + kanal + marla + sqft <= 0) {
+            showError('Enter at least one positive area value (acre, kanal, marla, or sq ft).');
+            return;
+        }
+        if (!(amount > 0)) {
+            showError('Enter a sale amount greater than zero.');
+            return;
+        }
+
+        setBusy(true);
+        showError('');
+        fetch(@json(route('daybook.sale.plot')), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                project_id: selectedProject.id,
+                project_file_id: selectedItem.id,
+                customer_id: parseInt(customerId, 10),
+                area_acre: acre,
+                area_kanal: kanal,
+                area_marla: marla,
+                area_sqft: sqft,
+                total_amount: amount
+            })
+        }).then(function (res) {
+            return res.json().then(function (data) {
+                return { ok: res.ok, status: res.status, data: data };
+            });
+        }).then(function (result) {
+            setBusy(false);
+            if (!result.ok) {
+                var msg = 'Could not save plot sale.';
+                if (result.data && result.data.errors) {
+                    var firstKey = Object.keys(result.data.errors)[0];
+                    if (firstKey && result.data.errors[firstKey] && result.data.errors[firstKey][0]) {
+                        msg = result.data.errors[firstKey][0];
+                    }
+                } else if (result.data && result.data.message) {
+                    msg = result.data.message;
+                }
+                showError(msg);
+                return;
+            }
+
+            // Refresh plot file remaining in memory
+            if (result.data && result.data.plot_file && selectedProject && Array.isArray(selectedProject.plot_files)) {
+                var updated = result.data.plot_file;
+                var idx = selectedProject.plot_files.findIndex(function (f) { return String(f.id) === String(updated.id); });
+                if (idx >= 0) selectedProject.plot_files[idx] = updated;
+                else selectedProject.plot_files.push(updated);
+            }
+
+            var customerName = '';
+            if (customerEl && customerEl.selectedIndex >= 0) {
+                customerName = customerEl.options[customerEl.selectedIndex].text || '';
+            }
+            var areaParts = [];
+            if (acre) areaParts.push(acre + ' acre');
+            if (kanal) areaParts.push(kanal + ' kanal');
+            if (marla) areaParts.push(marla + ' marla');
+            if (sqft) areaParts.push(sqft + ' sqft');
+            var desc = 'Plot sale — ' + (selectedItem.label || selectedItem.file_number || '') +
+                (customerName ? ' · ' + customerName : '') +
+                (areaParts.length ? ' · ' + areaParts.join(' ') : '');
+
+            var applied = typeof window.__daybookApplySaleToForm === 'function' && window.__daybookApplySaleToForm({
+                projectId: selectedProject.id,
+                purchaseFileId: null,
+                amount: amount.toFixed(2),
+                description: desc,
+                type: 'cash_in'
+            });
+            if (!applied) {
+                showError('Plot sale saved, but could not fill the entry form.');
+                return;
+            }
+            modal.hide();
+            var amountField = document.getElementById('entry_amount');
+            if (amountField) amountField.focus();
+        }).catch(function () {
+            setBusy(false);
+            showError('Network error while saving plot sale.');
+        });
+    }
+
+    openBtn.addEventListener('click', function () {
+        resetWizard();
+        modal.show();
+        if (projectSearch && window.daybookModalFocusText) {
+            window.daybookModalFocusText(projectSearch, { scheduleEnsure: true });
+        }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        setBusy(false);
+        hideList(projectList, projectSearch, projectWrap);
+        hideList(itemList, itemSearch, itemWrap);
+    });
+
+    if (backBtn) backBtn.addEventListener('click', goBack);
+    if (primaryBtn) primaryBtn.addEventListener('click', goNext);
+
+    var fillRemainingBtn = document.getElementById('daybook_sale_fill_remaining');
+    if (fillRemainingBtn) {
+        fillRemainingBtn.addEventListener('click', function () {
+            if (!selectedItem) return;
+            var qtyEl = document.getElementById('daybook_sale_sold_qty');
+            var unitEl = document.getElementById('daybook_sale_sold_unit');
+            if (!qtyEl || !unitEl) return;
+            unitEl.value = 'marla';
+            var rem = selectedItem.remaining_marla != null ? Number(selectedItem.remaining_marla) : 0;
+            qtyEl.value = rem > 0 ? String(rem) : '';
+        });
+    }
+
+    if (projectSearch) {
+        projectSearch.addEventListener('focus', function () {
+            renderProjectList(filterProjects(projectSearch.value));
+        });
+        projectSearch.addEventListener('input', function () {
+            selectedProject = null;
+            if (projectHidden) projectHidden.value = '';
+            renderProjectList(filterProjects(projectSearch.value));
+        });
+        projectSearch.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hideList(projectList, projectSearch, projectWrap);
+            }
+        });
+    }
+
+    if (itemSearch) {
+        itemSearch.addEventListener('focus', function () {
+            loadItemRows();
+            renderItemList(filterItems(itemSearch.value));
+        });
+        itemSearch.addEventListener('input', function () {
+            selectedItem = null;
+            if (itemHidden) itemHidden.value = '';
+            syncItemMeta(null);
+            renderItemList(filterItems(itemSearch.value));
+        });
+        itemSearch.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hideList(itemList, itemSearch, itemWrap);
+            }
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        if (projectWrap && !projectWrap.contains(e.target)) hideList(projectList, projectSearch, projectWrap);
+        if (itemWrap && !itemWrap.contains(e.target)) hideList(itemList, itemSearch, itemWrap);
     });
 })();
 </script>

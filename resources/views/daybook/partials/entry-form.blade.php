@@ -14,6 +14,10 @@
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <label class="form-label daybook-label mb-0" for="daybook_form_project_search">Project</label>
                     <div class="d-flex flex-wrap align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-pink daybook-sale-open-btn px-2 py-0" id="daybook_form_sale_open" aria-label="Record sale" title="Sale — pick project, then file or plot">
+                            <i class="bi bi-tag-fill" aria-hidden="true"></i>
+                            <span>Sale</span>
+                        </button>
                         <button type="button" class="btn btn-sm btn-outline-theme daybook-field-add-btn px-2 py-0" id="daybook_form_project_create" aria-label="Create project" title="Create project"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                         <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_project_reset" aria-label="Clear project">Reset</button>
                     </div>
@@ -308,6 +312,8 @@
             </div>
         </div>
         @php($daybookPaymentMethodOld = old('payment_method', $daybookPaymentMethodDefault ?? 'cash'))
+        @php($daybookPaymentReferenceLabel = $daybookPaymentMethodOld === 'payorder' ? 'Pay order reference #' : ($daybookPaymentMethodOld === 'cash_deposit' ? 'Deposit reference #' : 'Cheque #'))
+        @php($daybookPaymentReferencePlaceholder = $daybookPaymentMethodOld === 'payorder' ? 'Reference number' : ($daybookPaymentMethodOld === 'cash_deposit' ? 'Deposit slip / reference number' : 'Cheque number'))
         {{-- Paid by temporarily hidden from daybook UI
         @php($daybookPaidByPartyIdOld = old('paid_by_party_id', $daybookPaidByPartyIdDefault ?? ''))
         --}}
@@ -319,6 +325,7 @@
                     <option value="online" @selected($daybookPaymentMethodOld === 'online')>Online payment</option>
                     <option value="cheque" @selected($daybookPaymentMethodOld === 'cheque')>Cheque</option>
                     <option value="payorder" @selected($daybookPaymentMethodOld === 'payorder')>Pay order</option>
+                    <option value="cash_deposit" @selected($daybookPaymentMethodOld === 'cash_deposit')>Cash Deposit to Bank</option>
                 </select>
                 @error('payment_method')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -350,7 +357,7 @@
                 @enderror
             </div>
             --}}
-            <div class="col-md-6 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
+            <div class="col-md-6 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['online', 'cheque', 'payorder', 'cash_deposit'], true) ? '' : 'd-none' }}" id="entry_payment_bank_row">
                 <label class="form-label daybook-label" for="entry_payment_bank_search">Bank</label>
                 <div class="daybook-form-combo @error('payment_bank') is-invalid @enderror">
                     <input type="hidden" name="payment_bank" id="entry_payment_bank" value="{{ old('payment_bank', $daybookPaymentBankDefault ?? '') }}">
@@ -371,9 +378,9 @@
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-md-12 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['cheque', 'payorder'], true) ? '' : 'd-none' }}" id="entry_payment_reference_row">
-                <label class="form-label daybook-label" for="entry_payment_reference" id="entry_payment_reference_label">{{ $daybookPaymentMethodOld === 'payorder' ? 'Pay order reference #' : 'Cheque #' }}</label>
-                <input type="text" id="entry_payment_reference" name="payment_reference" class="form-control form-control-theme @error('payment_reference') is-invalid @enderror" placeholder="{{ $daybookPaymentMethodOld === 'payorder' ? 'Reference number' : 'Cheque number' }}" value="{{ old('payment_reference', $daybookPaymentReferenceDefault ?? '') }}" maxlength="100" autocomplete="off">
+            <div class="col-md-12 col-xl-3 {{ in_array($daybookPaymentMethodOld, ['cheque', 'payorder', 'cash_deposit'], true) ? '' : 'd-none' }}" id="entry_payment_reference_row">
+                <label class="form-label daybook-label" for="entry_payment_reference" id="entry_payment_reference_label">{{ $daybookPaymentReferenceLabel }}</label>
+                <input type="text" id="entry_payment_reference" name="payment_reference" class="form-control form-control-theme @error('payment_reference') is-invalid @enderror" placeholder="{{ $daybookPaymentReferencePlaceholder }}" value="{{ old('payment_reference', $daybookPaymentReferenceDefault ?? '') }}" maxlength="100" autocomplete="off">
                 @error('payment_reference')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror

@@ -138,7 +138,12 @@ final class FileSaleLandService
      *     total_amount: float,
      *     total_amount_formatted: string
      *   }>,
-     *   moved_files: list<array{id: int, name: string}>
+     *   moved_files: list<array{
+     *     id: int,
+     *     name: string,
+     *     owners: list<array<string, mixed>>,
+     *     total_amount_formatted: string
+     *   }>
      * }
      */
     public function buildFileSaleSummary(Project $project): array
@@ -217,7 +222,129 @@ final class FileSaleLandService
                 $file->daybookSaleFilePayload(),
                 ['name' => $file->file_name]
             ))->values()->all(),
+            'area_balance' => $this->buildAreaBalanceByMoza($project, $purchaseFileIds, $config),
         ];
+    }
+
+    /**
+     * Area balance: Mouza → file → khasra, with land + R1/R2/R3/C4… formula files grouped by Mouza.
+     *
+     * @param  list<int>  $purchaseFileIds
+     * @return array{
+     *   formula_columns: list<array<string, mixed>>,
+     *   moza_groups: list<array<string, mixed>>,
+     *   totals: array{total_land: string, formula_values: array<string, array{display: string, breakdown: string}>}
+     * }
+     */
+    private function buildAreaBalanceByMoza(Project $project, array $purchaseFileIds, SaleExemptionConfig $config): array
+    {
+        if ($purchaseFileIds === []) {
+            return [
+                'formula_columns' => [],
+                'moza_groups' => [],
+                'totals' => [
+                    'total_land' => '—',
+                    'formula_values' => [],
+                ],
+            ];
+        }
+
+        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, $purchaseFileIds);
+        $formulaColumns = collect($sheet['formula_columns'] ?? [])
+            ->map(function (array $column) {
+                return array_merge($column, [
+                    'column_code' => str_replace('.', '', (string) ($column['code'] ?? '')),
+                ]);
+            })
+            ->values()
+            ->all();
+
+        $groups = [];
+        foreach ($sheet['rows'] ?? [] as $row) {
+            $mozaKey = (string) ($row['moza_key'] ?? $row['moza'] ?? '');
+            if (! isset($groups[$mozaKey])) {
+                $groups[$mozaKey] = [
+                    'moza' => $row['moza'] ?? '—',
+                    'moza_key' => $mozaKey,
+                    'files' => [],
+                    'total_land_marla' => 0.0,
+                ];
+            }
+
+            $groups[$mozaKey]['files'][] = [
+                'purchase_file_id' => $row['purchase_file_id'] ?? null,
+                'file_name' => $row['file_name'] ?? '—',
+                'khasra' => $row['khasra'] ?? '—',
+                'land_owner' => $row['land_owner'] ?? '—',
+                'total_land' => $row['total_land'] ?? '—',
+                'total_land_marla' => (float) ($row['total_land_marla'] ?? 0),
+            ];
+            $groups[$mozaKey]['total_land_marla'] += (float) ($row['total_land_marla'] ?? 0);
+        }
+
+        uasort($groups, fn (array $a, array $b) => strnatcasecmp((string) $a['moza'], (string) $b['moza']));
+
+        $mozaGroups = [];
+        foreach ($groups as $group) {
+            $marla = (float) $group['total_land_marla'];
+            $mozaGroups[] = [
+                'moza' => $group['moza'],
+                'moza_key' => $group['moza_key'],
+                'files' => $group['files'],
+                'rowspan' => max(1, count($group['files'])),
+                'total_land_marla' => $marla,
+                'total_land' => $marla > 0 ? LandMeasure::formatAkmsLabelFromMarla($marla) : '—',
+                'formula_values' => $this->formulaValuesForMarla($marla, $config, $formulaColumns),
+            ];
+        }
+
+        $totalMarla = collect($mozaGroups)->sum(fn (array $g) => (float) $g['total_land_marla']);
+
+        return [
+            'formula_columns' => $formulaColumns,
+            'moza_groups' => $mozaGroups,
+            'totals' => [
+                'total_land' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($totalMarla) : '—',
+                'total_land_marla' => round($totalMarla, 4),
+                'formula_values' => $this->formulaValuesForMarla($totalMarla, $config, $formulaColumns),
+            ],
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $formulaColumns
+     * @return array<string, array{display: string, breakdown: string}>
+     */
+    private function formulaValuesForMarla(float $marla, SaleExemptionConfig $config, array $formulaColumns): array
+    {
+        if ($marla <= 0 || $formulaColumns === []) {
+            return [];
+        }
+
+        $calculator = SaleExemptionFileCalculator::calculate($marla, $config);
+        $byPlot = [];
+        foreach ($calculator['rows'] as $calcRow) {
+            $byPlot[$calcRow['component_slug'].'|'.$calcRow['plot_slug']] = [
+                'display' => SaleExemptionFileCalculator::formatFileCount((float) $calcRow['file_count']),
+                'breakdown' => SaleExemptionFileCalculator::formatFileBreakdown(
+                    (int) $calcRow['full_files'],
+                    (float) $calcRow['fraction_files'],
+                    (float) $calcRow['fraction_marla'],
+                ),
+            ];
+        }
+
+        $values = [];
+        foreach ($formulaColumns as $column) {
+            $key = ($column['component_slug'] ?? '').'|'.($column['plot_slug'] ?? '');
+            $plotKey = (string) ($column['plot_key'] ?? $key);
+            $values[$plotKey] = $byPlot[$key] ?? [
+                'display' => '—',
+                'breakdown' => '—',
+            ];
+        }
+
+        return $values;
     }
 
     private function shortPlotLabel(string $plotLabel): string

@@ -187,3 +187,209 @@
         </div>
     </div>
 </div>
+
+{{-- Sale wizard: Project → File (DHA) / Plot (non-DHA) → Details --}}
+<div class="modal fade" id="daybookSaleWizardModal" tabindex="-1" aria-labelledby="daybookSaleWizardModalLabel" aria-hidden="true" data-bs-focus="false">
+    <div class="modal-dialog daybook-sale-wizard-dialog modal-fullscreen-sm-down">
+        <div class="modal-content daybook-sale-wizard">
+            <div class="modal-header daybook-sale-wizard__header">
+                <div class="daybook-sale-wizard__brand">
+                    <span class="daybook-sale-wizard__icon" aria-hidden="true"><i class="bi bi-tag-fill"></i></span>
+                    <div>
+                        <h2 class="modal-title" id="daybookSaleWizardModalLabel">Record sale</h2>
+                        <p class="daybook-sale-wizard__subtitle mb-0" id="daybook_sale_wizard_subtitle">Select a project to begin.</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body daybook-sale-wizard__body">
+                <ol class="daybook-sale-steps" aria-label="Sale steps">
+                    <li class="daybook-sale-steps__item is-active" data-step="1">
+                        <span class="daybook-sale-steps__num">1</span>
+                        <span class="daybook-sale-steps__text">
+                            <span class="daybook-sale-steps__title">Project</span>
+                            <span class="daybook-sale-steps__desc">Choose project</span>
+                        </span>
+                    </li>
+                    <li class="daybook-sale-steps__connector" aria-hidden="true"></li>
+                    <li class="daybook-sale-steps__item" data-step="2">
+                        <span class="daybook-sale-steps__num">2</span>
+                        <span class="daybook-sale-steps__text">
+                            <span class="daybook-sale-steps__title" id="daybook_sale_step2_label">File / Plot</span>
+                            <span class="daybook-sale-steps__desc">Pick what to sell</span>
+                        </span>
+                    </li>
+                    <li class="daybook-sale-steps__connector" aria-hidden="true"></li>
+                    <li class="daybook-sale-steps__item" data-step="3">
+                        <span class="daybook-sale-steps__num">3</span>
+                        <span class="daybook-sale-steps__text">
+                            <span class="daybook-sale-steps__title">Details</span>
+                            <span class="daybook-sale-steps__desc">Amount &amp; area</span>
+                        </span>
+                    </li>
+                </ol>
+
+                <div class="daybook-sale-panel daybook-sale-card" data-sale-panel="1">
+                    <div class="daybook-sale-card__head">
+                        <h3 class="daybook-sale-card__title">Select project</h3>
+                        <p class="daybook-sale-card__hint mb-0">🟢 DHA sells <strong>files</strong> · 🟡 Non-DHA sells <strong>plots</strong></p>
+                    </div>
+                    <label class="daybook-modal-label" for="daybook_sale_project_search">Project</label>
+                    <div class="daybook-form-combo daybook-sale-combo mb-0">
+                        <input type="hidden" id="daybook_sale_project_id" value="">
+                        <input
+                            type="text"
+                            class="form-control form-control-theme form-control-lg"
+                            id="daybook_sale_project_search"
+                            placeholder="Search project…"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-controls="daybook_sale_project_listbox"
+                            aria-autocomplete="list"
+                        >
+                        <ul class="daybook-form-combo-list d-none" id="daybook_sale_project_listbox" role="listbox" hidden></ul>
+                    </div>
+                </div>
+
+                <div class="daybook-sale-panel daybook-sale-card d-none" data-sale-panel="2">
+                    <div class="daybook-sale-card__head d-flex flex-wrap align-items-start justify-content-between gap-2">
+                        <div>
+                            <h3 class="daybook-sale-card__title mb-1" id="daybook_sale_item_label">Sale file</h3>
+                            <p class="daybook-sale-card__hint mb-0">Search and select an available item</p>
+                        </div>
+                        <span class="daybook-sale-mode-badge" id="daybook_sale_mode_badge">File sale</span>
+                    </div>
+                    <label class="daybook-modal-label visually-hidden" for="daybook_sale_item_search">Search</label>
+                    <div class="daybook-form-combo daybook-sale-combo mb-3">
+                        <input type="hidden" id="daybook_sale_item_id" value="">
+                        <input
+                            type="text"
+                            class="form-control form-control-theme form-control-lg"
+                            id="daybook_sale_item_search"
+                            placeholder="Search…"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-controls="daybook_sale_item_listbox"
+                            aria-autocomplete="list"
+                        >
+                        <ul class="daybook-form-combo-list d-none" id="daybook_sale_item_listbox" role="listbox" hidden></ul>
+                    </div>
+                    <div id="daybook_sale_item_meta" class="daybook-sale-item-meta d-none">
+                        <div class="daybook-sale-stat">
+                            <span class="daybook-sale-stat__label">Available</span>
+                            <span class="daybook-sale-stat__value" id="daybook_sale_item_remaining">—</span>
+                        </div>
+                        <div class="daybook-sale-stat">
+                            <span class="daybook-sale-stat__label">Total / Sold</span>
+                            <span class="daybook-sale-stat__value" id="daybook_sale_item_totals">—</span>
+                        </div>
+                        <div class="daybook-sale-stat" id="daybook_sale_item_status_wrap">
+                            <span class="daybook-sale-stat__label">Status</span>
+                            <span class="daybook-sale-stat__value" id="daybook_sale_item_status">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="daybook-sale-panel d-none" data-sale-panel="3">
+                    <div id="daybook_sale_details_file" class="daybook-sale-card d-none">
+                        <div class="daybook-sale-card__head">
+                            <h3 class="daybook-sale-card__title">File sale details</h3>
+                            <p class="daybook-sale-card__hint mb-0" id="daybook_sale_file_summary">—</p>
+                        </div>
+                        <div class="row g-3 g-lg-4">
+                            <div class="col-sm-7 col-lg-4">
+                                <label class="daybook-modal-label" for="daybook_sale_sold_qty">Area sold <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_sold_qty" min="0" step="0.0001" inputmode="decimal" placeholder="0" autocomplete="off">
+                            </div>
+                            <div class="col-sm-5 col-lg-3">
+                                <label class="daybook-modal-label" for="daybook_sale_sold_unit">Unit</label>
+                                <select class="form-select form-select-theme form-select-lg" id="daybook_sale_sold_unit">
+                                    <option value="marla" selected>Marla</option>
+                                    <option value="kanal">Kanal</option>
+                                    <option value="acre">Acre</option>
+                                    <option value="sqft">Sq. Ft.</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-lg-5 d-flex align-items-end">
+                                <button type="button" class="btn btn-outline-theme daybook-sale-fill-btn" id="daybook_sale_fill_remaining">
+                                    <i class="bi bi-lightning-charge-fill" aria-hidden="true"></i>
+                                    Sell full available balance
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="daybook-modal-label" for="daybook_sale_file_amount">Amount (Rs) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_file_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="daybook-modal-label" for="daybook_sale_file_note">Note <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_file_note" placeholder="e.g. File sale receipt" autocomplete="off" maxlength="255">
+                            </div>
+                        </div>
+                        <p class="daybook-sale-card__foot mb-0">Applies as <strong>Payment in</strong> with sold area. Choose party and save the entry after.</p>
+                    </div>
+
+                    <div id="daybook_sale_details_plot" class="daybook-sale-card d-none">
+                        <div class="daybook-sale-card__head">
+                            <h3 class="daybook-sale-card__title">Plot sale details</h3>
+                            <p class="daybook-sale-card__hint mb-0" id="daybook_sale_plot_summary">—</p>
+                        </div>
+                        <div class="row g-3 g-lg-4">
+                            <div class="col-12 col-lg-6">
+                                <label class="daybook-modal-label" for="daybook_sale_customer_id">Customer <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-theme form-select-lg" id="daybook_sale_customer_id">
+                                    <option value="">Select customer</option>
+                                    @foreach(($customers ?? collect()) as $customer)
+                                        <option value="{{ $customer->id }}">{{ $customer->name }}</option>
+                                    @endforeach
+                                </select>
+                                @if(($customers ?? collect())->isEmpty())
+                                    <div class="form-text">No customers yet. <a href="{{ route('customers.create') }}" target="_blank" rel="noopener">Add a customer</a> first.</div>
+                                @endif
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_amount">Amount (Rs) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_acre">Acre</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_acre" value="0" min="0" step="1">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_kanal">Kanal</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_kanal" value="0" min="0" step="1">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_marla">Marla</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_marla" value="0" min="0" step="1">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_sqft">Sq ft</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_sqft" value="0" min="0" step="1">
+                            </div>
+                        </div>
+                        <p class="daybook-sale-card__foot mb-0">Saves the plot sale, then fills the entry as <strong>Payment in</strong>. Choose party and save after.</p>
+                    </div>
+                </div>
+
+                <p class="daybook-sale-wizard__error d-none" id="daybook_sale_wizard_error" role="alert"></p>
+            </div>
+            <div class="modal-footer daybook-sale-wizard__footer">
+                <button type="button" class="btn btn-outline-theme btn-lg" id="daybook_sale_wizard_back" disabled>Back</button>
+                <div class="daybook-sale-wizard__footer-actions">
+                    <button type="button" class="btn btn-outline-theme btn-lg" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="daybook-save-record daybook-sale-wizard__primary btn-lg" id="daybook_sale_wizard_primary">
+                        <span class="daybook-save-record__idle">
+                            <span id="daybook_sale_wizard_primary_label">Next</span>
+                        </span>
+                        <span class="daybook-save-record__busy" aria-hidden="true">
+                            <span class="daybook-save-spinner" role="status" aria-hidden="true"></span>
+                            <span>Saving…</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

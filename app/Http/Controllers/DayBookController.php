@@ -13,7 +13,9 @@ use App\Models\PartyCategory;
 use App\Models\PartySubCategory;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Models\ProjectFile;
 use App\Models\PurchaseFile;
+use App\Models\Sale;
 use App\Models\Setting;
 use App\Support\DaybookVoucher;
 use App\Support\LandMeasure;
@@ -588,6 +590,7 @@ class DayBookController extends Controller
             DayBookEntry::PAYMENT_PAYORDER => ['in' => 0.0, 'out' => 0.0],
             DayBookEntry::PAYMENT_CHEQUE => ['in' => 0.0, 'out' => 0.0],
             DayBookEntry::PAYMENT_ONLINE => ['in' => 0.0, 'out' => 0.0],
+            DayBookEntry::PAYMENT_CASH_DEPOSIT => ['in' => 0.0, 'out' => 0.0],
         ];
 
         foreach ($entries as $entry) {
@@ -620,9 +623,10 @@ class DayBookController extends Controller
         $payorder = $withNet($methods[DayBookEntry::PAYMENT_PAYORDER]);
         $cheque = $withNet($methods[DayBookEntry::PAYMENT_CHEQUE]);
         $online = $withNet($methods[DayBookEntry::PAYMENT_ONLINE]);
+        $cashDeposit = $withNet($methods[DayBookEntry::PAYMENT_CASH_DEPOSIT]);
 
-        $bankIn = $payorder['in'] + $cheque['in'] + $online['in'];
-        $bankOut = $payorder['out'] + $cheque['out'] + $online['out'];
+        $bankIn = $payorder['in'] + $cheque['in'] + $online['in'] + $cashDeposit['in'];
+        $bankOut = $payorder['out'] + $cheque['out'] + $online['out'] + $cashDeposit['out'];
 
         return [
             'cash' => $cash,
@@ -634,6 +638,7 @@ class DayBookController extends Controller
                 'payorder' => $payorder,
                 'cheque' => $cheque,
                 'online' => $online,
+                'cash_deposit' => $cashDeposit,
             ],
         ];
     }
@@ -694,6 +699,7 @@ class DayBookController extends Controller
 
         $landTypes = LandType::orderBy('name')->get();
         $partyCategories = PartyCategory::orderBy('name')->get();
+        $customers = Customer::query()->orderBy('name')->get(['id', 'name']);
 
         $daybookProjectIdDefault = '';
         $daybookPurchaseFileIdDefault = '';
@@ -729,6 +735,7 @@ class DayBookController extends Controller
             'partySubCategories' => $partySubCategories,
             'partyCategories' => $partyCategories,
             'landTypes' => $landTypes,
+            'customers' => $customers,
             'daybookProjectIdDefault' => $daybookProjectIdDefault,
             'daybookPurchaseFileIdDefault' => $daybookPurchaseFileIdDefault,
         ]);
@@ -953,6 +960,7 @@ class DayBookController extends Controller
                 'landType',
                 'parties',
                 'purchaseFiles' => fn ($q) => $q->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
+                'projectFiles' => fn ($q) => $q->orderBy('file_number')->with('sales'),
             ])
             ->get()
             ->map(function (Project $p) use ($excludeDaybookEntryId) {
@@ -961,6 +969,29 @@ class DayBookController extends Controller
 
                 $saleFiles = $p->purchaseFiles
                     ->map(fn (PurchaseFile $f) => $f->daybookSaleFilePayload($excludeDaybookEntryId))
+                    ->values()
+                    ->all();
+
+                $plotFiles = $p->projectFiles
+                    ->map(function (ProjectFile $f) {
+                        $total = (float) $f->land_area_marla;
+                        $remaining = $f->remainingMarla();
+                        $sold = max(0.0, $total - $remaining);
+
+                        return [
+                            'id' => $f->id,
+                            'label' => $f->file_number,
+                            'file_number' => $f->file_number,
+                            'project_id' => $f->project_id,
+                            'total_marla' => $total,
+                            'sold_marla' => $sold,
+                            'remaining_marla' => $remaining,
+                            'total_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
+                            'sold_label' => $sold > 0 ? LandMeasure::formatAkmsLabelFromMarla($sold) : '—',
+                            'remaining_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : '—',
+                            'is_fully_sold' => $remaining <= 1e-6 && $total > 1e-6,
+                        ];
+                    })
                     ->values()
                     ->all();
 
@@ -976,6 +1007,7 @@ class DayBookController extends Controller
                             'id' => $f['id'],
                             'label' => $f['label'],
                         ])->values()->all(),
+                        'plot_files' => $plotFiles,
                     ],
                     LandMeasure::projectPartyAreaPayload($p)
                 );
@@ -1313,6 +1345,111 @@ class DayBookController extends Controller
     }
 
     /**
+     * Record a non-DHA direct plot sale from the daybook Sale wizard (JSON).
+     */
+    public function storePlotSale(Request $request)
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'project_file_id' => ['required', 'integer', 'exists:project_files,id'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'area_acre' => ['required', 'integer', 'min:0'],
+            'area_kanal' => ['required', 'integer', 'min:0'],
+            'area_marla' => ['required', 'integer', 'min:0'],
+            'area_sqft' => ['required', 'integer', 'min:0'],
+            'total_amount' => ['required', 'numeric', 'min:0.01'],
+        ]);
+
+        /** @var Project $project */
+        $project = Project::query()->findOrFail((int) $validated['project_id']);
+        if ($project->isDha()) {
+            throw ValidationException::withMessages([
+                'project_id' => 'DHA projects sell files, not plots. Use the file sale flow.',
+            ]);
+        }
+
+        /** @var ProjectFile|null $projectFile */
+        $projectFile = null;
+        $sale = null;
+
+        DB::transaction(function () use ($validated, $project, &$projectFile, &$sale) {
+            $projectFile = ProjectFile::query()
+                ->whereKey((int) $validated['project_file_id'])
+                ->where('project_id', $project->id)
+                ->with('sales')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $projectFile) {
+                throw ValidationException::withMessages([
+                    'project_file_id' => 'The selected plot file does not belong to this project.',
+                ]);
+            }
+
+            $marla = LandMeasure::marlaFromAkms(
+                (int) $validated['area_acre'],
+                (int) $validated['area_kanal'],
+                (int) $validated['area_marla'],
+                (int) $validated['area_sqft']
+            );
+            if ($marla <= 0) {
+                throw ValidationException::withMessages([
+                    'area_acre' => 'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.',
+                ]);
+            }
+
+            $remaining = $projectFile->remainingMarla();
+            if ($marla > $remaining + 0.0001) {
+                throw ValidationException::withMessages([
+                    'area_acre' => 'Plot size exceeds remaining file land ('.LandMeasure::formatAkmsLabelFromMarla($remaining).').',
+                ]);
+            }
+
+            $sale = Sale::create([
+                'project_id' => $project->id,
+                'project_file_id' => $projectFile->id,
+                'sale_type' => Sale::TYPE_DIRECT,
+                'customer_id' => (int) $validated['customer_id'],
+                'area_acre' => (int) $validated['area_acre'],
+                'area_kanal' => (int) $validated['area_kanal'],
+                'area_marla' => (int) $validated['area_marla'],
+                'area_sqft' => (int) $validated['area_sqft'],
+                'land_area_marla' => round($marla, 4),
+                'total_amount' => round((float) $validated['total_amount'], 2),
+            ]);
+        });
+
+        $projectFile->load('sales');
+        $total = (float) $projectFile->land_area_marla;
+        $remainingAfter = $projectFile->remainingMarla();
+        $soldAfter = max(0.0, $total - $remainingAfter);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Plot sale recorded.',
+            'sale' => [
+                'id' => $sale->id,
+                'total_amount' => (float) $sale->total_amount,
+                'land_area_marla' => (float) $sale->land_area_marla,
+                'area_label' => LandMeasure::formatAkmsLabelFromMarla((float) $sale->land_area_marla),
+            ],
+            'plot_file' => [
+                'id' => $projectFile->id,
+                'label' => $projectFile->file_number,
+                'file_number' => $projectFile->file_number,
+                'project_id' => $projectFile->project_id,
+                'total_marla' => $total,
+                'sold_marla' => $soldAfter,
+                'remaining_marla' => $remainingAfter,
+                'total_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
+                'sold_label' => $soldAfter > 0 ? LandMeasure::formatAkmsLabelFromMarla($soldAfter) : '—',
+                'remaining_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remainingAfter) : '—',
+                'is_fully_sold' => $remainingAfter <= 1e-6 && $total > 1e-6,
+            ],
+        ]);
+    }
+
+    /**
      * Clear bank / reference when settlement method does not use them (after validation).
      *
      * @param  array<string, mixed>  $validated
@@ -1364,12 +1501,14 @@ class DayBookController extends Controller
                     DayBookEntry::PAYMENT_ONLINE,
                     DayBookEntry::PAYMENT_CHEQUE,
                     DayBookEntry::PAYMENT_PAYORDER,
+                    DayBookEntry::PAYMENT_CASH_DEPOSIT,
                 ])],
                 'payment_bank' => Rule::when(
                     in_array($request->input('payment_method'), [
                         DayBookEntry::PAYMENT_ONLINE,
                         DayBookEntry::PAYMENT_CHEQUE,
                         DayBookEntry::PAYMENT_PAYORDER,
+                        DayBookEntry::PAYMENT_CASH_DEPOSIT,
                     ], true),
                     ['required', 'string', 'max:120', Rule::in(array_values(config('pakistan_banks')))],
                     ['nullable']
@@ -1378,6 +1517,7 @@ class DayBookController extends Controller
                     in_array($request->input('payment_method'), [
                         DayBookEntry::PAYMENT_CHEQUE,
                         DayBookEntry::PAYMENT_PAYORDER,
+                        DayBookEntry::PAYMENT_CASH_DEPOSIT,
                     ], true),
                     ['required', 'string', 'max:100'],
                     ['nullable']
@@ -1532,6 +1672,7 @@ class DayBookController extends Controller
             ->get();
         $landTypes = LandType::orderBy('name')->get();
         $partyCategories = PartyCategory::orderBy('name')->get();
+        $customers = Customer::query()->orderBy('name')->get(['id', 'name']);
 
         $formPartyId = $entry->link_type === DayBookEntry::LINK_PARTY ? $entry->link_id : null;
         $formProjectId = null;
@@ -1550,6 +1691,7 @@ class DayBookController extends Controller
             'partySubCategories' => $partySubCategories,
             'partyCategories' => $partyCategories,
             'landTypes' => $landTypes,
+            'customers' => $customers,
             'daybookProjectIdDefault' => $formProjectId !== null ? (string) $formProjectId : '',
             'daybookPartyIdDefault' => $formPartyId !== null ? (string) $formPartyId : '',
             'daybookPartySubCategoryIdDefault' => $entry->party_sub_category_id !== null ? (string) $entry->party_sub_category_id : '',
@@ -1584,12 +1726,14 @@ class DayBookController extends Controller
                     DayBookEntry::PAYMENT_ONLINE,
                     DayBookEntry::PAYMENT_CHEQUE,
                     DayBookEntry::PAYMENT_PAYORDER,
+                    DayBookEntry::PAYMENT_CASH_DEPOSIT,
                 ])],
                 'payment_bank' => Rule::when(
                     in_array($request->input('payment_method'), [
                         DayBookEntry::PAYMENT_ONLINE,
                         DayBookEntry::PAYMENT_CHEQUE,
                         DayBookEntry::PAYMENT_PAYORDER,
+                        DayBookEntry::PAYMENT_CASH_DEPOSIT,
                     ], true),
                     ['required', 'string', 'max:120', Rule::in(array_values(config('pakistan_banks')))],
                     ['nullable']
@@ -1598,6 +1742,7 @@ class DayBookController extends Controller
                     in_array($request->input('payment_method'), [
                         DayBookEntry::PAYMENT_CHEQUE,
                         DayBookEntry::PAYMENT_PAYORDER,
+                        DayBookEntry::PAYMENT_CASH_DEPOSIT,
                     ], true),
                     ['required', 'string', 'max:100'],
                     ['nullable']

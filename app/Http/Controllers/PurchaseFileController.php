@@ -1597,6 +1597,7 @@ class PurchaseFileController extends Controller
             DayBookEntry::PAYMENT_ONLINE => 'Online Transfer',
             DayBookEntry::PAYMENT_CHEQUE => 'Cheque',
             DayBookEntry::PAYMENT_PAYORDER => 'Pay Order',
+            DayBookEntry::PAYMENT_CASH_DEPOSIT => 'Cash Deposit to Bank',
             null, '' => $entry->type === DayBookEntry::TYPE_CASH_IN ? '' : 'Cash',
             default => ucfirst(str_replace('_', ' ', (string) $entry->payment_method)),
         };

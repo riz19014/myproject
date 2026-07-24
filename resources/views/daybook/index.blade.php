@@ -100,6 +100,7 @@
                     <li><span>Pay order</span><span>Rs {{ number_format($paymentBreakdown['bank']['payorder']['total'], 2) }}</span></li>
                     <li><span>Cheque</span><span>Rs {{ number_format($paymentBreakdown['bank']['cheque']['total'], 2) }}</span></li>
                     <li><span>Online</span><span>Rs {{ number_format($paymentBreakdown['bank']['online']['total'], 2) }}</span></li>
+                    <li><span>Cash deposit</span><span>Rs {{ number_format($paymentBreakdown['bank']['cash_deposit']['total'], 2) }}</span></li>
                 </ul>
             </div>
         </div>

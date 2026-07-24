@@ -103,6 +103,8 @@ class DayBookEntry extends Model
 
     public const PAYMENT_PAYORDER = 'payorder';
 
+    public const PAYMENT_CASH_DEPOSIT = 'cash_deposit';
+
     public const LINK_OFFICE = 'office';
 
     public const LINK_PROJECT = 'project';
@@ -215,6 +217,9 @@ class DayBookEntry extends Model
             self::PAYMENT_PAYORDER => 'Pay order'
                 .($this->payment_bank ? ' · Bank: '.$this->payment_bank : '')
                 .($this->payment_reference ? ' · No. '.$this->payment_reference : ''),
+            self::PAYMENT_CASH_DEPOSIT => 'Cash Deposit to Bank'
+                .($this->payment_bank ? ' · Bank: '.$this->payment_bank : '')
+                .($this->payment_reference ? ' · Ref. '.$this->payment_reference : ''),
             default => (string) $method,
         };
     }
@@ -277,6 +282,7 @@ class DayBookEntry extends Model
             self::PAYMENT_ONLINE => 'Online',
             self::PAYMENT_CHEQUE => 'Cheque',
             self::PAYMENT_PAYORDER => 'Pay Order',
+            self::PAYMENT_CASH_DEPOSIT => 'Cash Deposit to Bank',
             null, '' => $this->type === self::TYPE_CASH_IN ? null : 'Cash',
             default => ucfirst(str_replace('_', ' ', (string) $method)),
         };
@@ -295,13 +301,17 @@ class DayBookEntry extends Model
         }
 
         $bank = trim((string) $this->payment_bank);
-        if ($bank !== '' && in_array($method, [self::PAYMENT_CHEQUE, self::PAYMENT_PAYORDER, self::PAYMENT_ONLINE], true)) {
+        if ($bank !== '' && in_array($method, [self::PAYMENT_CHEQUE, self::PAYMENT_PAYORDER, self::PAYMENT_ONLINE, self::PAYMENT_CASH_DEPOSIT], true)) {
             $lines[] = ['kind' => 'meta', 'text' => $bank];
         }
 
         $reference = trim((string) $this->payment_reference);
-        if ($reference !== '' && in_array($method, [self::PAYMENT_CHEQUE, self::PAYMENT_PAYORDER], true)) {
-            $prefix = $method === self::PAYMENT_PAYORDER ? 'PO#' : 'Chq#';
+        if ($reference !== '' && in_array($method, [self::PAYMENT_CHEQUE, self::PAYMENT_PAYORDER, self::PAYMENT_CASH_DEPOSIT], true)) {
+            $prefix = match ($method) {
+                self::PAYMENT_PAYORDER => 'PO#',
+                self::PAYMENT_CASH_DEPOSIT => 'Dep#',
+                default => 'Chq#',
+            };
             $lines[] = ['kind' => 'meta', 'text' => $prefix.' '.$reference];
         }
 

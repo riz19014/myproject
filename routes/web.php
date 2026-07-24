@@ -109,6 +109,7 @@ Route::middleware('auth')->group(function () {
     Route::get('daybook/ledger/pdf', [DayBookController::class, 'ledgerPdf'])->name('daybook.ledger.pdf');
     Route::get('daybook/report/pdf', [DayBookController::class, 'reportPdf'])->name('daybook.report.pdf');
     Route::post('daybook/petty-cash', [DayBookController::class, 'updatePettyCash'])->name('daybook.petty-cash');
+    Route::post('daybook/sale/plot', [DayBookController::class, 'storePlotSale'])->name('daybook.sale.plot');
     Route::get('daybook/create', [DayBookController::class, 'create'])->name('daybook.create');
     Route::post('daybook', [DayBookController::class, 'store'])->name('daybook.store');
     Route::get('daybook/{entry}/voucher', [DayBookController::class, 'voucher'])->name('daybook.voucher');

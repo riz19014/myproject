@@ -76,6 +76,22 @@
     .file-sale-popover__list li + li {
         margin-top: 0.3rem;
     }
+    .file-sale-area-balance__moza-start td {
+        border-top: 2px solid #cbd5e1;
+    }
+    .file-sale-area-balance tbody tr:first-child.file-sale-area-balance__moza-start td {
+        border-top-width: 0;
+    }
+    .file-sale-area-balance__formula-col {
+        min-width: 4.5rem;
+        white-space: nowrap;
+    }
+    .file-sale-area-balance__file-start td {
+        border-top: 2px solid #cbd5e1;
+    }
+    .file-sale-area-balance tbody tr:first-child.file-sale-area-balance__file-start td {
+        border-top-width: 0;
+    }
     .file-sale-strip {
         border: 2px solid #334155;
         border-radius: 12px;
@@ -181,11 +197,15 @@
 
 @section('content')
 @php
-    $summary = $fileSaleSummary ?? ['totals' => [], 'daybook_rows' => [], 'moved_files' => [], 'files_land_columns' => []];
+    $summary = $fileSaleSummary ?? ['totals' => [], 'daybook_rows' => [], 'moved_files' => [], 'files_land_columns' => [], 'area_balance' => []];
     $totals = $summary['totals'] ?? [];
     $daybookRows = $summary['daybook_rows'] ?? [];
     $movedFiles = $summary['moved_files'] ?? [];
     $filesLandColumns = $summary['files_land_columns'] ?? [];
+    $areaBalance = $summary['area_balance'] ?? ['formula_columns' => [], 'moza_groups' => [], 'totals' => []];
+    $areaBalanceColumns = $areaBalance['formula_columns'] ?? [];
+    $areaBalanceGroups = $areaBalance['moza_groups'] ?? [];
+    $areaBalanceTotals = $areaBalance['totals'] ?? ['total_land' => '—', 'formula_values' => []];
 @endphp
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
@@ -272,51 +292,87 @@
             <h2 class="h6 mb-0">Sale land files — area balance</h2>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-striped table-theme mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th style="width: 56px;">#</th>
-                            <th>File</th>
-                            <th>Total land</th>
-                            <th class="text-end">Sold</th>
-                            <th class="text-end">Available</th>
-                            <th>Status</th>
-                            <th style="width: 120px;">Sell</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($movedFiles as $file)
+            @if($areaBalanceGroups === [])
+                <p class="text-muted small mb-0 p-3">No Mouza land found on the moved sale land files.</p>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-striped table-theme mb-0 align-middle file-sale-area-balance">
+                        <thead>
                             <tr>
-                                <td>{{ $loop->iteration }}</td>
-                                <td class="fw-semibold">{{ $file['name'] ?? $file['label'] ?? '—' }}</td>
-                                <td class="small">{{ $file['total_label'] ?? '—' }}</td>
-                                <td class="text-end small">{{ $file['sold_label'] ?? '—' }}</td>
-                                <td class="text-end small fw-semibold">{{ $file['remaining_label'] ?? '—' }}</td>
-                                <td>
-                                    @php
-                                        $status = $file['status'] ?? 'Available';
-                                    @endphp
-                                    @if(($file['is_fully_sold'] ?? false) || $status === 'Fully Sold')
-                                        <span class="badge text-bg-secondary">Fully Sold</span>
-                                    @elseif($status === 'Partially Sold')
-                                        <span class="badge text-bg-warning">Partially Sold</span>
-                                    @else
-                                        <span class="badge text-bg-success">Available</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if($file['is_fully_sold'] ?? false)
-                                        <span class="text-muted small">—</span>
-                                    @else
-                                        <a href="{{ route('daybook.index', ['project' => $project->id, 'purchase_file_id' => $file['id'] ?? null]) }}" class="btn btn-sm btn-pink">Daybook</a>
-                                    @endif
-                                </td>
+                                <th>Moza</th>
+                                <th>File</th>
+                                <th>Khasra</th>
+                                <th>Land</th>
+                                @foreach($areaBalanceColumns as $column)
+                                    <th class="text-end file-sale-area-balance__formula-col" title="{{ $column['plot_label'] ?? '' }} — {{ $column['component_label'] ?? '' }}">
+                                        {{ $column['column_code'] ?? $column['code'] ?? '' }}
+                                        <div class="text-muted fw-normal" style="font-size: 0.7rem;">{{ $column['short_label'] ?? '' }}</div>
+                                    </th>
+                                @endforeach
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            @foreach($areaBalanceGroups as $group)
+                                @php
+                                    $files = $group['files'] ?? [];
+                                    if ($files === []) {
+                                        $files = [['file_name' => '—', 'khasra' => '—']];
+                                    }
+                                    $rowspan = max(1, (int) ($group['rowspan'] ?? count($files)));
+                                @endphp
+                                @foreach($files as $fileRow)
+                                    <tr @class(['file-sale-area-balance__moza-start' => $loop->first])>
+                                        @if($loop->first)
+                                            <td rowspan="{{ $rowspan }}" class="fw-semibold align-top">{{ $group['moza'] ?? '—' }}</td>
+                                        @endif
+                                        <td class="small fw-semibold">{{ $fileRow['file_name'] ?? '—' }}</td>
+                                        <td class="small">{{ $fileRow['khasra'] ?? '—' }}</td>
+                                        @if($loop->first)
+                                            <td rowspan="{{ $rowspan }}" class="small fw-semibold align-top">{{ $group['total_land'] ?? '—' }}</td>
+                                            @foreach($areaBalanceColumns as $column)
+                                                @php
+                                                    $formula = ($group['formula_values'] ?? [])[$column['plot_key'] ?? ''] ?? null;
+                                                @endphp
+                                                <td rowspan="{{ $rowspan }}" class="text-end small align-top file-sale-area-balance__formula-col">
+                                                    @if($formula)
+                                                        <span class="fw-semibold">{{ $formula['display'] ?? '—' }}</span>
+                                                        @if(($formula['breakdown'] ?? '—') !== '—')
+                                                            <div class="text-muted" style="font-size: 0.72rem;">{{ $formula['breakdown'] }}</div>
+                                                        @endif
+                                                    @else
+                                                        —
+                                                    @endif
+                                                </td>
+                                            @endforeach
+                                        @endif
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr class="fw-semibold">
+                                <td colspan="3" class="text-end">Total</td>
+                                <td class="small">{{ $areaBalanceTotals['total_land'] ?? '—' }}</td>
+                                @foreach($areaBalanceColumns as $column)
+                                    @php
+                                        $formula = ($areaBalanceTotals['formula_values'] ?? [])[$column['plot_key'] ?? ''] ?? null;
+                                    @endphp
+                                    <td class="text-end small file-sale-area-balance__formula-col">
+                                        @if($formula)
+                                            {{ $formula['display'] ?? '—' }}
+                                            @if(($formula['breakdown'] ?? '—') !== '—')
+                                                <div class="text-muted fw-normal" style="font-size: 0.72rem;">{{ $formula['breakdown'] }}</div>
+                                            @endif
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                @endforeach
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 
