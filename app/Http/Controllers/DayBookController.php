@@ -1582,14 +1582,9 @@ class DayBookController extends Controller
             $validated['party_sub_category_id'] = null;
         }
 
-        $isFactoryExpense = false;
-        if (! empty($contextProjectId)) {
-            $project = Project::query()->with('landType')->find($contextProjectId);
-            $lt = $project?->landType?->name;
-            $isFactoryExpense = $lt !== null && mb_strtolower(trim($lt)) === 'factory';
-        }
+        $isConstructionBuilder = ! empty($contextProjectId) && $request->boolean('construction_builder');
 
-        if ($isFactoryExpense) {
+        if ($isConstructionBuilder) {
             $request->validate([
                 'sub_category_id' => ['required', 'integer', Rule::exists('party_sub_categories', 'id')],
                 'quantity' => ['required', 'integer', 'min:1'],
@@ -1609,22 +1604,19 @@ class DayBookController extends Controller
                     ->withInput();
             }
 
-            $validated['unit'] = $sc->unit;
+            $submittedUnit = trim((string) ($validated['unit'] ?? ''));
+            $validated['unit'] = $submittedUnit !== '' ? $submittedUnit : $sc->unit;
             $validated['quantity'] = (int) $validated['quantity'];
             $validated['unit_price'] = number_format((float) $validated['unit_price'], 2, '.', '');
-            $expected = round(((int) $validated['quantity']) * ((float) $validated['unit_price']), 2);
-            $amount = round((float) $validated['amount'], 2);
-            if (abs($expected - $amount) > 0.009) {
-                return back()
-                    ->withErrors(['amount' => 'Amount must equal Quantity × Unit Price.'])
-                    ->withInput();
-            }
+            // Amount stays editable; Quantity × Unit Price is only a frontend helper.
         } else {
             $validated['sub_category_id'] = null;
             $validated['unit'] = null;
             $validated['quantity'] = null;
             $validated['unit_price'] = null;
         }
+
+        unset($validated['construction_builder']);
 
         $entry = DB::transaction(function () use ($validated, $contextProjectId) {
             $validated = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
@@ -1807,14 +1799,9 @@ class DayBookController extends Controller
             $validated['party_sub_category_id'] = null;
         }
 
-        $isFactoryExpense = false;
-        if (! empty($contextProjectId)) {
-            $project = Project::query()->with('landType')->find($contextProjectId);
-            $lt = $project?->landType?->name;
-            $isFactoryExpense = $lt !== null && mb_strtolower(trim($lt)) === 'factory';
-        }
+        $isConstructionBuilder = ! empty($contextProjectId) && $request->boolean('construction_builder');
 
-        if ($isFactoryExpense) {
+        if ($isConstructionBuilder) {
             $request->validate([
                 'sub_category_id' => ['required', 'integer', Rule::exists('party_sub_categories', 'id')],
                 'quantity' => ['required', 'integer', 'min:1'],
@@ -1834,22 +1821,19 @@ class DayBookController extends Controller
                     ->withInput();
             }
 
-            $validated['unit'] = $sc->unit;
+            $submittedUnit = trim((string) ($validated['unit'] ?? ''));
+            $validated['unit'] = $submittedUnit !== '' ? $submittedUnit : $sc->unit;
             $validated['quantity'] = (int) $validated['quantity'];
             $validated['unit_price'] = number_format((float) $validated['unit_price'], 2, '.', '');
-            $expected = round(((int) $validated['quantity']) * ((float) $validated['unit_price']), 2);
-            $amount = round((float) $validated['amount'], 2);
-            if (abs($expected - $amount) > 0.009) {
-                return back()
-                    ->withErrors(['amount' => 'Amount must equal Quantity × Unit Price.'])
-                    ->withInput();
-            }
+            // Amount stays editable; Quantity × Unit Price is only a frontend helper.
         } else {
             $validated['sub_category_id'] = null;
             $validated['unit'] = null;
             $validated['quantity'] = null;
             $validated['unit_price'] = null;
         }
+
+        unset($validated['construction_builder']);
 
         DB::transaction(function () use ($validated, $contextProjectId, $entry) {
             $validated = $this->applyPurchaseFileToEntry($validated, $contextProjectId, (int) $entry->id);

@@ -1357,4 +1357,44 @@
         align-items: center;
         gap: 0.4rem;
     }
+
+    /* Construction / Builder section */
+    .daybook-construction-section__card {
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 14px;
+        padding: 1rem 1.15rem 1.15rem;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+        overflow: hidden;
+    }
+    .daybook-construction-section__check {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.7rem;
+        margin: 0;
+        padding: 0.15rem 0 0.35rem;
+        min-width: 0;
+    }
+    .daybook-construction-section__check .form-check-input {
+        float: none;
+        position: relative;
+        margin: 0.2rem 0 0;
+        flex: 0 0 auto;
+        width: 1.15rem;
+        height: 1.15rem;
+        border-color: rgba(15, 23, 42, 0.25);
+    }
+    .daybook-construction-section__check .form-check-input:checked {
+        background-color: var(--accent-orange, #f97316);
+        border-color: var(--accent-orange, #f97316);
+    }
+    .daybook-construction-section__check-body {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .daybook-construction-section__check .form-check-label {
+        color: #0f172a;
+        font-size: 0.98rem;
+        padding-left: 0;
+    }
 </style>

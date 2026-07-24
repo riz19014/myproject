@@ -230,85 +230,108 @@
             </div>
         </div>
 
-        {{-- Factory-only: Construction & Material expense fields (hidden unless selected project is Factory) --}}
-        <div class="row g-4 mt-1 pt-3 border-top border-secondary border-opacity-25 d-none" id="daybook_factory_fields">
-            <div class="col-md-6">
-                <label class="form-label daybook-label" for="daybook_factory_sub_search">Sub Category</label>
-                <div class="daybook-form-combo @error('sub_category_id') is-invalid @enderror">
-                    <input type="hidden" name="sub_category_id" id="daybook_factory_sub_category_id" value="{{ old('sub_category_id', $daybookFactorySubCategoryIdDefault ?? '') }}">
+        {{-- Optional Construction / Builder expense fields (any project) --}}
+        @php($daybookConstructionBuilderOld = old('construction_builder', (!empty($daybookFactorySubCategoryIdDefault ?? null) || !empty($daybookFactoryQuantityDefault ?? null) || !empty($daybookFactoryUnitPriceDefault ?? null)) ? '1' : ''))
+        <div class="daybook-construction-section d-none mt-1 pt-3 border-top border-secondary border-opacity-25" id="daybook_factory_fields">
+            <div class="daybook-construction-section__card">
+                <div class="daybook-construction-section__check">
                     <input
-                        type="text"
-                        class="form-control form-control-theme @error('sub_category_id') is-invalid @enderror"
-                        id="daybook_factory_sub_search"
-                        placeholder="Search sub category…"
-                        autocomplete="off"
-                        role="combobox"
-                        aria-expanded="false"
-                        aria-controls="daybook_factory_sub_listbox"
-                        aria-autocomplete="list"
+                        class="form-check-input"
+                        type="checkbox"
+                        value="1"
+                        id="daybook_construction_builder"
+                        name="construction_builder"
+                        @checked((string) $daybookConstructionBuilderOld === '1')
                     >
-                    <ul class="daybook-form-combo-list d-none" id="daybook_factory_sub_listbox" role="listbox" hidden></ul>
+                    <div class="daybook-construction-section__check-body">
+                        <label class="form-check-label fw-semibold" for="daybook_construction_builder">
+                            Construction / Builder
+                        </label>
+                        <div class="form-text mb-0">Enable for material / construction lines (sub category, unit, quantity &amp; unit price).</div>
+                    </div>
                 </div>
-                @error('sub_category_id')
-                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-6">
-                <label class="form-label daybook-label" for="daybook_factory_unit">Unit <span class="text-muted fw-normal">(auto-filled, editable)</span></label>
-                <div class="daybook-form-combo @error('unit') is-invalid @enderror">
-                    <input
-                        id="daybook_factory_unit"
-                        name="unit"
-                        type="text"
-                        class="form-control form-control-theme @error('unit') is-invalid @enderror"
-                        value="{{ old('unit', $daybookFactoryUnitDefault ?? '') }}"
-                        placeholder="e.g. Bag, Kg, CFT"
-                        autocomplete="off"
-                        role="combobox"
-                        aria-expanded="false"
-                        aria-controls="daybook_factory_unit_listbox"
-                        aria-autocomplete="list"
-                    >
-                    <ul class="daybook-form-combo-list d-none" id="daybook_factory_unit_listbox" role="listbox" hidden></ul>
+
+                <div class="row g-4 mt-1 {{ (string) $daybookConstructionBuilderOld === '1' ? '' : 'd-none' }}" id="daybook_construction_builder_fields">
+                    <div class="col-md-6">
+                        <label class="form-label daybook-label" for="daybook_factory_sub_search">Sub Category</label>
+                        <div class="daybook-form-combo @error('sub_category_id') is-invalid @enderror">
+                            <input type="hidden" name="sub_category_id" id="daybook_factory_sub_category_id" value="{{ old('sub_category_id', $daybookFactorySubCategoryIdDefault ?? '') }}">
+                            <input
+                                type="text"
+                                class="form-control form-control-theme @error('sub_category_id') is-invalid @enderror"
+                                id="daybook_factory_sub_search"
+                                placeholder="Search sub category…"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-expanded="false"
+                                aria-controls="daybook_factory_sub_listbox"
+                                aria-autocomplete="list"
+                            >
+                            <ul class="daybook-form-combo-list d-none" id="daybook_factory_sub_listbox" role="listbox" hidden></ul>
+                        </div>
+                        @error('sub_category_id')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label daybook-label" for="daybook_factory_unit">Unit <span class="text-muted fw-normal">(auto-filled, editable)</span></label>
+                        <div class="daybook-form-combo @error('unit') is-invalid @enderror">
+                            <input
+                                id="daybook_factory_unit"
+                                name="unit"
+                                type="text"
+                                class="form-control form-control-theme @error('unit') is-invalid @enderror"
+                                value="{{ old('unit', $daybookFactoryUnitDefault ?? '') }}"
+                                placeholder="e.g. Bag, Kg, CFT"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-expanded="false"
+                                aria-controls="daybook_factory_unit_listbox"
+                                aria-autocomplete="list"
+                            >
+                            <ul class="daybook-form-combo-list d-none" id="daybook_factory_unit_listbox" role="listbox" hidden></ul>
+                        </div>
+                        <script type="application/json" id="daybook-form-units-json">@json(array_values(config('construction_units', [])))</script>
+                        @error('unit')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label daybook-label" for="daybook_factory_quantity">Quantity</label>
+                        <input
+                            id="daybook_factory_quantity"
+                            type="number"
+                            name="quantity"
+                            class="form-control form-control-theme @error('quantity') is-invalid @enderror"
+                            value="{{ old('quantity', $daybookFactoryQuantityDefault ?? '') }}"
+                            min="1"
+                            step="1"
+                            inputmode="numeric"
+                            autocomplete="off"
+                        >
+                        @error('quantity')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label daybook-label" for="daybook_factory_unit_price">Unit Price</label>
+                        <input
+                            id="daybook_factory_unit_price"
+                            type="number"
+                            name="unit_price"
+                            class="form-control form-control-theme @error('unit_price') is-invalid @enderror"
+                            value="{{ old('unit_price', $daybookFactoryUnitPriceDefault ?? '') }}"
+                            min="0"
+                            step="0.01"
+                            inputmode="decimal"
+                            autocomplete="off"
+                        >
+                        @error('unit_price')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                        <div class="form-text mb-0">Amount is filled as Quantity × Unit Price (you can still edit Amount).</div>
+                    </div>
                 </div>
-                <script type="application/json" id="daybook-form-units-json">@json(array_values(config('construction_units', [])))</script>
-                @error('unit')
-                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-6">
-                <label class="form-label daybook-label" for="daybook_factory_quantity">Quantity</label>
-                <input
-                    id="daybook_factory_quantity"
-                    type="number"
-                    name="quantity"
-                    class="form-control form-control-theme @error('quantity') is-invalid @enderror"
-                    value="{{ old('quantity', $daybookFactoryQuantityDefault ?? '') }}"
-                    min="1"
-                    step="1"
-                    inputmode="numeric"
-                    autocomplete="off"
-                >
-                @error('quantity')
-                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-6">
-                <label class="form-label daybook-label" for="daybook_factory_unit_price">Unit Price</label>
-                <input
-                    id="daybook_factory_unit_price"
-                    type="number"
-                    name="unit_price"
-                    class="form-control form-control-theme @error('unit_price') is-invalid @enderror"
-                    value="{{ old('unit_price', $daybookFactoryUnitPriceDefault ?? '') }}"
-                    min="0"
-                    step="0.01"
-                    inputmode="decimal"
-                    autocomplete="off"
-                >
-                @error('unit_price')
-                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                @enderror
             </div>
         </div>
         @php($daybookPaymentMethodOld = old('payment_method', $daybookPaymentMethodDefault ?? 'cash'))

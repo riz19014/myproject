@@ -2217,6 +2217,8 @@
     var projectHidden = document.getElementById('daybook_form_project_id');
     var partySubWrap = document.getElementById('daybook_party_sub_category_wrap');
     var factoryWrap = document.getElementById('daybook_factory_fields');
+    var constructionToggle = document.getElementById('daybook_construction_builder');
+    var constructionFields = document.getElementById('daybook_construction_builder_fields');
     var subHidden = document.getElementById('daybook_factory_sub_category_id');
     var subSearch = document.getElementById('daybook_factory_sub_search');
     var subList = document.getElementById('daybook_factory_sub_listbox');
@@ -2263,19 +2265,12 @@
         }
     }
 
-    function getSelectedProject() {
-        var pid = String(projectHidden.value || '').trim();
-        if (!pid) return null;
-        var rows = window.__daybookFormProjectRows || [];
-        return rows.find(function (r) { return String(r.id) === pid; }) || null;
+    function hasProjectSelected() {
+        return String(projectHidden.value || '').trim() !== '';
     }
 
-    function isFactoryProjectSelected() {
-        var pr = getSelectedProject();
-        if (!pr) return false;
-        if (typeof pr.is_factory === 'boolean') return pr.is_factory;
-        var lt = (pr.land_type || '').toString().trim().toLowerCase();
-        return lt === 'factory';
+    function isConstructionBuilderOn() {
+        return !!(constructionToggle && constructionToggle.checked);
     }
 
     function hideFactorySubList() {
@@ -2358,12 +2353,6 @@
         else el.removeAttribute('required');
     }
 
-    function setReadOnly(el, on) {
-        if (!el) return;
-        el.readOnly = !!on;
-        el.setAttribute('aria-readonly', on ? 'true' : 'false');
-    }
-
     function normalizeUnsignedInt(raw) {
         var m = String(raw || '').trim().match(/^\d+/);
         var n = m ? parseInt(m[0], 10) : NaN;
@@ -2379,8 +2368,6 @@
         return v;
     }
 
-    // Auto-fill the unit from the sub category's default. `force` overwrites even a manually-typed unit
-    // (used when the user actively picks a sub category); otherwise only fills when empty.
     function setUnitFromSubCategoryId(id, force) {
         if (!unitInput) return;
         var sid = String(id || '').trim();
@@ -2392,16 +2379,11 @@
     }
 
     function updateAmountFromQtyPrice() {
-        if (!isFactoryProjectSelected()) return;
+        if (!hasProjectSelected() || !isConstructionBuilderOn()) return;
         var q = normalizeUnsignedInt(qtyInput.value);
         var p = normalizePositiveNumber(priceInput.value);
-        if (q === null || p === null) {
-            amountInput.value = '';
-            amountInput.dispatchEvent(new Event('input', { bubbles: true }));
-            return;
-        }
-        var amt = (q * p);
-        amountInput.value = amt.toFixed(2);
+        if (q === null || p === null) return;
+        amountInput.value = (q * p).toFixed(2);
         amountInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
@@ -2475,32 +2457,38 @@
         renderUnitList(filterUnitOptions(unitInput ? unitInput.value : ''));
     }
 
-    function syncMode() {
-        var on = isFactoryProjectSelected();
-        factoryWrap.classList.toggle('d-none', !on);
-        if (partySubWrap) partySubWrap.classList.toggle('d-none', on);
+    function clearConstructionFields() {
+        hideFactorySubList();
+        hideUnitList();
+        if (subHidden) subHidden.value = '';
+        if (subSearch) subSearch.value = '';
+        if (qtyInput) qtyInput.value = '';
+        if (priceInput) priceInput.value = '';
+        if (unitInput) unitInput.value = '';
+    }
 
-        setRequired(subHidden, on);
-        setRequired(qtyInput, on);
-        setRequired(priceInput, on);
-        setReadOnly(amountInput, on);
-        subSearch.disabled = !on;
+    function syncConstructionFields() {
+        var projectOn = hasProjectSelected();
+        var constructionOn = projectOn && isConstructionBuilderOn();
 
-        if (!on) {
-            hideFactorySubList();
-            if (subHidden) subHidden.value = '';
-            if (subSearch) subSearch.value = '';
-            if (qtyInput) qtyInput.value = '';
-            if (priceInput) priceInput.value = '';
-            if (unitInput) unitInput.value = '';
-            return;
+        if (constructionFields) {
+            constructionFields.classList.toggle('d-none', !constructionOn);
         }
 
-        // When switching to Factory mode, avoid accidentally submitting the normal party_sub_category_id.
-        var normalSubHidden = document.getElementById('daybook_form_party_sub_category_id');
-        var normalSubSearch = document.getElementById('daybook_form_party_sub_search');
-        if (normalSubHidden) normalSubHidden.value = '';
-        if (normalSubSearch) normalSubSearch.value = '';
+        setRequired(subHidden, constructionOn);
+        setRequired(qtyInput, constructionOn);
+        setRequired(priceInput, constructionOn);
+        amountInput.readOnly = false;
+        amountInput.setAttribute('aria-readonly', 'false');
+        subSearch.disabled = !constructionOn;
+        if (unitInput) unitInput.disabled = !constructionOn;
+        qtyInput.disabled = !constructionOn;
+        priceInput.disabled = !constructionOn;
+
+        if (!constructionOn) {
+            clearConstructionFields();
+            return;
+        }
 
         var oldSelected = "{{ old('sub_category_id', $daybookFactorySubCategoryIdDefault ?? '') }}";
         var oldQty = "{{ old('quantity', $daybookFactoryQuantityDefault ?? '') }}";
@@ -2510,14 +2498,35 @@
         syncFactoryOptionList(keepSelected);
         if (String(qtyInput.value || '').trim() === '' && oldQty !== '') qtyInput.value = oldQty;
         if (String(priceInput.value || '').trim() === '' && oldPrice !== '') priceInput.value = oldPrice;
-        // On init keep any existing/old unit; only fill from default when empty.
         setUnitFromSubCategoryId(subHidden.value, false);
-        updateAmountFromQtyPrice();
+        if (String(amountInput.value || '').trim() === '') {
+            updateAmountFromQtyPrice();
+        }
+    }
+
+    function syncMode() {
+        var projectOn = hasProjectSelected();
+        factoryWrap.classList.toggle('d-none', !projectOn);
+        if (partySubWrap) partySubWrap.classList.remove('d-none');
+
+        if (!projectOn) {
+            if (constructionToggle) constructionToggle.checked = false;
+            syncConstructionFields();
+            return;
+        }
+
+        syncConstructionFields();
     }
 
     window.__daybookSyncFactoryMode = syncMode;
 
     syncMode();
+
+    if (constructionToggle) {
+        constructionToggle.addEventListener('change', function () {
+            syncConstructionFields();
+        });
+    }
 
     subSearch.addEventListener('focus', function () {
         if (subSearch.disabled) return;
@@ -2536,9 +2545,11 @@
 
     if (unitInput && unitList) {
         unitInput.addEventListener('focus', function () {
+            if (unitInput.disabled) return;
             openFilteredUnitList();
         });
         unitInput.addEventListener('input', function () {
+            if (unitInput.disabled) return;
             openFilteredUnitList();
         });
         unitInput.addEventListener('keydown', function (e) {
