@@ -3,18 +3,84 @@
 namespace App\Http\Controllers;
 
 use App\Models\DayBookEntry;
+use App\Models\FileSaleRecord;
 use App\Models\Land;
 use App\Models\Plot;
 use App\Models\PurchaseFile;
 use App\Support\LandMeasure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class LandController extends Controller
 {
     public function index()
     {
         $lands = Land::withCount('plots')->orderBy('id', 'desc')->paginate(10);
+
+        $fileSaleRecords = FileSaleRecord::query()
+            ->with([
+                'project',
+                'purchaseFile.purchaseItems',
+                'documents',
+                'sale',
+            ])
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (FileSaleRecord $record) {
+                $file = $record->purchaseFile;
+                $project = $record->project ?? $file?->project;
+                $marla = (float) $record->land_area_marla;
+
+                return [
+                    'id' => $record->id,
+                    'e_stamp_id' => $record->e_stamp_id,
+                    'purchaser_name' => $record->purchaser_name,
+                    'land_owner' => $record->land_owner ?: '—',
+                    'land_provider' => $record->land_provider ?: '—',
+                    'moza' => $record->moza ?: '—',
+                    'khasra' => $record->khasra ?: '—',
+                    'khewat_no' => $record->khewat_no ?: '—',
+                    'khatooni_no' => $record->khatooni_no ?: '—',
+                    'plot_label' => collect([
+                        $record->component,
+                        $record->plot_type,
+                        $record->plot_quantity > 1 ? '×'.$record->plot_quantity : null,
+                    ])->filter()->implode(' · ') ?: '—',
+                    'land_area_marla' => $marla,
+                    'land_area_label' => $marla > 0 ? LandMeasure::formatAkmsLabelFromMarla($marla) : '—',
+                    'amount' => (float) ($record->total_amount ?? 0),
+                    'amount_formatted' => $record->total_amount !== null
+                        ? 'Rs '.number_format((float) $record->total_amount, 0)
+                        : '—',
+                    'status' => $record->status,
+                    'status_label' => $record->statusLabel(),
+                    'file_name' => $file?->file_name ?? ('File #'.$record->purchase_file_id),
+                    'purchase_file_id' => $record->purchase_file_id,
+                    'project_id' => $project?->id,
+                    'project_name' => $project?->name ?? '—',
+                    'project_is_dha' => $project?->isDha() ?? false,
+                    'created_at' => $record->created_at?->format('d M Y') ?? '—',
+                    'notes' => $record->notes ?: '—',
+                    'documents' => $record->documents->map(fn ($doc) => [
+                        'id' => $doc->id,
+                        'name' => $doc->name ?: 'Document',
+                        'url' => $doc->file_path ? Storage::disk('public')->url($doc->file_path) : null,
+                    ])->values()->all(),
+                ];
+            });
+
+        $activeRecords = $fileSaleRecords->where('status', '!=', FileSaleRecord::STATUS_CANCELLED);
+        $areaSum = round((float) $activeRecords->sum('land_area_marla'), 6);
+        $fileSaleRecordSummary = [
+            'records_count' => $fileSaleRecords->count(),
+            'complete_count' => $fileSaleRecords->where('status', FileSaleRecord::STATUS_COMPLETE)->count(),
+            'pending_count' => $fileSaleRecords->where('status', FileSaleRecord::STATUS_PENDING)->count(),
+            'total_amount_formatted' => 'Rs '.number_format((float) $activeRecords->sum('amount'), 0),
+            'total_sold_label' => $areaSum > 0
+                ? LandMeasure::formatAkmsLabelFromMarla($areaSum)
+                : '—',
+        ];
 
         $fileSaleSoldEntries = DayBookEntry::query()
             ->whereNotNull('purchase_file_id')
@@ -44,7 +110,14 @@ class LandController extends Controller
             'total_amount_formatted' => 'Rs '.number_format((float) $fileSaleSoldEntries->sum('amount'), 0),
         ];
 
-        return view('lands.index', compact('lands', 'soldFiles', 'fileSaleSoldEntries', 'fileSaleSoldSummary'));
+        return view('lands.index', compact(
+            'lands',
+            'soldFiles',
+            'fileSaleSoldEntries',
+            'fileSaleSoldSummary',
+            'fileSaleRecords',
+            'fileSaleRecordSummary'
+        ));
     }
 
     public function create()

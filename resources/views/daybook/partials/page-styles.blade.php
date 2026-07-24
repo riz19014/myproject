@@ -1346,6 +1346,123 @@
         color: #64748b;
         margin-top: 0.2rem;
     }
+    .daybook-sale-land-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    @media (min-width: 768px) {
+        .daybook-sale-land-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+    .daybook-sale-land-stat {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+        padding: 0.7rem 0.85rem;
+        min-width: 0;
+    }
+    .daybook-sale-land-stat__label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.2rem;
+    }
+    .daybook-sale-land-stat__value {
+        display: block;
+        font-size: 0.92rem;
+        font-weight: 650;
+        color: #0f172a;
+        word-break: break-word;
+    }
+    .daybook-sale-plot-options {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 0.65rem;
+    }
+    @media (min-width: 576px) {
+        .daybook-sale-plot-options {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (min-width: 992px) {
+        .daybook-sale-plot-options {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+    .daybook-sale-plot-option {
+        text-align: left;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: #fff;
+        border-radius: 12px;
+        padding: 0.85rem 0.95rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .daybook-sale-plot-option:hover:not(:disabled) {
+        border-color: rgba(190, 24, 93, 0.35);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+    }
+    .daybook-sale-plot-option.is-selected {
+        border-color: rgba(190, 24, 93, 0.55);
+        background: rgba(251, 232, 241, 0.55);
+        box-shadow: 0 0 0 1px rgba(190, 24, 93, 0.2);
+    }
+    .daybook-sale-plot-option:disabled,
+    .daybook-sale-plot-option.is-disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+    .daybook-sale-plot-option__title {
+        display: block;
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.95rem;
+    }
+    .daybook-sale-plot-option__meta {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 0.78rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .daybook-sale-plot-options__empty {
+        grid-column: 1 / -1;
+        border: 1px dashed rgba(15, 23, 42, 0.15);
+        border-radius: 12px;
+        padding: 1rem;
+        color: #64748b;
+        font-size: 0.9rem;
+        background: #f8fafc;
+    }
+    .daybook-sale-selected-plot {
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 12px;
+        padding: 0.65rem 0.85rem;
+        background: #f8fafc;
+        min-height: 3.1rem;
+    }
+    .daybook-sale-selected-plot__label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: #64748b;
+    }
+    .daybook-sale-selected-plot__value {
+        display: block;
+        font-weight: 650;
+        color: #0f172a;
+        font-size: 0.92rem;
+    }
+    #daybook_sale_details_file .form-control[readonly] {
+        background: #f8fafc;
+        color: #334155;
+    }
     #daybookSaleWizardModal.is-busy .daybook-save-record__idle {
         display: none;
     }

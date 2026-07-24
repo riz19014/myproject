@@ -5,16 +5,117 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h1 class="mb-1">Sale Land</h1>
-        <p class="text-muted small mb-0">Sold land from Daybook file sales, plus land records.</p>
+        <h1 class="mb-1">Sold Land Files</h1>
+        <p class="text-muted small mb-0">File sales recorded from Daybook, plus legacy daybook sold-area entries and land records.</p>
     </div>
-    {{--<a href="{{ route('lands.create') }}" class="btn btn-pink">Add Land</a>--}}
 </div>
 
 <div class="card card-theme mb-4">
     <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h2 class="h6 mb-0">Sold files from Daybook (File Sale)</h2>
+        <h2 class="h6 mb-0">File sale records</h2>
         <a href="{{ route('daybook.index') }}" class="btn btn-sm btn-outline-theme">Open Daybook</a>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="small text-muted">Records</div>
+                <div class="fw-semibold">{{ $fileSaleRecordSummary['records_count'] }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-muted">Complete / Pending</div>
+                <div class="fw-semibold">{{ $fileSaleRecordSummary['complete_count'] }} / {{ $fileSaleRecordSummary['pending_count'] }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-muted">Total area sold</div>
+                <div class="fw-semibold">{{ $fileSaleRecordSummary['total_sold_label'] }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="small text-muted">Total amount</div>
+                <div class="fw-semibold">{{ $fileSaleRecordSummary['total_amount_formatted'] }}</div>
+            </div>
+        </div>
+
+        @if($fileSaleRecords->isEmpty())
+            <p class="text-muted small mb-0">
+                No file sale records yet. Use the <strong>Sale</strong> button on Daybook to record a DHA file sale.
+            </p>
+        @else
+            <div class="table-responsive">
+                <table class="table table-striped table-theme align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>eStamp</th>
+                            <th>File</th>
+                            <th>Purchaser</th>
+                            <th>Land</th>
+                            <th>Plot</th>
+                            <th class="text-end">Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Docs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($fileSaleRecords as $record)
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td class="fw-semibold small">{{ $record['e_stamp_id'] }}</td>
+                                <td>
+                                    <a href="{{ route('purchase.files.show', $record['purchase_file_id']) }}" class="text-decoration-none fw-semibold">
+                                        {{ $record['file_name'] }}
+                                    </a>
+                                    <div class="text-muted small">
+                                        @if($record['project_id'])
+                                            <a href="{{ route('sale.files.index', $record['project_id']) }}" class="text-decoration-none"><x-project-name :name="$record['project_name']" :is-dha="$record['project_is_dha'] ?? false" /></a>
+                                        @else
+                                            <x-project-name :name="$record['project_name']" :is-dha="$record['project_is_dha'] ?? false" />
+                                        @endif
+                                    </div>
+                                    <div class="text-muted small">Owner: {{ $record['land_owner'] }} · Provider: {{ $record['land_provider'] }}</div>
+                                </td>
+                                <td class="small">{{ $record['purchaser_name'] }}</td>
+                                <td class="small">
+                                    <div>{{ $record['land_area_label'] }}</div>
+                                    <div class="text-muted">Mouza: {{ $record['moza'] }}</div>
+                                    <div class="text-muted">Khewat: {{ $record['khewat_no'] }} · Khatoni: {{ $record['khatooni_no'] }}</div>
+                                    <div class="text-muted">Khasra: {{ $record['khasra'] }}</div>
+                                </td>
+                                <td class="small">{{ $record['plot_label'] }}</td>
+                                <td class="text-end fw-semibold">{{ $record['amount_formatted'] }}</td>
+                                <td>
+                                    @if($record['status'] === 'complete')
+                                        <span class="badge text-bg-success">{{ $record['status_label'] }}</span>
+                                    @elseif($record['status'] === 'pending')
+                                        <span class="badge text-bg-warning">{{ $record['status_label'] }}</span>
+                                    @else
+                                        <span class="badge text-bg-secondary">{{ $record['status_label'] }}</span>
+                                    @endif
+                                </td>
+                                <td class="small">{{ $record['created_at'] }}</td>
+                                <td class="small">
+                                    @forelse($record['documents'] as $doc)
+                                        @if($doc['url'])
+                                            <a href="{{ $doc['url'] }}" target="_blank" rel="noopener" class="d-block text-decoration-none">{{ $doc['name'] }}</a>
+                                        @else
+                                            <span class="d-block">{{ $doc['name'] }}</span>
+                                        @endif
+                                    @empty
+                                        <span class="text-muted">—</span>
+                                    @endforelse
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+</div>
+
+<div class="card card-theme mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h2 class="h6 mb-0">Daybook sold-area entries (legacy)</h2>
     </div>
     <div class="card-body">
         <div class="row g-3 mb-3">
@@ -38,7 +139,7 @@
 
         @if($soldFiles->isEmpty())
             <p class="text-muted small mb-0">
-                No file-sale sold area found yet. Create a Daybook entry linked to a File Sale file and enter sold area.
+                No daybook sold-area entries found.
             </p>
         @else
             <div class="table-responsive">

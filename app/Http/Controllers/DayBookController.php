@@ -15,9 +15,11 @@ use App\Models\Plot;
 use App\Models\Project;
 use App\Models\ProjectFile;
 use App\Models\PurchaseFile;
+use App\Models\FileSaleRecord;
 use App\Models\Sale;
 use App\Models\Setting;
 use App\Support\DaybookVoucher;
+use App\Support\FileSaleRecordService;
 use App\Support\LandMeasure;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -1342,6 +1344,118 @@ class DayBookController extends Controller
         return redirect()
             ->route('daybook.index', ['date' => $dateStr])
             ->with('success', 'Petty cash saved.');
+    }
+
+    /**
+     * DHA file details for the daybook Sale wizard (owners, land info, formula plot options).
+     */
+    public function fileSaleDetails(Request $request, FileSaleRecordService $fileSaleRecords)
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'purchase_file_id' => ['required', 'integer', 'exists:purchase_files,id'],
+        ]);
+
+        /** @var Project $project */
+        $project = Project::query()->findOrFail((int) $validated['project_id']);
+        if (! $project->isDha()) {
+            throw ValidationException::withMessages([
+                'project_id' => 'Only DHA projects use file sales.',
+            ]);
+        }
+
+        /** @var PurchaseFile $purchaseFile */
+        $purchaseFile = PurchaseFile::query()
+            ->whereKey((int) $validated['purchase_file_id'])
+            ->where('project_id', $project->id)
+            ->firstOrFail();
+
+        if (! $purchaseFile->isMovedToFileSale()) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => 'Move this file to File Sale before recording a sale here.',
+            ]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'file' => $fileSaleRecords->buildFileDetails($project, $purchaseFile),
+        ]);
+    }
+
+    /**
+     * Record a DHA file sale from the daybook Sale wizard (multipart JSON/form).
+     */
+    public function storeFileSale(Request $request, FileSaleRecordService $fileSaleRecords)
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'purchase_file_id' => ['required', 'integer', 'exists:purchase_files,id'],
+            'e_stamp_id' => ['required', 'string', 'max:120'],
+            'purchaser_name' => ['required', 'string', 'max:255'],
+            'component' => ['required', 'string', 'max:40'],
+            'plot_type' => ['required', 'string', 'max:40'],
+            'plot_quantity' => ['required', 'integer', 'min:1', 'max:999'],
+            'total_amount' => ['required', 'numeric', 'min:0.01'],
+            'status' => ['required', 'string', Rule::in([
+                FileSaleRecord::STATUS_PENDING,
+                FileSaleRecord::STATUS_COMPLETE,
+                FileSaleRecord::STATUS_CANCELLED,
+            ])],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'documents' => ['nullable', 'array'],
+            'documents.*' => ['file', 'max:10240'],
+        ]);
+
+        /** @var Project $project */
+        $project = Project::query()->findOrFail((int) $validated['project_id']);
+        if (! $project->isDha()) {
+            throw ValidationException::withMessages([
+                'project_id' => 'Only DHA projects use file sales.',
+            ]);
+        }
+
+        /** @var PurchaseFile $purchaseFile */
+        $purchaseFile = PurchaseFile::query()
+            ->whereKey((int) $validated['purchase_file_id'])
+            ->where('project_id', $project->id)
+            ->with(['purchaseItems.party', 'fileSaleLand', 'sales'])
+            ->firstOrFail();
+
+        if (! $purchaseFile->isMovedToFileSale()) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => 'Move this file to File Sale before recording a sale here.',
+            ]);
+        }
+
+        $documents = $request->file('documents', []);
+        if (! is_array($documents)) {
+            $documents = $documents ? [$documents] : [];
+        }
+
+        $record = $fileSaleRecords->store($project, $purchaseFile, $validated, $documents);
+
+        $purchaseFile->refresh()->load(['purchaseItems.party', 'fileSaleLand', 'sales']);
+        $saleFilePayload = $purchaseFile->daybookSaleFilePayload();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'File sale recorded.',
+            'record' => [
+                'id' => $record->id,
+                'e_stamp_id' => $record->e_stamp_id,
+                'purchaser_name' => $record->purchaser_name,
+                'status' => $record->status,
+                'status_label' => $record->statusLabel(),
+                'component' => $record->component,
+                'plot_type' => $record->plot_type,
+                'plot_quantity' => $record->plot_quantity,
+                'land_area_marla' => (float) $record->land_area_marla,
+                'land_area_label' => LandMeasure::formatAkmsLabelFromMarla((float) $record->land_area_marla),
+                'total_amount' => (float) $record->total_amount,
+                'documents_count' => $record->documents->count(),
+            ],
+            'sale_file' => $saleFilePayload,
+        ]);
     }
 
     /**
