@@ -271,10 +271,16 @@ final class FileSaleRecordService
                 'notes' => isset($data['notes']) ? trim((string) $data['notes']) : null,
             ]);
 
-            foreach ($documents as $file) {
-                if ($file instanceof UploadedFile && $file->isValid()) {
-                    $record->addDocument($file);
+            foreach ($documents as $index => $file) {
+                if (! $file instanceof UploadedFile) {
+                    continue;
                 }
+                if (! $file->isValid()) {
+                    throw ValidationException::withMessages([
+                        'documents.'.$index => [$file->getErrorMessage() ?: 'Document upload failed.'],
+                    ]);
+                }
+                $record->addDocument($file);
             }
 
             return $record->load(['documents', 'purchaseFile.project', 'sale']);

@@ -1463,6 +1463,117 @@
         background: #f8fafc;
         color: #334155;
     }
+    .daybook-sale-docs {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+    .daybook-sale-docs__picker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        margin: 0;
+        padding: 1rem 1rem;
+        border: 1.5px dashed rgba(15, 23, 42, 0.18);
+        border-radius: 12px;
+        background: #f8fafc;
+        cursor: pointer;
+        text-align: center;
+        transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .daybook-sale-docs__picker:hover {
+        border-color: rgba(190, 24, 93, 0.45);
+        background: rgba(251, 232, 241, 0.35);
+    }
+    .daybook-sale-docs__picker i {
+        font-size: 1.35rem;
+        color: #be185d;
+        margin-bottom: 0.15rem;
+    }
+    .daybook-sale-docs__picker-title {
+        font-weight: 700;
+        font-size: 0.92rem;
+        color: #0f172a;
+    }
+    .daybook-sale-docs__picker-hint {
+        font-size: 0.78rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .daybook-sale-docs__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+    .daybook-sale-docs__item {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.55rem 0.65rem 0.55rem 0.75rem;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 10px;
+        background: #fff;
+        min-width: 0;
+    }
+    .daybook-sale-docs__icon {
+        flex: 0 0 auto;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 1rem;
+    }
+    .daybook-sale-docs__meta {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .daybook-sale-docs__name {
+        display: block;
+        font-weight: 650;
+        font-size: 0.88rem;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .daybook-sale-docs__size {
+        display: block;
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .daybook-sale-docs__remove {
+        flex: 0 0 auto;
+        width: 1.85rem;
+        height: 1.85rem;
+        border: 0;
+        border-radius: 999px;
+        background: #fef2f2;
+        color: #b91c1c;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        padding: 0;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .daybook-sale-docs__remove:hover {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .daybook-sale-docs__remove:focus-visible {
+        outline: 2px solid rgba(185, 28, 28, 0.35);
+        outline-offset: 2px;
+    }
     #daybookSaleWizardModal.is-busy .daybook-save-record__idle {
         display: none;
     }

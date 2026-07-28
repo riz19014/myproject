@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 
 class FileSaleRecord extends Model
 {
@@ -89,6 +90,11 @@ class FileSaleRecord extends Model
     public function addDocument(UploadedFile $file): FileSaleRecordDocument
     {
         $path = $file->store('file-sale-records/'.$this->id, 'public');
+        if (! $path) {
+            throw ValidationException::withMessages([
+                'documents' => ['Could not store the uploaded document. Check storage permissions.'],
+            ]);
+        }
 
         return $this->documents()->create([
             'name' => $file->getClientOriginalName(),

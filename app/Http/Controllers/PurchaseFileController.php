@@ -621,13 +621,13 @@ class PurchaseFileController extends Controller
 
         if (preg_match('/^party_(\d+)$/', $sectionKey, $matches)) {
             $partyId = (int) $matches[1];
-            $partyMarla = (float) $sellers->where('party_id', $partyId)->sum('land_area_marla');
+            $partyMarla = PurchaseItem::sumEffectiveMarla($sellers->where('party_id', $partyId));
             $partyName = $sellers->firstWhere('party_id', $partyId)?->party?->name ?? $headline;
             if ($partyMarla > 0) {
                 $headline = $this->formatLedgerPdfLandHeadline($partyMarla).' ('.$partyName.')';
             }
         } elseif (str_contains($sectionKey, '_all')) {
-            $totalMarla = (float) $sellers->sum('land_area_marla');
+            $totalMarla = PurchaseItem::sumEffectiveMarla($sellers);
             if ($totalMarla > 0) {
                 $headline = $this->formatLedgerPdfLandHeadline($totalMarla).' (All land owners)';
             }
@@ -716,7 +716,7 @@ class PurchaseFileController extends Controller
                 ->values()
                 ->all();
             $data['sellers'] = $data['sellers']->whereIn('id', $ids)->values();
-            $marla = (float) $data['sellers']->sum('land_area_marla');
+            $marla = PurchaseItem::sumEffectiveMarla($data['sellers']);
             $data['landTotalRs'] = (float) $data['sellers']->sum('line_total_rs');
             $data['landAreaLabel'] = $marla > 0
                 ? LandMeasure::formatAkmsLabelFromMarla($marla)
@@ -810,7 +810,7 @@ class PurchaseFileController extends Controller
     {
         $sellers = $file->purchaseItems;
         $landTotalRs = (float) $sellers->sum('line_total_rs');
-        $landAreaMarla = (float) $sellers->sum('land_area_marla');
+        $landAreaMarla = PurchaseItem::sumEffectiveMarla($sellers);
         $landAreaLabel = $landAreaMarla > 0
             ? LandMeasure::formatAkmsLabelFromMarla($landAreaMarla)
             : '—';
@@ -1004,7 +1004,7 @@ class PurchaseFileController extends Controller
             }
 
             $key = 'party_'.$partyId;
-            $landAreaMarla = (float) $data['sellers']->where('party_id', $partyId)->sum('land_area_marla');
+            $landAreaMarla = PurchaseItem::sumEffectiveMarla($data['sellers']->where('party_id', $partyId));
             $landAreaSpoken = $landAreaMarla > 0
                 ? LandMeasure::formatSpokenKanalMarlaFromMarla($landAreaMarla)
                 : null;
@@ -1348,7 +1348,7 @@ class PurchaseFileController extends Controller
             $party = $parties->get($partyId);
             $breakdown = $this->purchaseFilePartyOpeningBreakdown($file, $data, $partyId);
             $openingAmount = $breakdown['opening'];
-            $landAreaMarla = (float) $data['sellers']->where('party_id', $partyId)->sum('land_area_marla');
+            $landAreaMarla = PurchaseItem::sumEffectiveMarla($data['sellers']->where('party_id', $partyId));
             $landAreaSpoken = $landAreaMarla > 0
                 ? LandMeasure::formatSpokenKanalMarlaFromMarla($landAreaMarla)
                 : null;

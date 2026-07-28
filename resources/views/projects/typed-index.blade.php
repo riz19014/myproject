@@ -145,7 +145,7 @@
                 <p class="text-muted small mb-0">No purchase lines yet. Pick a project under <strong>Add lines for project</strong> above (or use <strong>Add purchase</strong> in the header), then enter one or more rows. Use <strong>Edit</strong> in the table to change a line.</p>
             @else
                 @php
-                    $purchaseTotalMarla = (float) $purchaseItems->sum(fn ($i) => (float) $i->land_area_marla);
+                    $purchaseTotalMarla = \App\Models\PurchaseItem::sumEffectiveMarla($purchaseItems);
                     $purchaseTotalRs = (float) $purchaseItems->sum(fn ($i) => (float) $i->line_total_rs);
                     $purchaseLineCount = $purchaseItems->count();
                 @endphp
@@ -175,7 +175,7 @@
                                     <td class="small">{{ $item->party?->name ?? '—' }}</td>
                                     <td class="small">{{ $item->moza ?: '—' }}</td>
                                     <td class="small">{{ $item->khasra ?: '—' }}</td>
-                                    <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $item->land_area_marla) }}</td>
+                                    <td class="small">{{ $item->landAreaLabel() }}</td>
                                     <td class="text-end small">{{ number_format((float) $item->amount_per_acre, 0) }}</td>
                                     <td class="text-end fw-semibold">{{ number_format((float) $item->line_total_rs, 0) }}</td>
                                     <td class="text-muted small">{{ $item->created_at?->format('Y-m-d') }}</td>

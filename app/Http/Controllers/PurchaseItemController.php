@@ -198,7 +198,7 @@ class PurchaseItemController extends Controller
             ->limit(400)
             ->get();
 
-        $purchaseTotalMarla = (float) $purchaseItems->sum(fn ($i) => (float) $i->land_area_marla);
+        $purchaseTotalMarla = PurchaseItem::sumEffectiveMarla($purchaseItems);
         $purchaseTotalRs = (float) $purchaseItems->sum(fn ($i) => (float) $i->line_total_rs);
         $purchaseLineCount = $purchaseItems->count();
         $generatedAt = now();

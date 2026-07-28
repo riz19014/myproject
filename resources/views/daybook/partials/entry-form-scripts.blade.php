@@ -2589,6 +2589,7 @@
     var itemRows = [];
     var fileDetails = null;
     var selectedPlotOption = null;
+    var selectedDocuments = [];
     var busy = false;
     var fileDetailsUrl = @json(route('daybook.sale.file-details'));
     var fileSaleStoreUrl = @json(route('daybook.sale.file'));
@@ -2689,6 +2690,7 @@
         if (itemSearch) itemSearch.value = '';
         fileDetails = null;
         selectedPlotOption = null;
+        clearSelectedDocuments();
         var fileAmount = document.getElementById('daybook_sale_file_amount');
         var fileNote = document.getElementById('daybook_sale_file_note');
         var eStamp = document.getElementById('daybook_sale_e_stamp_id');
@@ -2699,7 +2701,6 @@
         var plotQty = document.getElementById('daybook_sale_plot_qty');
         var componentEl = document.getElementById('daybook_sale_component');
         var plotTypeEl = document.getElementById('daybook_sale_plot_type');
-        var docsEl = document.getElementById('daybook_sale_documents');
         var customer = document.getElementById('daybook_sale_customer_id');
         var acre = document.getElementById('daybook_sale_plot_acre');
         var kanal = document.getElementById('daybook_sale_plot_kanal');
@@ -2716,7 +2717,6 @@
         if (plotQty) plotQty.value = '1';
         if (componentEl) componentEl.value = '';
         if (plotTypeEl) plotTypeEl.value = '';
-        if (docsEl) docsEl.value = '';
         if (customer) customer.value = '';
         if (acre) acre.value = '0';
         if (kanal) kanal.value = '0';
@@ -2801,6 +2801,129 @@
     function setText(id, value) {
         var el = document.getElementById(id);
         if (el) el.textContent = value == null || value === '' ? '—' : String(value);
+    }
+
+    function formatDocSize(bytes) {
+        var n = Number(bytes) || 0;
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function docIconClass(file) {
+        var name = (file && file.name ? file.name : '').toLowerCase();
+        if (/\.(png|jpe?g|webp|gif)$/.test(name)) return 'bi-file-earmark-image';
+        if (/\.pdf$/.test(name)) return 'bi-file-earmark-pdf';
+        if (/\.docx?$/.test(name)) return 'bi-file-earmark-word';
+        return 'bi-file-earmark';
+    }
+
+    function fileIdentity(file) {
+        return [file.name, file.size, file.lastModified].join('::');
+    }
+
+    function syncDocumentsInput() {
+        var docsEl = document.getElementById('daybook_sale_documents');
+        if (!docsEl) return;
+        try {
+            var dt = new DataTransfer();
+            selectedDocuments.forEach(function (file) { dt.items.add(file); });
+            docsEl.files = dt.files;
+        } catch (e) {
+            // Some browsers may not allow assigning FileList; FormData still uses selectedDocuments.
+        }
+    }
+
+    function renderSelectedDocuments() {
+        var listEl = document.getElementById('daybook_sale_documents_list');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        if (!selectedDocuments.length) {
+            listEl.classList.add('d-none');
+            return;
+        }
+        listEl.classList.remove('d-none');
+        selectedDocuments.forEach(function (file, index) {
+            var li = document.createElement('li');
+            li.className = 'daybook-sale-docs__item';
+
+            var iconWrap = document.createElement('span');
+            iconWrap.className = 'daybook-sale-docs__icon';
+            iconWrap.setAttribute('aria-hidden', 'true');
+            var icon = document.createElement('i');
+            icon.className = 'bi ' + docIconClass(file);
+            iconWrap.appendChild(icon);
+
+            var meta = document.createElement('div');
+            meta.className = 'daybook-sale-docs__meta';
+            var name = document.createElement('span');
+            name.className = 'daybook-sale-docs__name';
+            name.textContent = file.name || ('Document ' + (index + 1));
+            name.title = file.name || '';
+            var size = document.createElement('span');
+            size.className = 'daybook-sale-docs__size';
+            size.textContent = formatDocSize(file.size);
+            meta.appendChild(name);
+            meta.appendChild(size);
+
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'daybook-sale-docs__remove';
+            removeBtn.setAttribute('aria-label', 'Remove ' + (file.name || 'document'));
+            removeBtn.title = 'Remove';
+            removeBtn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+            removeBtn.addEventListener('click', function () {
+                removeSelectedDocument(index);
+            });
+
+            li.appendChild(iconWrap);
+            li.appendChild(meta);
+            li.appendChild(removeBtn);
+            listEl.appendChild(li);
+        });
+    }
+
+    function clearSelectedDocuments() {
+        selectedDocuments = [];
+        var docsEl = document.getElementById('daybook_sale_documents');
+        if (docsEl) docsEl.value = '';
+        renderSelectedDocuments();
+    }
+
+    function removeSelectedDocument(index) {
+        if (index < 0 || index >= selectedDocuments.length) return;
+        selectedDocuments.splice(index, 1);
+        syncDocumentsInput();
+        renderSelectedDocuments();
+    }
+
+    function addSelectedDocuments(fileList) {
+        var incoming = Array.prototype.slice.call(fileList || []);
+        if (!incoming.length) return;
+        var maxBytes = 10 * 1024 * 1024;
+        var existing = {};
+        selectedDocuments.forEach(function (f) { existing[fileIdentity(f)] = true; });
+        var skipped = 0;
+        incoming.forEach(function (file) {
+            if (!file) return;
+            if (file.size > maxBytes) {
+                skipped += 1;
+                return;
+            }
+            var key = fileIdentity(file);
+            if (existing[key]) return;
+            existing[key] = true;
+            selectedDocuments.push(file);
+        });
+        syncDocumentsInput();
+        renderSelectedDocuments();
+        var docsEl = document.getElementById('daybook_sale_documents');
+        if (docsEl) docsEl.value = '';
+        if (skipped) {
+            showError(skipped + ' file(s) skipped (over 10 MB).');
+        } else {
+            showError('');
+        }
     }
 
     function clearFileDetailsUi() {
@@ -3185,7 +3308,6 @@
         var noteEl = document.getElementById('daybook_sale_file_note');
         var statusEl = document.getElementById('daybook_sale_status');
         var qtyEl = document.getElementById('daybook_sale_plot_qty');
-        var docsEl = document.getElementById('daybook_sale_documents');
         var eStamp = eStampEl ? eStampEl.value.trim() : '';
         var purchaser = purchaserEl ? purchaserEl.value.trim() : '';
         var amount = amountEl ? parseFloat(amountEl.value) : 0;
@@ -3232,11 +3354,9 @@
         formData.append('total_amount', String(amount));
         formData.append('status', status);
         if (note) formData.append('notes', note);
-        if (docsEl && docsEl.files && docsEl.files.length) {
-            Array.prototype.forEach.call(docsEl.files, function (file) {
-                formData.append('documents[]', file);
-            });
-        }
+        selectedDocuments.forEach(function (file, index) {
+            formData.append('documents[' + index + ']', file, file.name || ('document-' + (index + 1)));
+        });
 
         setBusy(true);
         showError('');
@@ -3250,7 +3370,9 @@
             body: formData
         }).then(function (res) {
             return res.json().then(function (data) {
-                return { ok: res.ok, data: data };
+                return { ok: res.ok, status: res.status, data: data };
+            }).catch(function () {
+                return { ok: res.ok, status: res.status, data: null };
             });
         }).then(function (result) {
             setBusy(false);
@@ -3263,6 +3385,8 @@
                     }
                 } else if (result.data && result.data.message) {
                     msg = result.data.message;
+                } else if (result.status === 413) {
+                    msg = 'Upload too large for the server. Try fewer or smaller documents.';
                 }
                 showError(msg);
                 return;
@@ -3313,6 +3437,7 @@
                 showError('Sale saved, but could not fill the entry form.');
                 return;
             }
+            clearSelectedDocuments();
             modal.hide();
             var amountField = document.getElementById('entry_amount');
             if (amountField) amountField.focus();
@@ -3445,6 +3570,13 @@
 
     if (backBtn) backBtn.addEventListener('click', goBack);
     if (primaryBtn) primaryBtn.addEventListener('click', goNext);
+
+    var docsInput = document.getElementById('daybook_sale_documents');
+    if (docsInput) {
+        docsInput.addEventListener('change', function () {
+            addSelectedDocuments(docsInput.files);
+        });
+    }
 
     if (projectSearch) {
         projectSearch.addEventListener('focus', function () {

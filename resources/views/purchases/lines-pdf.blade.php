@@ -120,7 +120,7 @@
                         <td>{{ e($item->party?->name ?? '—') }}</td>
                         <td>{{ e($item->moza ?? '') ?: '—' }}</td>
                         <td>{{ e($item->khasra ?? '') ?: '—' }}</td>
-                        <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $item->land_area_marla) }}</td>
+                        <td class="small">{{ $item->landAreaLabel() }}</td>
                         <td class="num">{{ number_format((float) $item->amount_per_acre, 0) }}</td>
                         <td class="num fwb">{{ number_format((float) $item->line_total_rs, 0) }}</td>
                         <td class="cen small">{{ $item->created_at?->format('Y-m-d') }}</td>

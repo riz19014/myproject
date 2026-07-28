@@ -4,10 +4,19 @@ namespace App\Support;
 
 final class LandMeasure
 {
-    /** Punjab-style: 1 kanal = 20 marla, 1 acre = 8 kanal. 1 marla ≈ 272.25 sq ft. */
+    /** Sq ft in one marla (standard used across the app). */
+    public const SQFT_PER_MARLA = 225.0;
+
+    /** 1 kanal = 20 marla, 1 acre = 8 kanal. 1 marla = 225 sq ft. */
     public static function marlaFromAkms(int $acre, int $kanal, int $marla, int $sqft): float
     {
-        return $acre * 160 + $kanal * 20 + $marla + $sqft / 272.25;
+        return $acre * 160 + $kanal * 20 + $marla + $sqft / self::SQFT_PER_MARLA;
+    }
+
+    /** Display stored A/K/M/SQFT components exactly as entered (no marla round-trip). */
+    public static function formatAkmsLabel(int $acre, int $kanal, int $marla, int $sqft): string
+    {
+        return sprintf('A %d — K %d — M %d — SQFT %d', $acre, $kanal, $marla, $sqft);
     }
 
     /** Display total marla as A — K — M — SQFT (decomposed + fractional marla as sq ft). */
@@ -26,7 +35,7 @@ final class LandMeasure
         if ($frac < 0) {
             $frac = 0;
         }
-        $sqft = $frac > $eps ? (int) round($frac * 272.25) : 0;
+        $sqft = $frac > $eps ? (int) round($frac * self::SQFT_PER_MARLA) : 0;
 
         return sprintf('A %d — K %d — M %d — SQFT %d', $a, $k, $m, $sqft);
     }
@@ -49,7 +58,7 @@ final class LandMeasure
         }
         $base = sprintf('A-%d-%dK-%dM', $a, $k, $m);
         if ($frac > $eps) {
-            $sqft = (int) round($frac * 272.25);
+            $sqft = (int) round($frac * self::SQFT_PER_MARLA);
             if ($sqft > 0) {
                 return $base.'-'.$sqft.'SQFT';
             }
@@ -64,7 +73,7 @@ final class LandMeasure
             'marla' => $amount,
             'kanal' => $amount * 20,
             'acre' => $amount * 160,
-            'sqft' => $amount / 272.25,
+            'sqft' => $amount / self::SQFT_PER_MARLA,
             default => 0.0,
         };
     }

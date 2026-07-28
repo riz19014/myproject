@@ -171,7 +171,7 @@
                             Khatooni: {{ $seller->khatooni_no ?: '—' }}<br>
                             Intiqal: {{ $seller->intiqal_no ?: '—' }}
                         </td>
-                        <td>{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $seller->land_area_marla) }}</td>
+                        <td>{{ $seller->landAreaLabel() }}</td>
                         <td class="amt">{{ number_format((float) $seller->amount_per_acre, 0) }}</td>
                         <td class="amt">Rs {{ number_format((float) $seller->line_total_rs, 2) }}</td>
                     </tr>

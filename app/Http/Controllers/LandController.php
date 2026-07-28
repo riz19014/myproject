@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\DayBookEntry;
 use App\Models\FileSaleRecord;
+use App\Models\FileSaleRecordDocument;
 use App\Models\Land;
 use App\Models\Plot;
 use App\Models\PurchaseFile;
 use App\Support\LandMeasure;
+use App\Support\ProjectExemptionDefaults;
+use App\Support\SaleExemptionConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LandController extends Controller
 {
@@ -18,57 +22,84 @@ class LandController extends Controller
     {
         $lands = Land::withCount('plots')->orderBy('id', 'desc')->paginate(10);
 
-        $fileSaleRecords = FileSaleRecord::query()
+        $rawRecords = FileSaleRecord::query()
             ->with([
-                'project',
+                'project.landType',
                 'purchaseFile.purchaseItems',
+                'purchaseFile.sales',
+                'purchaseFile.project.landType',
                 'documents',
                 'sale',
             ])
             ->orderByDesc('id')
-            ->get()
-            ->map(function (FileSaleRecord $record) {
-                $file = $record->purchaseFile;
-                $project = $record->project ?? $file?->project;
-                $marla = (float) $record->land_area_marla;
+            ->get();
 
-                return [
-                    'id' => $record->id,
-                    'e_stamp_id' => $record->e_stamp_id,
-                    'purchaser_name' => $record->purchaser_name,
-                    'land_owner' => $record->land_owner ?: '—',
-                    'land_provider' => $record->land_provider ?: '—',
-                    'moza' => $record->moza ?: '—',
-                    'khasra' => $record->khasra ?: '—',
-                    'khewat_no' => $record->khewat_no ?: '—',
-                    'khatooni_no' => $record->khatooni_no ?: '—',
-                    'plot_label' => collect([
-                        $record->component,
-                        $record->plot_type,
-                        $record->plot_quantity > 1 ? '×'.$record->plot_quantity : null,
-                    ])->filter()->implode(' · ') ?: '—',
-                    'land_area_marla' => $marla,
-                    'land_area_label' => $marla > 0 ? LandMeasure::formatAkmsLabelFromMarla($marla) : '—',
-                    'amount' => (float) ($record->total_amount ?? 0),
-                    'amount_formatted' => $record->total_amount !== null
-                        ? 'Rs '.number_format((float) $record->total_amount, 0)
-                        : '—',
-                    'status' => $record->status,
-                    'status_label' => $record->statusLabel(),
-                    'file_name' => $file?->file_name ?? ('File #'.$record->purchase_file_id),
-                    'purchase_file_id' => $record->purchase_file_id,
-                    'project_id' => $project?->id,
-                    'project_name' => $project?->name ?? '—',
-                    'project_is_dha' => $project?->isDha() ?? false,
-                    'created_at' => $record->created_at?->format('d M Y') ?? '—',
-                    'notes' => $record->notes ?: '—',
-                    'documents' => $record->documents->map(fn ($doc) => [
-                        'id' => $doc->id,
-                        'name' => $doc->name ?: 'Document',
-                        'url' => $doc->file_path ? Storage::disk('public')->url($doc->file_path) : null,
-                    ])->values()->all(),
-                ];
-            });
+        $configByProject = [];
+        $fileSaleRecords = $rawRecords->map(function (FileSaleRecord $record) use (&$configByProject) {
+            $file = $record->purchaseFile;
+            $project = $record->project ?? $file?->project;
+            $marla = (float) $record->land_area_marla;
+            $plotLabel = '—';
+            if ($project && $record->component && $record->plot_type) {
+                $projectId = (int) $project->id;
+                if (! isset($configByProject[$projectId])) {
+                    ProjectExemptionDefaults::ensureForProject($project);
+                    $configByProject[$projectId] = SaleExemptionConfig::forProject($project);
+                }
+                /** @var SaleExemptionConfig $config */
+                $config = $configByProject[$projectId];
+                $label = $config->plotLabel((string) $record->component, (string) $record->plot_type);
+                $qty = (int) $record->plot_quantity;
+                $plotLabel = $label.($qty > 1 ? ' × '.$qty : '');
+            }
+
+            $totalMarla = $file ? $file->totalLandMarla() : 0.0;
+            $soldMarla = $file ? $file->soldLandMarla() : 0.0;
+            $remainingMarla = $file ? $file->remainingLandMarla() : 0.0;
+
+            return [
+                'id' => $record->id,
+                'e_stamp_id' => $record->e_stamp_id,
+                'purchaser_name' => $record->purchaser_name,
+                'land_owner' => $record->land_owner ?: '—',
+                'land_provider' => $record->land_provider ?: '—',
+                'moza' => $record->moza ?: '—',
+                'khasra' => $record->khasra ?: '—',
+                'khewat_no' => $record->khewat_no ?: '—',
+                'khatooni_no' => $record->khatooni_no ?: '—',
+                'plot_label' => $plotLabel,
+                'component' => $record->component ?: '—',
+                'plot_type' => $record->plot_type ?: '—',
+                'plot_quantity' => (int) $record->plot_quantity,
+                'land_area_marla' => $marla,
+                'land_area_label' => $marla > 0 ? LandMeasure::formatAkmsLabelFromMarla($marla) : '—',
+                'amount' => (float) ($record->total_amount ?? 0),
+                'amount_formatted' => $record->total_amount !== null
+                    ? 'Rs '.number_format((float) $record->total_amount, 0)
+                    : '—',
+                'status' => $record->status,
+                'status_label' => $record->statusLabel(),
+                'file_name' => $file?->file_name ?? ('File #'.$record->purchase_file_id),
+                'purchase_file_id' => $record->purchase_file_id,
+                'project_id' => $project?->id,
+                'project_name' => $project?->name ?? '—',
+                'project_is_dha' => $project?->isDha() ?? false,
+                'created_at' => $record->created_at?->format('d M Y H:i') ?? '—',
+                'notes' => $record->notes ?: '—',
+                'file_total_label' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($totalMarla) : '—',
+                'file_sold_label' => $soldMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($soldMarla) : '—',
+                'file_remaining_label' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($remainingMarla) : '—',
+                'file_status' => $file?->saleStatusLabel() ?? '—',
+                'documents' => $record->documents->map(fn ($doc) => [
+                    'id' => $doc->id,
+                    'name' => $doc->name ?: 'Document',
+                    'url' => route('sale-land.documents.show', [
+                        'record' => $record->id,
+                        'document' => $doc->id,
+                    ], false),
+                ])->values()->all(),
+            ];
+        });
 
         $activeRecords = $fileSaleRecords->where('status', '!=', FileSaleRecord::STATUS_CANCELLED);
         $areaSum = round((float) $activeRecords->sum('land_area_marla'), 6);
@@ -81,6 +112,35 @@ class LandController extends Controller
                 ? LandMeasure::formatAkmsLabelFromMarla($areaSum)
                 : '—',
         ];
+
+        $purchaseFileIds = $rawRecords->pluck('purchase_file_id')->unique()->filter()->values()->all();
+        $inventoryFiles = $purchaseFileIds === []
+            ? collect()
+            : PurchaseFile::query()
+                ->whereIn('id', $purchaseFileIds)
+                ->with(['project.landType', 'purchaseItems', 'sales'])
+                ->orderBy('file_name')
+                ->get()
+                ->map(function (PurchaseFile $file) {
+                    $total = $file->totalLandMarla();
+                    $sold = $file->soldLandMarla();
+                    $remaining = $file->remainingLandMarla();
+                    $project = $file->project;
+
+                    return [
+                        'purchase_file_id' => $file->id,
+                        'file_name' => $file->file_name,
+                        'project_id' => $project?->id,
+                        'project_name' => $project?->name ?? '—',
+                        'project_is_dha' => $project?->isDha() ?? false,
+                        'total_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
+                        'sold_label' => $sold > 0 ? LandMeasure::formatAkmsLabelFromMarla($sold) : '—',
+                        'remaining_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : '—',
+                        'status' => $file->saleStatusLabel(),
+                        'sales_count' => $file->sales->count(),
+                        'file_sale_url' => $project ? route('sale.files.index', $project) : null,
+                    ];
+                });
 
         $fileSaleSoldEntries = DayBookEntry::query()
             ->whereNotNull('purchase_file_id')
@@ -116,7 +176,8 @@ class LandController extends Controller
             'fileSaleSoldEntries',
             'fileSaleSoldSummary',
             'fileSaleRecords',
-            'fileSaleRecordSummary'
+            'fileSaleRecordSummary',
+            'inventoryFiles'
         ));
     }
 
@@ -218,6 +279,25 @@ class LandController extends Controller
         $doc->delete();
 
         return redirect()->route('lands.show', $land)->with('success', 'Document removed.');
+    }
+
+    /**
+     * View / download a document attached to a file sale record.
+     */
+    public function showFileSaleDocument(FileSaleRecord $record, FileSaleRecordDocument $document): StreamedResponse
+    {
+        abort_unless((int) $document->file_sale_record_id === (int) $record->id, 404);
+        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
+
+        $filename = $document->name ?: basename($document->file_path);
+
+        return Storage::disk('public')->response(
+            $document->file_path,
+            $filename,
+            [
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            ]
+        );
     }
 
     /**

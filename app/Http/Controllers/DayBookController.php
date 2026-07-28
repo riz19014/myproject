@@ -1402,7 +1402,7 @@ class DayBookController extends Controller
                 FileSaleRecord::STATUS_CANCELLED,
             ])],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'documents' => ['nullable', 'array'],
+            'documents' => ['sometimes', 'array'],
             'documents.*' => ['file', 'max:10240'],
         ]);
 
@@ -1427,10 +1427,7 @@ class DayBookController extends Controller
             ]);
         }
 
-        $documents = $request->file('documents', []);
-        if (! is_array($documents)) {
-            $documents = $documents ? [$documents] : [];
-        }
+        $documents = $this->uploadedDocuments($request);
 
         $record = $fileSaleRecords->store($project, $purchaseFile, $validated, $documents);
 
@@ -1453,6 +1450,11 @@ class DayBookController extends Controller
                 'land_area_label' => LandMeasure::formatAkmsLabelFromMarla((float) $record->land_area_marla),
                 'total_amount' => (float) $record->total_amount,
                 'documents_count' => $record->documents->count(),
+                'documents' => $record->documents->map(fn ($doc) => [
+                    'id' => $doc->id,
+                    'name' => $doc->name,
+                    'file_path' => $doc->file_path,
+                ])->values()->all(),
             ],
             'sale_file' => $saleFilePayload,
         ]);
@@ -1561,6 +1563,40 @@ class DayBookController extends Controller
                 'is_fully_sold' => $remainingAfter <= 1e-6 && $total > 1e-6,
             ],
         ]);
+    }
+
+    /**
+     * Collect valid uploaded documents from the sale wizard request.
+     *
+     * @return list<\Illuminate\Http\UploadedFile>
+     */
+    private function uploadedDocuments(Request $request): array
+    {
+        $files = $request->file('documents');
+
+        if ($files === null) {
+            $all = $request->allFiles();
+            $files = $all['documents'] ?? [];
+        }
+
+        if (! is_array($files)) {
+            $files = $files ? [$files] : [];
+        }
+
+        $documents = [];
+        foreach (array_values($files) as $index => $file) {
+            if (! $file instanceof \Illuminate\Http\UploadedFile) {
+                continue;
+            }
+            if (! $file->isValid()) {
+                throw ValidationException::withMessages([
+                    'documents.'.$index => [$file->getErrorMessage() ?: 'Document upload failed.'],
+                ]);
+            }
+            $documents[] = $file;
+        }
+
+        return $documents;
     }
 
     /**

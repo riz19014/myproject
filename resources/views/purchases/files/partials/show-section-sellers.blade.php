@@ -20,7 +20,7 @@
                         <span class="pf-section-item__meta small text-muted d-block">
                             {{ $seller->moza ?: '—' }} · {{ $seller->khasra ?: '—' }}
                         </span>
-                        <span class="pf-section-item__meta small d-block">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $seller->land_area_marla) }}</span>
+                        <span class="pf-section-item__meta small d-block">{{ $seller->landAreaLabel() }}</span>
                         <span class="pf-section-item__meta small text-muted d-block">Rs {{ number_format((float) $seller->amount_per_acre, 0) }} / acre</span>
                         <span class="pf-section-item__amount d-block">Rs {{ number_format((float) $seller->line_total_rs, 2) }}</span>
                     </span>

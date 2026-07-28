@@ -203,6 +203,11 @@ final class FileSaleLandService
                 ->whereIn('purchase_file_id', $purchaseFileIds)
                 ->sum('total_amount');
 
+        $files->loadMissing('sales');
+        $soldMarla = round((float) $files->sum(fn (PurchaseFile $file) => $file->soldLandMarla()), 6);
+        $remainingMarla = max(0.0, round($totalMarla - $soldMarla, 6));
+        $leftoverBalance = $this->buildLeftoverBalance($project, $purchaseFileIds, $config, $files);
+
         return [
             'rows' => $rows,
             'files_land_columns' => $filesLandColumns,
@@ -210,6 +215,10 @@ final class FileSaleLandService
                 'total_land_area' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($totalMarla) : '—',
                 'total_land_compact' => $totalMarla > 0 ? LandMeasure::formatAkmsCompactFromMarla($totalMarla) : '—',
                 'total_land_marla' => round($totalMarla, 4),
+                'sold_land_marla' => $soldMarla,
+                'sold_land_area' => $soldMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($soldMarla) : '—',
+                'remaining_land_marla' => $remainingMarla,
+                'remaining_land_area' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($remainingMarla) : '—',
                 'total_files' => $totalFilesCount > 0 ? SaleExemptionFileCalculator::formatFileCount($totalFilesCount) : '—',
                 'total_files_count' => round($totalFilesCount, 4),
                 'grand_total_amount' => round($grandTotalAmount, 2),
@@ -223,6 +232,181 @@ final class FileSaleLandService
                 ['name' => $file->file_name]
             ))->values()->all(),
             'area_balance' => $this->buildAreaBalanceByMoza($project, $purchaseFileIds, $config),
+            'leftover_balance' => $leftoverBalance,
+        ];
+    }
+
+    /**
+     * Per-file leftover land + formula plot remaining after sale_land sales.
+     *
+     * @param  list<int>  $purchaseFileIds
+     * @param  Collection<int, PurchaseFile>  $files
+     * @return array{
+     *   formula_columns: list<array<string, mixed>>,
+     *   files: list<array<string, mixed>>,
+     *   totals: array<string, mixed>
+     * }
+     */
+    private function buildLeftoverBalance(
+        Project $project,
+        array $purchaseFileIds,
+        SaleExemptionConfig $config,
+        Collection $files
+    ): array {
+        if ($purchaseFileIds === []) {
+            return [
+                'formula_columns' => [],
+                'files' => [],
+                'totals' => [
+                    'total_land' => '—',
+                    'sold_land' => '—',
+                    'remaining_land' => '—',
+                    'files_count' => 0,
+                    'partially_sold' => 0,
+                    'fully_sold' => 0,
+                    'formula_remaining' => [],
+                ],
+            ];
+        }
+
+        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, $purchaseFileIds);
+        $formulaColumns = collect($sheet['formula_columns'] ?? [])
+            ->map(function (array $column) {
+                return array_merge($column, [
+                    'column_code' => str_replace('.', '', (string) ($column['code'] ?? '')),
+                ]);
+            })
+            ->values()
+            ->all();
+
+        $sheetRowsByFile = collect($sheet['rows'] ?? [])->groupBy(
+            fn (array $row) => (int) ($row['purchase_file_id'] ?? 0)
+        );
+
+        $usedSales = Sale::query()
+            ->where('project_id', $project->id)
+            ->where('sale_type', Sale::TYPE_SALE_LAND)
+            ->whereIn('purchase_file_id', $purchaseFileIds)
+            ->get()
+            ->groupBy('purchase_file_id');
+
+        $fileRows = [];
+        $totalMarla = 0.0;
+        $soldMarla = 0.0;
+        $formulaRemainingTotals = [];
+        $formulaSoldTotals = [];
+        $formulaAvailableTotals = [];
+        foreach ($formulaColumns as $column) {
+            $plotKey = (string) ($column['plot_key'] ?? '');
+            $formulaRemainingTotals[$plotKey] = 0.0;
+            $formulaSoldTotals[$plotKey] = 0.0;
+            $formulaAvailableTotals[$plotKey] = 0.0;
+        }
+
+        foreach ($files as $file) {
+            $fileId = (int) $file->id;
+            $fileSheetRows = $sheetRowsByFile->get($fileId, collect());
+            $total = $file->totalLandMarla();
+            $sold = $file->soldLandMarla();
+            $remaining = $file->remainingLandMarla();
+            $totalMarla += $total;
+            $soldMarla += $sold;
+
+            $plots = [];
+            $fileUsed = $usedSales->get($fileId, collect());
+            foreach ($formulaColumns as $column) {
+                $plotKey = (string) ($column['plot_key'] ?? '');
+                $available = (float) $fileSheetRows->sum(
+                    fn (array $row) => (float) ($row['formula_values'][$plotKey]['file_count'] ?? 0)
+                );
+                if ($available <= 0 && $fileSheetRows->isEmpty() && $total > 0) {
+                    // Fallback when sheet has no rows: derive from file total marla.
+                    $calc = SaleExemptionFileCalculator::calculate($total, $config);
+                    foreach ($calc['rows'] as $calcRow) {
+                        if (
+                            ($calcRow['component_slug'] ?? '') === ($column['component_slug'] ?? '')
+                            && ($calcRow['plot_slug'] ?? '') === ($column['plot_slug'] ?? '')
+                        ) {
+                            $available = (float) ($calcRow['file_count'] ?? 0);
+                            break;
+                        }
+                    }
+                }
+
+                $usedQty = (int) $fileUsed
+                    ->where('component', $column['component_slug'] ?? '')
+                    ->where('plot_type', $column['plot_slug'] ?? '')
+                    ->sum('plot_quantity');
+                $left = max(0.0, $available - $usedQty);
+
+                $plots[$plotKey] = [
+                    'available' => round($available, 4),
+                    'available_display' => SaleExemptionFileCalculator::formatFileCount($available),
+                    'sold' => $usedQty,
+                    'sold_display' => $usedQty > 0 ? (string) $usedQty : '—',
+                    'remaining' => round($left, 4),
+                    'remaining_display' => SaleExemptionFileCalculator::formatFileCount($left),
+                    'is_depleted' => $left <= 1e-6 && $available > 1e-6,
+                ];
+
+                $formulaAvailableTotals[$plotKey] = ($formulaAvailableTotals[$plotKey] ?? 0) + $available;
+                $formulaSoldTotals[$plotKey] = ($formulaSoldTotals[$plotKey] ?? 0) + $usedQty;
+                $formulaRemainingTotals[$plotKey] = ($formulaRemainingTotals[$plotKey] ?? 0) + $left;
+            }
+
+            $moza = $file->purchaseItems
+                ->pluck('moza')
+                ->filter(fn ($v) => filled($v))
+                ->map(fn ($v) => trim((string) $v))
+                ->unique()
+                ->values();
+
+            $fileRows[] = [
+                'purchase_file_id' => $fileId,
+                'file_name' => $file->file_name,
+                'moza' => $moza->isEmpty() ? '—' : $moza->implode(', '),
+                'total_land_marla' => $total,
+                'total_land' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
+                'sold_land_marla' => $sold,
+                'sold_land' => $sold > 0 ? LandMeasure::formatAkmsLabelFromMarla($sold) : '—',
+                'remaining_land_marla' => $remaining,
+                'remaining_land' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : '—',
+                'status' => $file->saleStatusLabel(),
+                'plots' => $plots,
+            ];
+        }
+
+        $remainingMarla = max(0.0, round($totalMarla - $soldMarla, 6));
+        $formulaRemaining = [];
+        foreach ($formulaColumns as $column) {
+            $plotKey = (string) ($column['plot_key'] ?? '');
+            $available = (float) ($formulaAvailableTotals[$plotKey] ?? 0);
+            $soldQty = (float) ($formulaSoldTotals[$plotKey] ?? 0);
+            $left = (float) ($formulaRemainingTotals[$plotKey] ?? 0);
+            $formulaRemaining[$plotKey] = [
+                'available_display' => SaleExemptionFileCalculator::formatFileCount($available),
+                'sold_display' => $soldQty > 0 ? SaleExemptionFileCalculator::formatFileCount($soldQty) : '—',
+                'remaining_display' => SaleExemptionFileCalculator::formatFileCount($left),
+                'remaining' => round($left, 4),
+                'is_depleted' => $left <= 1e-6 && $available > 1e-6,
+            ];
+        }
+
+        return [
+            'formula_columns' => $formulaColumns,
+            'files' => $fileRows,
+            'totals' => [
+                'total_land' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($totalMarla) : '—',
+                'sold_land' => $soldMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($soldMarla) : '—',
+                'remaining_land' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($remainingMarla) : '—',
+                'total_land_marla' => round($totalMarla, 6),
+                'sold_land_marla' => round($soldMarla, 6),
+                'remaining_land_marla' => $remainingMarla,
+                'files_count' => count($fileRows),
+                'partially_sold' => collect($fileRows)->where('status', 'Partially Sold')->count(),
+                'fully_sold' => collect($fileRows)->where('status', 'Fully Sold')->count(),
+                'formula_remaining' => $formulaRemaining,
+            ],
         ];
     }
 

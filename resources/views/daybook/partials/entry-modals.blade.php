@@ -391,8 +391,15 @@
                                 </div>
                                 <div class="col-12">
                                     <label class="daybook-modal-label" for="daybook_sale_documents">Documents <span class="text-muted fw-normal">(optional)</span></label>
-                                    <input type="file" class="form-control form-control-theme" id="daybook_sale_documents" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
-                                    <div class="form-text">Upload sale papers, eStamp copy, or related documents (max 10 MB each).</div>
+                                    <div class="daybook-sale-docs">
+                                        <label class="daybook-sale-docs__picker" for="daybook_sale_documents">
+                                            <i class="bi bi-cloud-upload" aria-hidden="true"></i>
+                                            <span class="daybook-sale-docs__picker-title">Add documents</span>
+                                            <span class="daybook-sale-docs__picker-hint">PDF, images, or Word · max 10 MB each · multiple allowed</span>
+                                        </label>
+                                        <input type="file" class="visually-hidden" id="daybook_sale_documents" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+                                        <ul class="daybook-sale-docs__list d-none" id="daybook_sale_documents_list" aria-live="polite"></ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>

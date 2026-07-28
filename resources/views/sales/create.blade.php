@@ -816,7 +816,7 @@
         return (parseInt(a, 10) || 0) * 160
             + (parseInt(k, 10) || 0) * 20
             + (parseInt(m, 10) || 0)
-            + (parseInt(s, 10) || 0) / 272.25;
+            + (parseInt(s, 10) || 0) / 225;
     }
 
     function formatAkmsLabel(totalMarla) {
@@ -829,7 +829,7 @@
         var m = r - k * 20;
         var frac = totalMarla - wholeMarla;
         if (frac < 0) frac = 0;
-        var sqft = frac > eps ? Math.round(frac * 272.25) : 0;
+        var sqft = frac > eps ? Math.round(frac * 225) : 0;
         return 'A ' + a + ' — K ' + k + ' — M ' + m + ' — SQFT ' + sqft;
     }
 

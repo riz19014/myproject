@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\LandMeasure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -52,5 +53,59 @@ class PurchaseItem extends Model
     public static function acresFromMarla(float $marla): float
     {
         return $marla / 160.0;
+    }
+
+    public function hasStoredAkms(): bool
+    {
+        return (int) $this->area_acre > 0
+            || (int) $this->area_kanal > 0
+            || (int) $this->area_marla > 0
+            || (int) $this->area_sqft > 0;
+    }
+
+    public function landAreaMarlaFromAkms(): float
+    {
+        return LandMeasure::marlaFromAkms(
+            (int) $this->area_acre,
+            (int) $this->area_kanal,
+            (int) $this->area_marla,
+            (int) $this->area_sqft,
+        );
+    }
+
+    public function effectiveLandAreaMarla(): float
+    {
+        if ($this->hasStoredAkms()) {
+            return $this->landAreaMarlaFromAkms();
+        }
+
+        return (float) $this->land_area_marla;
+    }
+
+    public function landAreaLabel(): string
+    {
+        if ($this->hasStoredAkms()) {
+            return LandMeasure::formatAkmsLabel(
+                (int) $this->area_acre,
+                (int) $this->area_kanal,
+                (int) $this->area_marla,
+                (int) $this->area_sqft,
+            );
+        }
+
+        return LandMeasure::formatAkmsLabelFromMarla((float) $this->land_area_marla);
+    }
+
+    /**
+     * @param  iterable<int, self>  $items
+     */
+    public static function sumEffectiveMarla(iterable $items): float
+    {
+        $sum = 0.0;
+        foreach ($items as $item) {
+            $sum += $item->effectiveLandAreaMarla();
+        }
+
+        return round($sum, 6);
     }
 }

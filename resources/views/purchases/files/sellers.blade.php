@@ -19,7 +19,7 @@
 
 @if($sellers->isNotEmpty())
     @php
-        $sellersTotalAreaMarla = (float) $sellers->sum(fn ($s) => (float) $s->land_area_marla);
+        $sellersTotalAreaMarla = (float) $sellers->sum(fn ($s) => $s->effectiveLandAreaMarla());
         $sellersTotalAmountRs = (float) $sellers->sum(fn ($s) => (float) $s->line_total_rs);
     @endphp
     <div class="card card-theme mb-4">
@@ -52,7 +52,7 @@
                                     <div><span class="text-muted">Khatooni:</span> {{ $seller->khatooni_no ?: '—' }}</div>
                                     <div><span class="text-muted">Intiqal:</span> {{ $seller->intiqal_no ?: '—' }}</div>
                                 </td>
-                                <td class="small">{{ \App\Support\LandMeasure::formatAkmsLabelFromMarla((float) $seller->land_area_marla) }}</td>
+                                <td class="small">{{ $seller->landAreaLabel() }}</td>
                                 <td class="text-end small">{{ number_format((float) $seller->amount_per_acre, 0) }}</td>
                                 <td class="text-end fw-semibold">{{ number_format((float) $seller->line_total_rs, 0) }}</td>
                                 <td class="text-end text-nowrap">
