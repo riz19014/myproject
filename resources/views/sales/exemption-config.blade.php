@@ -1,14 +1,32 @@
 @extends('layouts.app')
 
-@section('title', 'Exemption setup — '.$project->name)
+@section('title', ($snapshot ?? null) ? 'Edit exemption — '.$project->name : 'Exemption setup — '.$project->name)
 
 @section('content')
+@php
+    $snapshot = $snapshot ?? null;
+    $isEditingSnapshot = $snapshot !== null;
+    $defaultComponents = $formComponents ?? $project->saleExemptionComponents;
+    $defaultMarlaPerAcre = $formMarlaPerAcre ?? ($project->marla_per_acre ?? 160);
+    $trialFormAction = $isEditingSnapshot
+        ? route('sale.projects.exemption.snapshot.edit', [$project, $snapshot])
+        : route('sale.projects.exemption.edit', $project);
+    $saveFormAction = $isEditingSnapshot
+        ? route('sale.projects.exemption.snapshot.update', [$project, $snapshot])
+        : route('sale.projects.exemption.update', $project);
+@endphp
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h1 class="mb-1">Percentage sale exemption setup</h1>
-        <p class="text-muted small mb-0">Project: <strong><x-project-name :project="$project" /></strong></p>
+        <h1 class="mb-1">{{ $isEditingSnapshot ? 'Edit saved exemption' : 'Percentage sale exemption setup' }}</h1>
+        <p class="text-muted small mb-0">
+            Project: <strong><x-project-name :project="$project" /></strong> · DHA only
+            @if($isEditingSnapshot)
+                · Saved {{ $snapshot->created_at->format('d M Y, h:i A') }}
+            @endif
+        </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+        <a href="{{ route('sale.exemption.index') }}" class="btn btn-outline-theme">All projects</a>
         <a href="{{ route('sale.files.index', $project) }}" class="btn btn-outline-theme">Back to files</a>
     </div>
 </div>
@@ -17,33 +35,71 @@
     <div class="alert alert-success small">{{ session('success') }}</div>
 @endif
 
+<div class="card card-theme mb-4">
+    <div class="card-header py-3">
+        <h2 class="h6 mb-0">Trial land area → formula</h2>
+        <p class="text-muted small mb-0">Test {{ $isEditingSnapshot ? 'this saved exemption' : 'this project’s exemptions' }} against a sample area (does not save).</p>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ $trialFormAction }}" class="row g-2 align-items-end mb-3">
+            <div class="col-6 col-md-2">
+                <label for="trial_area_acre" class="form-label small mb-1">Acre</label>
+                <input type="number" class="form-control form-control-theme" id="trial_area_acre" name="area_acre" value="{{ $trialAcre }}" min="0" step="1">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="trial_area_kanal" class="form-label small mb-1">Kanal</label>
+                <input type="number" class="form-control form-control-theme" id="trial_area_kanal" name="area_kanal" value="{{ $trialKanal }}" min="0" step="1">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="trial_area_marla" class="form-label small mb-1">Marla</label>
+                <input type="number" class="form-control form-control-theme" id="trial_area_marla" name="area_marla" value="{{ $trialMarlaPart }}" min="0" step="1">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="trial_area_sqft" class="form-label small mb-1">SQFT</label>
+                <input type="number" class="form-control form-control-theme" id="trial_area_sqft" name="area_sqft" value="{{ $trialSqft }}" min="0" step="1">
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-outline-theme">Calculate</button>
+                <div class="small text-muted mt-1">Trial: <strong>{{ $trialLandLabel }}</strong></div>
+            </div>
+        </form>
+        @include('sales.partials.exemption-file-calculator-table', ['fileCalculator' => $fileCalculator])
+    </div>
+</div>
+
 <div class="card card-theme">
     <div class="card-body">
         <p class="text-muted small mb-4">
-            Configure allocation categories and plot file ratios for this project.
-            <strong>1 Acre = <span id="marla_per_acre_display">{{ rtrim(rtrim(number_format((float) $project->marla_per_acre, 4, '.', ''), '0'), '.') ?: '160' }}</span> Marla</strong> (editable below).
+            @if($isEditingSnapshot)
+                Update this saved exemption only — other saved entries stay unchanged.
+            @else
+                Configure allocation categories and plot file ratios for this DHA project.
+                Each time you save, a new entry is added on the <a href="{{ route('sale.exemption.index') }}">exemption list</a> — previous saves are kept.
+            @endif
+            <strong>1 Acre = <span id="marla_per_acre_display">{{ rtrim(rtrim(number_format((float) $defaultMarlaPerAcre, 4, '.', ''), '0'), '.') ?: '160' }}</span> Marla</strong> (editable below).
             Pool size = file land × pool %. Plot marla is deducted from the matching pool when you record a percentage sale.
         </p>
 
-        <form method="post" action="{{ route('sale.projects.exemption.update', $project) }}" id="exemption-config-form">
+        <form method="post" action="{{ $saveFormAction }}" id="exemption-config-form">
             @csrf
             @method('PUT')
 
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     <label for="marla_per_acre" class="form-label">Marla per acre</label>
-                    <input type="number" class="form-control form-control-theme @error('marla_per_acre') is-invalid @enderror" id="marla_per_acre" name="marla_per_acre" value="{{ old('marla_per_acre', $project->marla_per_acre ?? 160) }}" min="1" step="0.0001" required>
+                    <input type="number" class="form-control form-control-theme @error('marla_per_acre') is-invalid @enderror" id="marla_per_acre" name="marla_per_acre" value="{{ old('marla_per_acre', $defaultMarlaPerAcre) }}" min="1" step="0.0001" required>
                     @error('marla_per_acre')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
 
             <div id="exemption-components">
-                @foreach(old('components', $project->saleExemptionComponents) as $ci => $component)
+                @foreach(old('components', $defaultComponents) as $ci => $component)
                     @php
                         $compId = is_object($component) ? $component->id : ($component['id'] ?? null);
                         $compSlug = is_object($component) ? $component->slug : ($component['slug'] ?? '');
                         $compLabel = is_object($component) ? $component->label : ($component['label'] ?? '');
                         $compPool = is_object($component) ? $component->pool_percent : ($component['pool_percent'] ?? 0);
+                        $compPoolDisplay = rtrim(rtrim(number_format((float) $compPool, 4, '.', ''), '0'), '.');
                         $plots = is_object($component) ? $component->plotTypes : ($component['plot_types'] ?? []);
                     @endphp
                     <div class="border rounded p-3 mb-3 exemption-component-block" data-index="{{ $ci }}">
@@ -51,7 +107,9 @@
                             <h2 class="h6 mb-0">Allocation category</h2>
                             <button type="button" class="btn btn-sm btn-outline-danger remove-component-btn">Remove category</button>
                         </div>
-                        <input type="hidden" name="components[{{ $ci }}][id]" value="{{ old('components.'.$ci.'.id', $compId) }}">
+                        @unless($isEditingSnapshot)
+                            <input type="hidden" name="components[{{ $ci }}][id]" value="{{ old('components.'.$ci.'.id', $compId) }}">
+                        @endunless
                         <div class="row g-2 mb-3">
                             <div class="col-md-3">
                                 <label class="form-label">Code</label>
@@ -63,7 +121,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Pool % of file land</label>
-                                <input type="number" class="form-control form-control-theme component-pool-pct" name="components[{{ $ci }}][pool_percent]" value="{{ old('components.'.$ci.'.pool_percent', $compPool) }}" min="0" max="100" step="0.0001" required>
+                                <input type="number" class="form-control form-control-theme component-pool-pct" name="components[{{ $ci }}][pool_percent]" value="{{ old('components.'.$ci.'.pool_percent', $compPoolDisplay) }}" min="0" max="100" step="0.0001" required>
                             </div>
                         </div>
                         <p class="text-muted small component-dist-hint mb-2"></p>
@@ -89,16 +147,21 @@
                                             $plotMarla = is_object($plot) ? $plot->marla_per_plot : ($plot['marla_per_plot'] ?? 0);
                                             $plotNominal = is_object($plot) ? $plot->nominal_marla : ($plot['nominal_marla'] ?? \App\Support\SaleExemptionFileCalculator::nominalMarlaForSlug($plotSlug, $plotMarla));
                                             $plotShare = is_object($plot) ? $plot->share_percent : ($plot['share_percent'] ?? 0);
+                                            $plotMarlaDisplay = rtrim(rtrim(number_format((float) $plotMarla, 4, '.', ''), '0'), '.');
+                                            $plotNominalDisplay = rtrim(rtrim(number_format((float) $plotNominal, 4, '.', ''), '0'), '.');
+                                            $plotShareDisplay = rtrim(rtrim(number_format((float) $plotShare, 4, '.', ''), '0'), '.');
                                         @endphp
                                         <tr class="plot-type-row">
                                             <td>
-                                                <input type="hidden" name="components[{{ $ci }}][plot_types][{{ $pi }}][id]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.id', $plotId) }}">
+                                                @unless($isEditingSnapshot)
+                                                    <input type="hidden" name="components[{{ $ci }}][plot_types][{{ $pi }}][id]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.id', $plotId) }}">
+                                                @endunless
                                                 <input type="text" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][slug]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.slug', $plotSlug) }}" required>
                                             </td>
                                             <td><input type="text" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][label]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.label', $plotLabel) }}" required></td>
-                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][marla_per_plot]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.marla_per_plot', $plotMarla) }}" min="0" step="0.0001" required></td>
-                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][nominal_marla]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.nominal_marla', $plotNominal) }}" min="0.0001" step="0.0001" required title="Divisor for file count (2K=40, 1K=20, 10M=10, 8M=8)"></td>
-                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][share_percent]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.share_percent', $plotShare) }}" min="0" max="100" step="0.0001" required></td>
+                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][marla_per_plot]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.marla_per_plot', $plotMarlaDisplay) }}" min="0" step="0.0001" required></td>
+                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][nominal_marla]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.nominal_marla', $plotNominalDisplay) }}" min="0.0001" step="0.0001" required title="Divisor for file count (2K=40, 1K=20, 10M=10, 8M=8)"></td>
+                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][share_percent]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.share_percent', $plotShareDisplay) }}" min="0" max="100" step="0.0001" required></td>
                                             <td><button type="button" class="btn btn-sm btn-outline-danger remove-plot-btn">&times;</button></td>
                                         </tr>
                                     @endforeach
@@ -112,7 +175,7 @@
 
             <button type="button" class="btn btn-sm btn-outline-theme mb-4" id="add-component-btn">Add allocation category</button>
 
-            <button type="submit" class="btn btn-pink">Save exemption configuration</button>
+            <button type="submit" class="btn btn-pink">{{ $isEditingSnapshot ? 'Update this exemption' : 'Save exemption configuration' }}</button>
         </form>
     </div>
 </div>

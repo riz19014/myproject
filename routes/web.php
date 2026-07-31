@@ -31,9 +31,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('sale', [SaleController::class, 'index'])->name('sale.index');
     Route::get('sale/percentage', [SaleProjectFileController::class, 'percentageIndex'])->name('sale.percentage.index');
+    Route::get('sale/exemption', [ProjectSaleExemptionController::class, 'index'])->name('sale.exemption.index');
     Route::get('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'edit'])->name('sale.projects.exemption.edit');
     Route::put('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'update'])->name('sale.projects.exemption.update');
+    Route::get('sale/projects/{project}/exemption/snapshots/{snapshot}/edit', [ProjectSaleExemptionController::class, 'editSnapshot'])->name('sale.projects.exemption.snapshot.edit');
+    Route::put('sale/projects/{project}/exemption/snapshots/{snapshot}', [ProjectSaleExemptionController::class, 'updateSnapshot'])->name('sale.projects.exemption.snapshot.update');
     Route::get('sale/projects/{project}/files', [SaleProjectFileController::class, 'index'])->name('sale.files.index');
+    Route::get('sale/projects/{project}/files/original-formula-pdf', [SaleProjectFileController::class, 'originalFormulaPdf'])->name('sale.files.original-formula.pdf');
+    Route::get('sale/projects/{project}/files/leftover-land-pdf', [SaleProjectFileController::class, 'leftoverLandBalancePdf'])->name('sale.files.leftover-land.pdf');
     Route::get('sale/projects/{project}/files/create', [SaleProjectFileController::class, 'create'])->name('sale.files.create');
     Route::post('sale/projects/{project}/files', [SaleProjectFileController::class, 'store'])->name('sale.files.store');
     Route::get('sale/files/{projectFile}/sale', [SaleProjectFileController::class, 'saleCreate'])->name('sale.files.sale.create');

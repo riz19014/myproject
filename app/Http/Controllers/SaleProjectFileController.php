@@ -246,4 +246,47 @@ class SaleProjectFileController extends Controller
 
         return $pdf->download('sale-estimation-'.$safeProject.'-'.$safeFile.'-'.now()->format('Y-m-d').'.pdf');
     }
+
+    public function originalFormulaPdf(Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $project->load('landType');
+        $summary = $fileSaleLandService->buildFileSaleSummary($project);
+
+        $pdf = Pdf::loadView('sales.files.original-formula-pdf', [
+            'project' => $project,
+            'totalLand' => $summary['totals']['total_land_area'] ?? '—',
+            'files' => collect($summary['moved_files'] ?? [])->pluck('name')->filter()->values()->all(),
+            'areaBalance' => $summary['area_balance'] ?? [
+                'formula_columns' => [],
+                'moza_groups' => [],
+                'totals' => ['total_land' => '—', 'formula_values' => []],
+            ],
+            'generatedAt' => now(),
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name) ?: 'project';
+
+        return $pdf->download('total-land-'.$safeProject.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    public function leftoverLandBalancePdf(Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $project->load('landType');
+        $summary = $fileSaleLandService->buildFileSaleSummary($project);
+        $leftover = $summary['leftover_balance'] ?? ['formula_columns' => [], 'files' => [], 'totals' => []];
+
+        $pdf = Pdf::loadView('sales.files.leftover-land-balance-pdf', [
+            'project' => $project,
+            'leftoverColumns' => $leftover['formula_columns'] ?? [],
+            'leftoverFiles' => $leftover['files'] ?? [],
+            'leftoverTotals' => $leftover['totals'] ?? [],
+            'generatedAt' => now(),
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name) ?: 'project';
+
+        return $pdf->download('leftover-land-'.$safeProject.'-'.now()->format('Y-m-d').'.pdf');
+    }
 }

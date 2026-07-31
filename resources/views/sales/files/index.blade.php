@@ -76,60 +76,172 @@
     .file-sale-popover__list li + li {
         margin-top: 0.3rem;
     }
-    .file-sale-area-balance__moza-start td {
-        border-top: 2px solid #cbd5e1;
-    }
-    .file-sale-area-balance tbody tr:first-child.file-sale-area-balance__moza-start td {
-        border-top-width: 0;
-    }
-    .file-sale-area-balance__formula-col {
-        min-width: 4.5rem;
-        white-space: nowrap;
-    }
     .file-sale-strip__sold-land .file-sale-strip__total-land-value {
         color: #b45309;
     }
     .file-sale-strip__left-land .file-sale-strip__total-land-value {
         color: #047857;
     }
-    .file-sale-leftover-stat {
+    .file-sale-leftover-table__left {
+        color: #047857;
+    }
+    .leftover-land-balance__list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+    .leftover-land-balance__item {
         border: 1px solid rgba(15, 23, 42, 0.1);
         border-radius: 12px;
-        padding: 0.85rem 1rem;
+        overflow: hidden;
+        background: #fff;
+    }
+    .leftover-land-balance__item--summary {
+        border-color: rgba(15, 23, 42, 0.16);
         background: #f8fafc;
-        height: 100%;
     }
-    .file-sale-leftover-stat.is-sold {
-        background: #fff7ed;
-        border-color: rgba(234, 88, 12, 0.2);
+    .leftover-land-balance__item--nested {
+        background: #fff;
     }
-    .file-sale-leftover-stat.is-left {
-        background: #ecfdf5;
-        border-color: rgba(5, 150, 105, 0.2);
+    .leftover-land-balance__summary {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        padding: 0.85rem 1rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        cursor: pointer;
+        transition: background 0.15s ease;
     }
-    .file-sale-leftover-stat__label {
+    .leftover-land-balance__summary--nested {
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.55rem 0.85rem;
+    }
+    .leftover-land-balance__summary:hover,
+    .leftover-land-balance__summary:focus {
+        background: rgba(248, 250, 252, 0.9);
+        outline: none;
+    }
+    .leftover-land-balance__summary[aria-expanded="true"] {
+        background: #fff;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .leftover-land-balance__summary-block {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .leftover-land-balance__summary-title {
         display: block;
         font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        margin-bottom: 0.45rem;
+    }
+    .leftover-land-balance__summary-list {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        color: #334155;
+    }
+    .leftover-land-balance__summary-list strong {
+        color: #0f172a;
+        font-weight: 650;
+    }
+    .leftover-land-balance__summary:hover,
+    .leftover-land-balance__summary:focus {
+        background: rgba(248, 250, 252, 0.9);
+        outline: none;
+    }
+    .leftover-land-balance__summary[aria-expanded="true"] {
+        background: #f8fafc;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .leftover-land-balance__chevron {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-right: 2px solid #64748b;
+        border-bottom: 2px solid #64748b;
+        transform: rotate(-45deg);
+        transition: transform 0.15s ease;
+        flex: 0 0 auto;
+        margin-top: -0.15rem;
+    }
+    .leftover-land-balance__summary[aria-expanded="true"] .leftover-land-balance__chevron {
+        transform: rotate(45deg);
+        margin-top: 0.1rem;
+    }
+    .leftover-land-balance__land {
+        font-weight: 700;
+        color: #047857;
+    }
+    .leftover-land-balance__meta {
+        font-size: 0.84rem;
+        color: #334155;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .leftover-land-balance__plots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .leftover-land-balance__plots--summary {
+        margin-top: 0.65rem;
+    }
+    .leftover-land-balance__plot-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.18rem 0.5rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #3730a3;
+        font-size: 0.75rem;
+        font-weight: 650;
+        white-space: nowrap;
+    }
+    .leftover-land-balance__detail-inner {
+        padding: 1rem;
+    }
+    .leftover-land-balance__stat {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        padding: 0.7rem 0.85rem;
+        background: #fff;
+        height: 100%;
+    }
+    .leftover-land-balance__stat.is-sold {
+        background: #fff7ed;
+        border-color: rgba(234, 88, 12, 0.18);
+    }
+    .leftover-land-balance__stat.is-left {
+        background: #ecfdf5;
+        border-color: rgba(5, 150, 105, 0.18);
+    }
+    .leftover-land-balance__stat.is-total {
+        background: #f8fafc;
+    }
+    .leftover-land-balance__stat-label {
+        display: block;
+        font-size: 0.7rem;
         font-weight: 650;
         text-transform: uppercase;
         letter-spacing: 0.03em;
         color: #64748b;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.2rem;
     }
-    .file-sale-leftover-stat__value {
+    .leftover-land-balance__stat-value {
         display: block;
-        font-size: 1rem;
+        font-size: 0.92rem;
         font-weight: 700;
         color: #0f172a;
-    }
-    .file-sale-leftover-table__left {
-        color: #047857;
-    }
-    .file-sale-area-balance__file-start td {
-        border-top: 2px solid #cbd5e1;
-    }
-    .file-sale-area-balance tbody tr:first-child.file-sale-area-balance__file-start td {
-        border-top-width: 0;
     }
     .file-sale-strip {
         border: 2px solid #334155;
@@ -236,15 +348,10 @@
 
 @section('content')
 @php
-    $summary = $fileSaleSummary ?? ['totals' => [], 'daybook_rows' => [], 'moved_files' => [], 'files_land_columns' => [], 'area_balance' => [], 'leftover_balance' => []];
+    $summary = $fileSaleSummary ?? ['totals' => [], 'moved_files' => [], 'files_land_columns' => [], 'leftover_balance' => []];
     $totals = $summary['totals'] ?? [];
-    $daybookRows = $summary['daybook_rows'] ?? [];
     $movedFiles = $summary['moved_files'] ?? [];
     $filesLandColumns = $summary['files_land_columns'] ?? [];
-    $areaBalance = $summary['area_balance'] ?? ['formula_columns' => [], 'moza_groups' => [], 'totals' => []];
-    $areaBalanceColumns = $areaBalance['formula_columns'] ?? [];
-    $areaBalanceGroups = $areaBalance['moza_groups'] ?? [];
-    $areaBalanceTotals = $areaBalance['totals'] ?? ['total_land' => '—', 'formula_values' => []];
     $leftover = $summary['leftover_balance'] ?? ['formula_columns' => [], 'files' => [], 'totals' => []];
     $leftoverColumns = $leftover['formula_columns'] ?? [];
     $leftoverFiles = $leftover['files'] ?? [];
@@ -279,6 +386,12 @@
 @else
     <div class="card card-theme mb-4">
         @if($filesLandColumns !== [])
+            <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h6 mb-0">Total land &amp; files</h2>
+                <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">
+                    Print PDF
+                </a>
+            </div>
             <div class="card-body pt-4">
                 <div id="file-sale-files-popover-content" class="d-none">
                     <ul class="file-sale-popover__list">
@@ -344,300 +457,17 @@
                 <h2 class="h6 mb-0">Leftover land balance</h2>
                 <p class="text-muted small mb-0">Remaining after daybook / sale-land sales (plot counts left).</p>
             </div>
-            <a href="{{ route('sale-land.index') }}" class="btn btn-sm btn-outline-theme">Sold land files</a>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('sale.files.leftover-land.pdf', $project) }}" class="btn btn-sm btn-outline-theme">Print PDF</a>
+                <a href="{{ route('sale-land.index') }}" class="btn btn-sm btn-outline-theme">Sold land files</a>
+            </div>
         </div>
         <div class="card-body">
-            <div class="row g-3 mb-3">
-                <div class="col-md-3">
-                    <div class="file-sale-leftover-stat">
-                        <span class="file-sale-leftover-stat__label">Total land</span>
-                        <span class="file-sale-leftover-stat__value">{{ $leftoverTotals['total_land'] ?? '—' }}</span>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="file-sale-leftover-stat is-sold">
-                        <span class="file-sale-leftover-stat__label">Sold</span>
-                        <span class="file-sale-leftover-stat__value">{{ $leftoverTotals['sold_land'] ?? '—' }}</span>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="file-sale-leftover-stat is-left">
-                        <span class="file-sale-leftover-stat__label">Leftover</span>
-                        <span class="file-sale-leftover-stat__value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="file-sale-leftover-stat">
-                        <span class="file-sale-leftover-stat__label">Files status</span>
-                        <span class="file-sale-leftover-stat__value small">
-                            {{ (int) ($leftoverTotals['partially_sold'] ?? 0) }} partial ·
-                            {{ (int) ($leftoverTotals['fully_sold'] ?? 0) }} fully sold
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            @if($leftoverFiles === [])
-                <p class="text-muted small mb-0">No moved sale land files to show leftover for.</p>
-            @else
-                <div class="table-responsive">
-                    <table class="table table-striped table-theme mb-0 align-middle file-sale-leftover-table">
-                        <thead>
-                            <tr>
-                                <th>File</th>
-                                <th>Mouza</th>
-                                <th>Total</th>
-                                <th>Sold</th>
-                                <th class="file-sale-leftover-table__left">Leftover</th>
-                                <th>Status</th>
-                                @foreach($leftoverColumns as $column)
-                                    <th class="text-end" title="{{ ($column['plot_label'] ?? '').' — '.($column['component_label'] ?? '') }}">
-                                        {{ $column['column_code'] ?? $column['code'] ?? '' }}
-                                        <div class="text-muted fw-normal" style="font-size: 0.7rem;">left</div>
-                                    </th>
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($leftoverFiles as $file)
-                                <tr>
-                                    <td class="fw-semibold small">
-                                        <a href="{{ route('purchase.files.show', $file['purchase_file_id']) }}" class="text-decoration-none">
-                                            {{ $file['file_name'] }}
-                                        </a>
-                                    </td>
-                                    <td class="small">{{ $file['moza'] }}</td>
-                                    <td class="small">{{ $file['total_land'] }}</td>
-                                    <td class="small">{{ $file['sold_land'] }}</td>
-                                    <td class="small fw-semibold file-sale-leftover-table__left">{{ $file['remaining_land'] }}</td>
-                                    <td>
-                                        @if(($file['status'] ?? '') === 'Fully Sold')
-                                            <span class="badge text-bg-secondary">Fully Sold</span>
-                                        @elseif(($file['status'] ?? '') === 'Partially Sold')
-                                            <span class="badge text-bg-warning">Partially Sold</span>
-                                        @else
-                                            <span class="badge text-bg-success">{{ $file['status'] ?? 'Available' }}</span>
-                                        @endif
-                                    </td>
-                                    @foreach($leftoverColumns as $column)
-                                        @php
-                                            $plot = ($file['plots'] ?? [])[$column['plot_key'] ?? ''] ?? null;
-                                        @endphp
-                                        <td class="text-end small @if($plot && !empty($plot['is_depleted'])) text-muted @else fw-semibold @endif">
-                                            @if($plot)
-                                                {{ $plot['remaining_display'] }}
-                                                @if(($plot['sold'] ?? 0) > 0)
-                                                    <div class="text-muted" style="font-size: 0.7rem;">sold {{ $plot['sold_display'] }} / {{ $plot['available_display'] }}</div>
-                                                @endif
-                                            @else
-                                                —
-                                            @endif
-                                        </td>
-                                    @endforeach
-                                </tr>
-                            @endforeach
-                        </tbody>
-                        <tfoot class="table-light">
-                            <tr class="fw-semibold">
-                                <td colspan="2" class="text-end">Total</td>
-                                <td class="small">{{ $leftoverTotals['total_land'] ?? '—' }}</td>
-                                <td class="small">{{ $leftoverTotals['sold_land'] ?? '—' }}</td>
-                                <td class="small file-sale-leftover-table__left">{{ $leftoverTotals['remaining_land'] ?? '—' }}</td>
-                                <td></td>
-                                @foreach($leftoverColumns as $column)
-                                    @php
-                                        $plot = ($leftoverTotals['formula_remaining'] ?? [])[$column['plot_key'] ?? ''] ?? null;
-                                    @endphp
-                                    <td class="text-end small">
-                                        @if($plot)
-                                            {{ $plot['remaining_display'] }}
-                                            @if(($plot['sold_display'] ?? '—') !== '—')
-                                                <div class="text-muted fw-normal" style="font-size: 0.7rem;">sold {{ $plot['sold_display'] }}</div>
-                                            @endif
-                                        @else
-                                            —
-                                        @endif
-                                    </td>
-                                @endforeach
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            @endif
-        </div>
-    </div>
-
-    <div class="card card-theme mb-4">
-        <div class="card-header py-3">
-            <h2 class="h6 mb-0">Original formula (from total land)</h2>
-            <p class="text-muted small mb-0">Full capacity before sales — not leftover.</p>
-        </div>
-        <div class="card-body p-0">
-            @if($areaBalanceGroups === [])
-                <p class="text-muted small mb-0 p-3">No Mouza land found on the moved sale land files.</p>
-            @else
-                <div class="table-responsive">
-                    <table class="table table-striped table-theme mb-0 align-middle file-sale-area-balance">
-                        <thead>
-                            <tr>
-                                <th>Moza</th>
-                                <th>File</th>
-                                <th>Khasra</th>
-                                <th>Land</th>
-                                @foreach($areaBalanceColumns as $column)
-                                    <th class="text-end file-sale-area-balance__formula-col" title="{{ $column['plot_label'] ?? '' }} — {{ $column['component_label'] ?? '' }}">
-                                        {{ $column['column_code'] ?? $column['code'] ?? '' }}
-                                        <div class="text-muted fw-normal" style="font-size: 0.7rem;">{{ $column['short_label'] ?? '' }}</div>
-                                    </th>
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($areaBalanceGroups as $group)
-                                @php
-                                    $files = $group['files'] ?? [];
-                                    if ($files === []) {
-                                        $files = [['file_name' => '—', 'khasra' => '—']];
-                                    }
-                                    $rowspan = max(1, (int) ($group['rowspan'] ?? count($files)));
-                                @endphp
-                                @foreach($files as $fileRow)
-                                    <tr @class(['file-sale-area-balance__moza-start' => $loop->first])>
-                                        @if($loop->first)
-                                            <td rowspan="{{ $rowspan }}" class="fw-semibold align-top">{{ $group['moza'] ?? '—' }}</td>
-                                        @endif
-                                        <td class="small fw-semibold">{{ $fileRow['file_name'] ?? '—' }}</td>
-                                        <td class="small">{{ $fileRow['khasra'] ?? '—' }}</td>
-                                        @if($loop->first)
-                                            <td rowspan="{{ $rowspan }}" class="small fw-semibold align-top">{{ $group['total_land'] ?? '—' }}</td>
-                                            @foreach($areaBalanceColumns as $column)
-                                                @php
-                                                    $formula = ($group['formula_values'] ?? [])[$column['plot_key'] ?? ''] ?? null;
-                                                @endphp
-                                                <td rowspan="{{ $rowspan }}" class="text-end small align-top file-sale-area-balance__formula-col">
-                                                    @if($formula)
-                                                        <span class="fw-semibold">{{ $formula['display'] ?? '—' }}</span>
-                                                        @if(($formula['breakdown'] ?? '—') !== '—')
-                                                            <div class="text-muted" style="font-size: 0.72rem;">{{ $formula['breakdown'] }}</div>
-                                                        @endif
-                                                    @else
-                                                        —
-                                                    @endif
-                                                </td>
-                                            @endforeach
-                                        @endif
-                                    </tr>
-                                @endforeach
-                            @endforeach
-                        </tbody>
-                        <tfoot class="table-light">
-                            <tr class="fw-semibold">
-                                <td colspan="3" class="text-end">Total</td>
-                                <td class="small">{{ $areaBalanceTotals['total_land'] ?? '—' }}</td>
-                                @foreach($areaBalanceColumns as $column)
-                                    @php
-                                        $formula = ($areaBalanceTotals['formula_values'] ?? [])[$column['plot_key'] ?? ''] ?? null;
-                                    @endphp
-                                    <td class="text-end small file-sale-area-balance__formula-col">
-                                        @if($formula)
-                                            {{ $formula['display'] ?? '—' }}
-                                            @if(($formula['breakdown'] ?? '—') !== '—')
-                                                <div class="text-muted fw-normal" style="font-size: 0.72rem;">{{ $formula['breakdown'] }}</div>
-                                            @endif
-                                        @else
-                                            —
-                                        @endif
-                                    </td>
-                                @endforeach
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            @endif
-        </div>
-    </div>
-
-    <div class="card card-theme mb-4">
-        <div class="card-header py-3">
-            <h2 class="h6 mb-0">Daybook</h2>
-        </div>
-        <div class="card-body p-0">
-            @if($daybookRows === [])
-                <p class="text-muted small mb-0 p-3">No daybook entries linked to these sale land files for this project.</p>
-            @else
-                <div class="table-responsive">
-                    <table class="table table-striped table-theme mb-0 align-middle">
-                        <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th>Sub Category</th>
-                                <th class="text-end" style="width: 160px;">Total Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($daybookRows as $row)
-                                <tr>
-                                    <td>{{ $row['category'] }}</td>
-                                    <td>{{ $row['sub_category'] }}</td>
-                                    <td class="text-end fw-semibold">{{ $row['total_amount_formatted'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-    </div>
-@endif
-
-@if($project->projectFiles->isNotEmpty())
-    <div class="card card-theme">
-        <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h2 class="h6 mb-0">Project inventory files</h2>
-            <a href="{{ route('sale.files.create', $project) }}" class="btn btn-sm btn-pink">Add file</a>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-striped table-theme mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th style="width: 56px;">#</th>
-                            <th>File</th>
-                            <th>Total land</th>
-                            <th class="text-end">Sold</th>
-                            <th class="text-end">Remaining</th>
-                            <th>Dealer</th>
-                            <th style="width: 100px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($project->projectFiles as $file)
-                            @php
-                                $totalMarla = (float) $file->land_area_marla;
-                                $soldMarla = $file->soldMarla();
-                                $remaining = $file->remainingMarla();
-                            @endphp
-                            <tr>
-                                <td>{{ $loop->iteration }}</td>
-                                <td class="fw-semibold">{{ $file->file_number }}</td>
-                                <td class="small">
-                                    @if($totalMarla > 0)
-                                        {{ \App\Support\LandMeasure::formatAkmsLabelFromMarla($totalMarla) }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td class="text-end small">{{ $soldMarla > 0 ? \App\Support\LandMeasure::formatAkmsLabelFromMarla($soldMarla) : '—' }}</td>
-                                <td class="text-end small fw-semibold">{{ $totalMarla > 0 ? \App\Support\LandMeasure::formatAkmsLabelFromMarla($remaining) : '—' }}</td>
-                                <td class="small">{{ $file->dealerParty?->name ?? '—' }}</td>
-                                <td>
-                                    <a href="{{ route('sale.files.sale.create', $file) }}" class="btn btn-sm btn-pink">Sale</a>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+            @include('sales.partials.leftover-land-balance', [
+                'leftoverColumns' => $leftoverColumns,
+                'leftoverFiles' => $leftoverFiles,
+                'leftoverTotals' => $leftoverTotals,
+            ])
         </div>
     </div>
 @endif

@@ -97,6 +97,7 @@
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('daybook.entries') ? 'active' : '' }}" href="{{ route('daybook.entries') }}"><i class="bi bi-list-columns-reverse app-sidebar-link__icon" aria-hidden="true"></i><span>Daybook entries</span></a>
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('companies.*') ? 'active' : '' }}" href="{{ route('companies.index') }}"><i class="bi bi-building-gear app-sidebar-link__icon" aria-hidden="true"></i><span>Company</span></a>
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('sale.percentage.index') || (request()->routeIs('sale.files.sale.create') && request('type') === 'percentage') ? 'active' : '' }}" href="{{ route('sale.percentage.index') }}"><i class="bi bi-percent app-sidebar-link__icon" aria-hidden="true"></i><span>Sale percentage</span></a>
+                    <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('sale.exemption.index', 'sale.projects.exemption.*') ? 'active' : '' }}" href="{{ route('sale.exemption.index') }}"><i class="bi bi-sliders2 app-sidebar-link__icon" aria-hidden="true"></i><span>Project exemption</span></a>
                 </nav>
                 @endauth
                 <div class="app-sidebar-footer">

@@ -34,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
             'purchases.files.ledger-pdf',
             'projects.sale-land-pdf',
             'projects.ledger-pdf',
+            'sales.files.leftover-land-balance-pdf',
         ];
 
         View::composer($pdfViews, function ($view) {

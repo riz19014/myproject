@@ -262,6 +262,9 @@ final class FileSaleLandService
                     'sold_land' => '—',
                     'remaining_land' => '—',
                     'files_count' => 0,
+                    'total_khasras' => 0,
+                    'mouzas_count' => 0,
+                    'mouzas_names' => '—',
                     'partially_sold' => 0,
                     'fully_sold' => 0,
                     'formula_remaining' => [],
@@ -293,6 +296,8 @@ final class FileSaleLandService
         $fileRows = [];
         $totalMarla = 0.0;
         $soldMarla = 0.0;
+        $totalKhasras = 0;
+        $allMozas = collect();
         $formulaRemainingTotals = [];
         $formulaSoldTotals = [];
         $formulaAvailableTotals = [];
@@ -361,22 +366,30 @@ final class FileSaleLandService
                 ->unique()
                 ->values();
 
+            $totalKhasras += $file->purchaseItems->count();
+            foreach ($moza as $mozaName) {
+                $allMozas->push($mozaName);
+            }
+
             $fileRows[] = [
                 'purchase_file_id' => $fileId,
                 'file_name' => $file->file_name,
                 'moza' => $moza->isEmpty() ? '—' : $moza->implode(', '),
+                'items_count' => $file->purchaseItems->count(),
                 'total_land_marla' => $total,
                 'total_land' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
                 'sold_land_marla' => $sold,
                 'sold_land' => $sold > 0 ? LandMeasure::formatAkmsLabelFromMarla($sold) : '—',
                 'remaining_land_marla' => $remaining,
                 'remaining_land' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : '—',
+                'remaining_land_compact' => $remaining > 0 ? LandMeasure::formatAkmsCompactFromMarla($remaining) : '—',
                 'status' => $file->saleStatusLabel(),
                 'plots' => $plots,
             ];
         }
 
         $remainingMarla = max(0.0, round($totalMarla - $soldMarla, 6));
+        $uniqueMozas = $allMozas->unique()->sort()->values();
         $formulaRemaining = [];
         foreach ($formulaColumns as $column) {
             $plotKey = (string) ($column['plot_key'] ?? '');
@@ -403,6 +416,9 @@ final class FileSaleLandService
                 'sold_land_marla' => round($soldMarla, 6),
                 'remaining_land_marla' => $remainingMarla,
                 'files_count' => count($fileRows),
+                'total_khasras' => $totalKhasras,
+                'mouzas_count' => $uniqueMozas->count(),
+                'mouzas_names' => $uniqueMozas->isEmpty() ? '—' : $uniqueMozas->implode(', '),
                 'partially_sold' => collect($fileRows)->where('status', 'Partially Sold')->count(),
                 'fully_sold' => collect($fileRows)->where('status', 'Fully Sold')->count(),
                 'formula_remaining' => $formulaRemaining,

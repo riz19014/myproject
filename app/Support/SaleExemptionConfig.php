@@ -17,20 +17,54 @@ final class SaleExemptionConfig
     /** @var Collection<int, ProjectSaleExemptionComponent> */
     private Collection $components;
 
-    public function __construct(Project $project, ?ProjectFile $file = null)
+    private ?float $marlaPerAcreOverride = null;
+
+    public function __construct(Project $project, ?ProjectFile $file = null, bool $skipLoad = false)
     {
-        ProjectExemptionDefaults::ensureForProject($project);
-        if ($file) {
-            ProjectExemptionDefaults::syncLegacyFileOverrides($file);
-            $file->loadMissing('exemptionOverrides');
+        if (! $skipLoad) {
+            ProjectExemptionDefaults::ensureForProject($project);
+            if ($file) {
+                ProjectExemptionDefaults::syncLegacyFileOverrides($file);
+                $file->loadMissing('exemptionOverrides');
+            }
         }
 
         $this->project = $project;
         $this->file = $file;
-        $this->components = $project->saleExemptionComponents()
-            ->with(['plotTypes' => fn ($q) => $q->orderBy('sort_order')])
-            ->orderBy('sort_order')
-            ->get();
+        $this->components = $skipLoad
+            ? collect()
+            : $project->saleExemptionComponents()
+                ->with(['plotTypes' => fn ($q) => $q->orderBy('sort_order')])
+                ->orderBy('sort_order')
+                ->get();
+    }
+
+    /**
+     * @param  array{marla_per_acre?: float, components?: list<array<string, mixed>>}  $data
+     */
+    public static function fromSnapshotData(Project $project, array $data): self
+    {
+        $instance = new self($project, null, true);
+        $instance->marlaPerAcreOverride = (float) ($data['marla_per_acre'] ?? $project->marla_per_acre ?? 160);
+        $instance->components = collect($data['components'] ?? [])->map(function (array $row) use ($instance) {
+            $component = new ProjectSaleExemptionComponent([
+                'slug' => $row['slug'],
+                'label' => $row['label'],
+                'pool_percent' => $row['pool_percent'],
+                'marla_per_acre' => $instance->marlaPerAcreOverride,
+            ]);
+            $component->setRelation('plotTypes', collect($row['plot_types'] ?? [])->map(fn (array $plotRow) => new ProjectSaleExemptionPlotType([
+                'slug' => $plotRow['slug'],
+                'label' => $plotRow['label'],
+                'marla_per_plot' => $plotRow['marla_per_plot'],
+                'nominal_marla' => $plotRow['nominal_marla'],
+                'share_percent' => $plotRow['share_percent'],
+            ])));
+
+            return $component;
+        });
+
+        return $instance;
     }
 
     public static function forFile(ProjectFile $file): self
@@ -53,6 +87,10 @@ final class SaleExemptionConfig
 
     public function marlaPerAcreLand(): float
     {
+        if ($this->marlaPerAcreOverride !== null) {
+            return $this->marlaPerAcreOverride;
+        }
+
         return (float) ($this->project->marla_per_acre ?? 160);
     }
 

@@ -110,4 +110,9 @@ class Project extends Model
     {
         return $this->hasMany(ProjectSaleExemptionPlotType::class);
     }
+
+    public function saleExemptionSnapshots(): HasMany
+    {
+        return $this->hasMany(ProjectSaleExemptionSnapshot::class)->latest();
+    }
 }
