@@ -138,8 +138,8 @@
                                     <th style="width: 10%;">Voucher #</th>
                                     <th>Party</th>
                                     <th style="width: 14%;">Payment Method</th>
-                                    <th class="text-end" style="width: 13%;">Debit (Payable)</th>
-                                    <th class="text-end" style="width: 13%;">Credit (Paid)</th>
+                                    <th class="text-end" style="width: 13%;" id="pf-ledger-th-debit">Debit (Payable)</th>
+                                    <th class="text-end" style="width: 13%;" id="pf-ledger-th-credit">Credit (Paid)</th>
                                     <th class="text-end" style="width: 14%;">Running Balance</th>
                                 </tr>
                             </thead>
@@ -529,6 +529,8 @@
     var totalCreditEl = document.getElementById('pf-ledger-total-credit');
     var totalBalanceEl = document.getElementById('pf-ledger-total-balance');
     var footerLabelEl = document.getElementById('pf-ledger-footer-label');
+    var thDebitEl = document.getElementById('pf-ledger-th-debit');
+    var thCreditEl = document.getElementById('pf-ledger-th-credit');
     var printBtn = document.getElementById('pf-ledger-print-btn');
     var pdfBtn = document.getElementById('pf-ledger-pdf-btn');
     var selectPartiesBtn = document.getElementById('pf-ledger-select-parties-btn');
@@ -738,6 +740,16 @@
         } else {
             subtitleEl.textContent = '';
             subtitleEl.classList.add('d-none');
+        }
+
+        if (thDebitEl && thCreditEl) {
+            if (section.investor_polarity) {
+                thDebitEl.textContent = 'Debit (Paid)';
+                thCreditEl.textContent = 'Credit (Investment)';
+            } else {
+                thDebitEl.textContent = 'Debit (Payable)';
+                thCreditEl.textContent = 'Credit (Paid)';
+            }
         }
 
         rowsEl.innerHTML = '';

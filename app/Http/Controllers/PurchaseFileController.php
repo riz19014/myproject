@@ -1017,7 +1017,8 @@ class PurchaseFileController extends Controller
                 $landAreaSpoken,
                 $paymentEntries,
                 $parties,
-                $file->file_date
+                $file->file_date,
+                $breakdown,
             );
         }
 
@@ -1035,7 +1036,14 @@ class PurchaseFileController extends Controller
                 null,
                 $generalPayments,
                 collect(),
-                $file->file_date
+                $file->file_date,
+                [
+                    'land_total' => 0.0,
+                    'commission' => 0.0,
+                    'investment' => 0.0,
+                    'share_percentage' => 0.0,
+                    'opening' => 0.0,
+                ],
             );
         }
 
@@ -1231,8 +1239,22 @@ class PurchaseFileController extends Controller
     }
 
     /**
+     * Investor/partner capital: opening investment is Credit; paying the investor is Debit.
+     * Seller/dealer payable: opening is Debit; paying them is Credit.
+     *
+     * @param  array{land_total: float, commission: float, investment: float, share_percentage: float, opening: float}  $breakdown
+     */
+    private function isInvestorLedgerPolarity(array $breakdown): bool
+    {
+        return (float) ($breakdown['investment'] ?? 0) > 0
+            && (float) ($breakdown['land_total'] ?? 0) <= 0
+            && (float) ($breakdown['commission'] ?? 0) <= 0;
+    }
+
+    /**
      * @param  \Illuminate\Support\Collection<int|string, Party>  $parties
      * @param  \Illuminate\Support\Collection<int, DayBookEntry>  $entries
+     * @param  array{land_total: float, commission: float, investment: float, share_percentage: float, opening: float}|null  $breakdown
      * @return array<string, mixed>
      */
     private function buildFileLedgerPaymentSection(
@@ -1245,6 +1267,7 @@ class PurchaseFileController extends Controller
         $entries,
         $parties,
         ?\Carbon\CarbonInterface $fallbackDate = null,
+        ?array $breakdown = null,
     ): array {
         $entries = $entries->sortBy(fn (DayBookEntry $e) => [$e->entry_date->toDateString(), $e->id])->values();
         $rows = [];
@@ -1253,19 +1276,52 @@ class PurchaseFileController extends Controller
         $openingVoucher = $firstEntry ? $firstEntry->getVoucherNumber() : null;
         $paidRunning = 0.0;
 
-        if ($openingAmount > 0) {
-            $openingParty = $title;
-            if ($landAreaSpoken) {
-                $openingParty .= ' ('.$landAreaSpoken.')';
-            }
+        $breakdown ??= [
+            'land_total' => $landTotal,
+            'commission' => $commission,
+            'investment' => max(0.0, $openingAmount - $landTotal - $commission),
+            'share_percentage' => 0.0,
+            'opening' => $openingAmount,
+        ];
+        $investorPolarity = $this->isInvestorLedgerPolarity($breakdown);
+        $payableOpening = round((float) $breakdown['land_total'] + (float) $breakdown['commission'], 2);
+        $investmentOpening = round((float) $breakdown['investment'], 2);
 
+        $openingParty = $title;
+        if ($landAreaSpoken) {
+            $openingParty .= ' ('.$landAreaSpoken.')';
+        }
+
+        // Mixed seller/dealer + investor: show payable as debit and investment as credit.
+        if ($payableOpening > 0 && $investmentOpening > 0) {
             $rows[] = $this->fileLedgerTableRow(
                 date: $openingDate,
                 voucher: $openingVoucher,
                 party: $openingParty,
                 paymentMethod: '—',
-                debit: $openingAmount,
+                debit: $payableOpening,
                 credit: null,
+                runningBalance: $payableOpening,
+                isOpening: true,
+            );
+            $rows[] = $this->fileLedgerTableRow(
+                date: $openingDate,
+                voucher: $openingVoucher,
+                party: $openingParty.' · Investment',
+                paymentMethod: '—',
+                debit: null,
+                credit: $investmentOpening,
+                runningBalance: $payableOpening + $investmentOpening,
+                isOpening: true,
+            );
+        } elseif ($openingAmount > 0) {
+            $rows[] = $this->fileLedgerTableRow(
+                date: $openingDate,
+                voucher: $openingVoucher,
+                party: $openingParty,
+                paymentMethod: '—',
+                debit: $investorPolarity ? null : $openingAmount,
+                credit: $investorPolarity ? $openingAmount : null,
                 runningBalance: $openingAmount,
                 isOpening: true,
             );
@@ -1281,7 +1337,14 @@ class PurchaseFileController extends Controller
                 }
             }
 
-            if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
+            $isCashOut = $entry->type === DayBookEntry::TYPE_CASH_OUT;
+
+            if ($investorPolarity) {
+                // Investor commitment is credit; cash he brings in is debit and clears it.
+                $paidRunning += $isCashOut ? -$amount : $amount;
+                $debit = $isCashOut ? null : $amount;
+                $credit = $isCashOut ? $amount : null;
+            } elseif ($isCashOut) {
                 $paidRunning += $amount;
                 $debit = null;
                 $credit = $amount;
@@ -1316,6 +1379,7 @@ class PurchaseFileController extends Controller
                 'credit' => $totals['credit'],
                 'running_balance' => $finalBalance,
             ],
+            'investor_polarity' => $investorPolarity,
         ];
     }
 
@@ -1374,14 +1438,43 @@ class PurchaseFileController extends Controller
                     $openingParty .= ' ('.$landAreaSpoken.')';
                 }
 
-                $candidates[] = [
-                    'sort' => [$openingDate?->toDateString() ?? '', 0, $partyName, 0],
-                    'kind' => 'opening',
-                    'date' => $openingDate,
-                    'voucher' => $openingVoucher,
-                    'party' => $openingParty,
-                    'debit' => $openingAmount,
-                ];
+                $investorPolarity = $this->isInvestorLedgerPolarity($breakdown);
+                $payableOpening = round((float) $breakdown['land_total'] + (float) $breakdown['commission'], 2);
+                $investmentOpening = round((float) $breakdown['investment'], 2);
+
+                if ($payableOpening > 0 && $investmentOpening > 0) {
+                    $candidates[] = [
+                        'sort' => [$openingDate?->toDateString() ?? '', 0, $partyName, 0],
+                        'kind' => 'opening',
+                        'date' => $openingDate,
+                        'voucher' => $openingVoucher,
+                        'party' => $openingParty,
+                        'debit' => $payableOpening,
+                        'credit' => null,
+                        'balance_delta' => $payableOpening,
+                    ];
+                    $candidates[] = [
+                        'sort' => [$openingDate?->toDateString() ?? '', 0, $partyName, 1],
+                        'kind' => 'opening',
+                        'date' => $openingDate,
+                        'voucher' => $openingVoucher,
+                        'party' => $openingParty.' · Investment',
+                        'debit' => null,
+                        'credit' => $investmentOpening,
+                        'balance_delta' => $investmentOpening,
+                    ];
+                } else {
+                    $candidates[] = [
+                        'sort' => [$openingDate?->toDateString() ?? '', 0, $partyName, 0],
+                        'kind' => 'opening',
+                        'date' => $openingDate,
+                        'voucher' => $openingVoucher,
+                        'party' => $openingParty,
+                        'debit' => $investorPolarity ? null : $openingAmount,
+                        'credit' => $investorPolarity ? $openingAmount : null,
+                        'balance_delta' => $openingAmount,
+                    ];
+                }
             }
 
             foreach ($paymentEntries as $entry) {
@@ -1390,6 +1483,7 @@ class PurchaseFileController extends Controller
                     'kind' => 'payment',
                     'entry' => $entry,
                     'party_name' => $partyName,
+                    'investor_polarity' => $this->isInvestorLedgerPolarity($breakdown),
                 ];
             }
         }
@@ -1402,14 +1496,14 @@ class PurchaseFileController extends Controller
 
         foreach ($candidates as $candidate) {
             if ($candidate['kind'] === 'opening') {
-                $combinedRunning += (float) $candidate['debit'];
+                $combinedRunning += (float) ($candidate['balance_delta'] ?? $candidate['debit'] ?? $candidate['credit'] ?? 0);
                 $rows[] = $this->fileLedgerTableRow(
                     date: $candidate['date'],
                     voucher: $candidate['voucher'],
                     party: $candidate['party'],
                     paymentMethod: '—',
-                    debit: $candidate['debit'],
-                    credit: null,
+                    debit: $candidate['debit'] ?? null,
+                    credit: $candidate['credit'] ?? null,
                     runningBalance: $combinedRunning,
                     isOpening: true,
                 );
@@ -1420,8 +1514,15 @@ class PurchaseFileController extends Controller
             /** @var DayBookEntry $entry */
             $entry = $candidate['entry'];
             $amount = (float) $entry->amount;
+            $investorPolarity = (bool) ($candidate['investor_polarity'] ?? false);
+            $isCashOut = $entry->type === DayBookEntry::TYPE_CASH_OUT;
 
-            if ($entry->type === DayBookEntry::TYPE_CASH_OUT) {
+            if ($investorPolarity) {
+                $totalPaid += $isCashOut ? -$amount : $amount;
+                $combinedRunning += $isCashOut ? $amount : -$amount;
+                $debit = $isCashOut ? null : $amount;
+                $credit = $isCashOut ? $amount : null;
+            } elseif ($isCashOut) {
                 $totalPaid += $amount;
                 $combinedRunning -= $amount;
                 $debit = null;
