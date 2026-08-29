@@ -12,6 +12,7 @@ class FileSaleLand extends Model
     protected $fillable = [
         'project_id',
         'sale_land_id',
+        'collective_id',
     ];
 
     public function project(): BelongsTo
@@ -22,5 +23,10 @@ class FileSaleLand extends Model
     public function saleLand(): BelongsTo
     {
         return $this->belongsTo(PurchaseFile::class, 'sale_land_id');
+    }
+
+    public function collective(): BelongsTo
+    {
+        return $this->belongsTo(FileSaleCollective::class, 'collective_id');
     }
 }

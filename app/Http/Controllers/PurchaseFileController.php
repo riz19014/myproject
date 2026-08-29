@@ -48,7 +48,7 @@ class PurchaseFileController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $projects = Project::query()->orderBy('name')->get(['id', 'name']);
+        $projects = Project::query()->orderBy('name')->get(['id', 'name', 'is_dha']);
 
 
         return view('purchases.files.index', compact('files', 'projects', 'projectId', 'search'));

@@ -10,6 +10,8 @@
     $scopedPurchaseFiles = $scopedPurchaseFiles ?? collect();
     $scopedPurchaseFileIds = $scopedPurchaseFiles->pluck('id')->all();
     $movedToFileSaleIds = $movedToFileSaleIds ?? [];
+    $openCollectives = $openCollectives ?? [];
+    $suggestedCollectiveName = $suggestedCollectiveName ?? 'Collective-1';
     $fileCount = collect($sheetRows)->where('show_file_name', true)->count();
     $rowCount = count($sheetRows);
 @endphp
@@ -272,6 +274,61 @@
 
 @if($sheetRows !== [])
 @push('modals')
+    <div class="modal fade" id="sale-land-move-modal" tabindex="-1" aria-labelledby="sale-land-move-modal-title" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content card-theme">
+                <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="sale-land-move-modal-title">Move to File Sale</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        <span id="sale-land-move-selected-count">0</span> file(s) selected. How should they appear in File Sale?
+                    </p>
+                    <div class="d-flex flex-column gap-2 mb-3">
+                        <label class="border rounded-3 p-3 mb-0" style="cursor:pointer;">
+                            <input type="radio" name="sale_land_move_placement" value="separate" class="form-check-input me-2" checked>
+                            <strong>Separately</strong>
+                            <div class="small text-muted ms-4">Each file stays its own entry until you save as a sale file.</div>
+                        </label>
+                        <label class="border rounded-3 p-3 mb-0" style="cursor:pointer;">
+                            <input type="radio" name="sale_land_move_placement" value="new_collective" class="form-check-input me-2">
+                            <strong>New sale file</strong>
+                            <div class="small text-muted ms-4">Create a named header with exemption formula and save these files as lines.</div>
+                        </label>
+                        <label class="border rounded-3 p-3 mb-0 {{ $openCollectives === [] ? 'opacity-50' : '' }}" style="cursor:pointer;">
+                            <input type="radio" name="sale_land_move_placement" value="existing_collective" class="form-check-input me-2"
+                                   id="sale-land-move-existing-radio"
+                                   @disabled($openCollectives === [])>
+                            <strong>Existing sale file</strong>
+                            <div class="small text-muted ms-4">Add into an open sale file.</div>
+                        </label>
+                    </div>
+                    <div class="mb-3 d-none" id="sale-land-move-name-wrap">
+                        <label for="sale-land-move-name" class="form-label">Sale file name</label>
+                        <input type="text" id="sale-land-move-name" class="form-control" value="{{ $suggestedCollectiveName }}" maxlength="150">
+                    </div>
+                    <div class="mb-0 {{ $openCollectives === [] ? 'd-none' : '' }}" id="sale-land-move-collective-wrap">
+                        <label for="sale-land-move-collective-id" class="form-label">Open sale file</label>
+                        <select id="sale-land-move-collective-id" class="form-select">
+                            @forelse($openCollectives as $collective)
+                                <option value="{{ $collective['id'] }}">
+                                    {{ $collective['name'] }} ({{ $collective['file_count'] }} file{{ $collective['file_count'] === 1 ? '' : 's' }})
+                                </option>
+                            @empty
+                                <option value="">No open sale files</option>
+                            @endforelse
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-pink" id="sale-land-move-confirm">Move files</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="sale-land-sale-modal" tabindex="-1" aria-labelledby="sale-land-sale-modal-title" aria-hidden="true" data-bs-focus="false">
         <div class="modal-dialog modal-fullscreen-lg-down sale-land-sale-modal-dialog" style="max-width: 96vw;">
             <div class="modal-content card-theme sale-land-sale-modal-content">
@@ -937,6 +994,11 @@
     var moveCheckNoneBtn = document.getElementById('sale-land-move-check-none');
     var moveToFileSaleBtn = document.getElementById('sale-land-move-to-file-sale');
     var moveToFileSaleUrl = @json(route('projects.sale-land.move-to-file-sale', $project));
+    var openCollectives = @json($openCollectives);
+    var moveModalEl = document.getElementById('sale-land-move-modal');
+    var moveModalInstance = moveModalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(moveModalEl) : null;
+    var moveConfirmBtn = document.getElementById('sale-land-move-confirm');
+    var moveSelectedIds = [];
 
     function applyFileSaleRowState(movedIds) {
         var idSet = new Set((movedIds || []).map(function(id) { return String(id); }));
@@ -952,6 +1014,134 @@
             cb.checked = inFileSale;
             cb.disabled = inFileSale;
         });
+    }
+
+    function selectedPlacement() {
+        var checked = document.querySelector('input[name="sale_land_move_placement"]:checked');
+        return checked ? checked.value : 'separate';
+    }
+
+    function syncMovePlacementUi() {
+        var placement = selectedPlacement();
+        var nameWrap = document.getElementById('sale-land-move-name-wrap');
+        var collectiveWrap = document.getElementById('sale-land-move-collective-wrap');
+        if (nameWrap) nameWrap.classList.toggle('d-none', placement !== 'new_collective');
+        if (collectiveWrap) {
+            collectiveWrap.classList.toggle('d-none', placement !== 'existing_collective' || !openCollectives.length);
+        }
+    }
+
+    document.querySelectorAll('input[name="sale_land_move_placement"]').forEach(function(radio) {
+        radio.addEventListener('change', syncMovePlacementUi);
+    });
+
+    function refreshOpenCollectiveSelect(list) {
+        openCollectives = list || [];
+        var select = document.getElementById('sale-land-move-collective-id');
+        var wrap = document.getElementById('sale-land-move-collective-wrap');
+        var existingRadio = document.getElementById('sale-land-move-existing-radio');
+        if (!select) return;
+
+        select.innerHTML = '';
+        if (!openCollectives.length) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No open sale files';
+            select.appendChild(opt);
+            if (wrap) wrap.classList.add('d-none');
+            if (existingRadio) {
+                existingRadio.disabled = true;
+                existingRadio.checked = false;
+            }
+            syncMovePlacementUi();
+            return;
+        }
+
+        openCollectives.forEach(function(c) {
+            var opt = document.createElement('option');
+            opt.value = String(c.id);
+            opt.textContent = c.name + ' (' + c.file_count + ' file' + (c.file_count === 1 ? '' : 's') + ')';
+            select.appendChild(opt);
+        });
+        if (existingRadio) existingRadio.disabled = false;
+        syncMovePlacementUi();
+    }
+
+    function submitMoveToFileSale() {
+        var placement = selectedPlacement();
+        var payload = {
+            purchase_file_ids: moveSelectedIds,
+            placement: placement
+        };
+        if (placement === 'new_collective') {
+            var nameInput = document.getElementById('sale-land-move-name');
+            var name = nameInput ? String(nameInput.value || '').trim() : '';
+            if (!name) {
+                alert('Enter a sale file name.');
+                return;
+            }
+            payload.name = name;
+        }
+        if (placement === 'existing_collective') {
+            var select = document.getElementById('sale-land-move-collective-id');
+            var cid = select ? parseInt(select.value, 10) : NaN;
+            if (!cid) {
+                alert('Select an open sale file.');
+                return;
+            }
+            payload.collective_id = cid;
+        }
+
+        if (moveConfirmBtn) moveConfirmBtn.disabled = true;
+        if (moveToFileSaleBtn) moveToFileSaleBtn.disabled = true;
+
+        fetch(moveToFileSaleUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': token,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, data: data };
+                }).catch(function() {
+                    return { ok: false, data: {} };
+                });
+            })
+            .then(function(result) {
+                if (moveConfirmBtn) moveConfirmBtn.disabled = false;
+                if (moveToFileSaleBtn) moveToFileSaleBtn.disabled = false;
+                if (!result.ok) {
+                    var msg = (result.data && result.data.message) ? result.data.message : 'Could not move selected files.';
+                    if (result.data && result.data.errors) {
+                        var parts = [];
+                        Object.keys(result.data.errors).forEach(function(key) {
+                            parts = parts.concat(result.data.errors[key]);
+                        });
+                        if (parts.length) msg = parts.join(' ');
+                    }
+                    alert(msg);
+                    return;
+                }
+
+                if (result.data.open_collectives) {
+                    refreshOpenCollectiveSelect(result.data.open_collectives);
+                }
+                applyFileSaleRowState(result.data.moved_ids || []);
+                if (moveModalInstance) moveModalInstance.hide();
+                if (result.data.message) {
+                    window.location.reload();
+                }
+            })
+            .catch(function() {
+                if (moveConfirmBtn) moveConfirmBtn.disabled = false;
+                if (moveToFileSaleBtn) moveToFileSaleBtn.disabled = false;
+                alert('Could not move selected files. Please try again.');
+            });
     }
 
     if (moveCheckAllBtn) {
@@ -970,60 +1160,31 @@
     }
     if (moveToFileSaleBtn) {
         moveToFileSaleBtn.addEventListener('click', function() {
-            var selected = Array.from(document.querySelectorAll('.sale-land-file-move-check:checked:not(:disabled)')).map(function(cb) {
+            moveSelectedIds = Array.from(document.querySelectorAll('.sale-land-file-move-check:checked:not(:disabled)')).map(function(cb) {
                 return parseInt(cb.value, 10);
             }).filter(function(id) { return !isNaN(id); });
 
-            if (!selected.length) {
+            if (!moveSelectedIds.length) {
                 alert('Select at least one sale land file that is not already in file sale.');
                 return;
             }
 
-            moveToFileSaleBtn.disabled = true;
+            var countEl = document.getElementById('sale-land-move-selected-count');
+            if (countEl) countEl.textContent = String(moveSelectedIds.length);
 
-            fetch(moveToFileSaleUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': token,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ purchase_file_ids: selected })
-            })
-                .then(function(res) {
-                    return res.json().then(function(data) {
-                        return { ok: res.ok, data: data };
-                    }).catch(function() {
-                        return { ok: false, data: {} };
-                    });
-                })
-                .then(function(result) {
-                    moveToFileSaleBtn.disabled = false;
-                    if (!result.ok) {
-                        var msg = (result.data && result.data.message) ? result.data.message : 'Could not move selected files.';
-                        if (result.data && result.data.errors) {
-                            var parts = [];
-                            Object.keys(result.data.errors).forEach(function(key) {
-                                parts = parts.concat(result.data.errors[key]);
-                            });
-                            if (parts.length) msg = parts.join(' ');
-                        }
-                        alert(msg);
-                        return;
-                    }
+            var separateRadio = document.querySelector('input[name="sale_land_move_placement"][value="separate"]');
+            if (separateRadio) separateRadio.checked = true;
+            syncMovePlacementUi();
 
-                    applyFileSaleRowState(result.data.moved_ids || []);
-
-                    if (result.data.message) {
-                        window.location.reload();
-                    }
-                })
-                .catch(function() {
-                    moveToFileSaleBtn.disabled = false;
-                    alert('Could not move selected files. Please try again.');
-                });
+            if (moveModalInstance) {
+                moveModalInstance.show();
+            } else {
+                submitMoveToFileSale();
+            }
         });
+    }
+    if (moveConfirmBtn) {
+        moveConfirmBtn.addEventListener('click', submitMoveToFileSale);
     }
 
     var saleLandModalData = @json($saleLandModalData ?? []);

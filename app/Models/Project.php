@@ -101,6 +101,11 @@ class Project extends Model
         return $this->hasMany(FileSaleLand::class);
     }
 
+    public function fileSaleCollectives(): HasMany
+    {
+        return $this->hasMany(FileSaleCollective::class)->orderBy('id');
+    }
+
     public function saleExemptionComponents(): HasMany
     {
         return $this->hasMany(ProjectSaleExemptionComponent::class)->orderBy('sort_order');

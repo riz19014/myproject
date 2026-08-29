@@ -39,6 +39,12 @@ Route::middleware('auth')->group(function () {
     Route::get('sale/projects/{project}/files', [SaleProjectFileController::class, 'index'])->name('sale.files.index');
     Route::get('sale/projects/{project}/files/original-formula-pdf', [SaleProjectFileController::class, 'originalFormulaPdf'])->name('sale.files.original-formula.pdf');
     Route::get('sale/projects/{project}/files/leftover-land-pdf', [SaleProjectFileController::class, 'leftoverLandBalancePdf'])->name('sale.files.leftover-land.pdf');
+    Route::get('sale/projects/{project}/files/collectives/{collective}', [SaleProjectFileController::class, 'showCollective'])->name('sale.files.collectives.show');
+    Route::post('sale/projects/{project}/files/collectives', [SaleProjectFileController::class, 'storeCollective'])->name('sale.files.collectives.store');
+    Route::post('sale/projects/{project}/files/collectives/group', [SaleProjectFileController::class, 'groupCollective'])->name('sale.files.collectives.group');
+    Route::post('sale/projects/{project}/files/collectives/{collective}/complete', [SaleProjectFileController::class, 'completeCollective'])->name('sale.files.collectives.complete');
+    Route::post('sale/projects/{project}/files/collectives/{collective}/reopen', [SaleProjectFileController::class, 'reopenCollective'])->name('sale.files.collectives.reopen');
+    Route::post('sale/projects/{project}/files/collectives/{collective}/apply-exemption', [SaleProjectFileController::class, 'applyExemption'])->name('sale.files.collectives.apply-exemption');
     Route::get('sale/projects/{project}/files/create', [SaleProjectFileController::class, 'create'])->name('sale.files.create');
     Route::post('sale/projects/{project}/files', [SaleProjectFileController::class, 'store'])->name('sale.files.store');
     Route::get('sale/files/{projectFile}/sale', [SaleProjectFileController::class, 'saleCreate'])->name('sale.files.sale.create');

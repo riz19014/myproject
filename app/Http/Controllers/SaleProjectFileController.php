@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\FileSaleCollective;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
@@ -25,8 +26,14 @@ class SaleProjectFileController extends Controller
         $project->load(['landType', 'projectFiles' => fn ($q) => $q->with(['dealerParty', 'sales'])->orderBy('file_number')]);
 
         $fileSaleSummary = $fileSaleLandService->buildFileSaleSummary($project);
+        $exemptionOptions = $project->saleExemptionSnapshots()->get()->map(fn ($snapshot) => [
+            'id' => (int) $snapshot->id,
+            'label' => $snapshot->summaryLabel()
+                .' · 1 acre = '.rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.').'M'
+                .' · '.$snapshot->created_at->format('d M Y'),
+        ])->values()->all();
 
-        return view('sales.files.index', compact('project', 'fileSaleSummary'));
+        return view('sales.files.index', compact('project', 'fileSaleSummary', 'exemptionOptions'));
     }
 
     public function percentageIndex()
@@ -288,5 +295,118 @@ class SaleProjectFileController extends Controller
         $safeProject = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name) ?: 'project';
 
         return $pdf->download('leftover-land-'.$safeProject.'-'.now()->format('Y-m-d').'.pdf');
+    }
+
+
+    public function showCollective(Project $project, FileSaleCollective $collective, FileSaleLandService $fileSaleLandService)
+    {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+
+        $project->load('landType');
+        $summary = $fileSaleLandService->buildFileSaleSummary($project);
+        $collectiveSummary = collect($summary['collectives'] ?? [])
+            ->firstWhere('id', (int) $collective->id);
+
+        abort_unless(is_array($collectiveSummary), 404);
+
+        $exemptionOptions = $project->saleExemptionSnapshots()->get()->map(fn ($snapshot) => [
+            'id' => (int) $snapshot->id,
+            'label' => $snapshot->summaryLabel()
+                .' · 1 acre = '.rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.').'M'
+                .' · '.$snapshot->created_at->format('d M Y'),
+        ])->values()->all();
+
+        return view('sales.files.collective-show', [
+            'project' => $project,
+            'collectiveModel' => $collective,
+            'collective' => $collectiveSummary,
+            'exemptionOptions' => $exemptionOptions,
+        ]);
+    }
+
+    public function storeCollective(Request $request, Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'sale_land_ids' => ['required', 'array', 'min:1'],
+            'sale_land_ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        $result = $fileSaleLandService->saveAsSaleFile(
+            $project,
+            $validated['sale_land_ids'],
+            $validated['name'],
+        );
+
+        return redirect()
+            ->route('sale.files.index', $project)
+            ->with('success', 'Sale file "'.$result['collective']['name'].'" saved with '.$result['file_count'].' file line(s) and exemption formula.');
+    }
+
+    public function groupCollective(Request $request, Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $validated = $request->validate([
+            'sale_land_ids' => ['required', 'array', 'min:1'],
+            'sale_land_ids.*' => ['required', 'integer', 'distinct'],
+            'placement' => ['required', 'string', Rule::in([
+                FileSaleLandService::PLACEMENT_NEW_COLLECTIVE,
+                FileSaleLandService::PLACEMENT_EXISTING_COLLECTIVE,
+            ])],
+            'collective_id' => ['nullable', 'integer'],
+            'name' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $result = $fileSaleLandService->groupIntoCollective(
+            $project,
+            $validated['sale_land_ids'],
+            $validated['placement'],
+            isset($validated['collective_id']) ? (int) $validated['collective_id'] : null,
+            isset($validated['name']) ? trim((string) $validated['name']) : null,
+        );
+
+        return redirect()
+            ->route('sale.files.index', $project)
+            ->with('success', $result['file_count'].' file(s) saved under '.$result['collective']['name'].'.');
+    }
+
+    public function completeCollective(Project $project, FileSaleCollective $collective, FileSaleLandService $fileSaleLandService)
+    {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+
+        $fileSaleLandService->completeCollective($project, $collective);
+
+        return redirect()
+            ->route('sale.files.collectives.show', [$project, $collective])
+            ->with('success', $collective->name.' marked complete. No more files can be added.');
+    }
+
+    public function reopenCollective(Project $project, FileSaleCollective $collective, FileSaleLandService $fileSaleLandService)
+    {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+
+        $fileSaleLandService->reopenCollective($project, $collective);
+
+        return redirect()
+            ->route('sale.files.collectives.show', [$project, $collective])
+            ->with('success', $collective->name.' reopened. Files can be added again.');
+    }
+
+    public function applyExemption(Request $request, Project $project, FileSaleCollective $collective, FileSaleLandService $fileSaleLandService)
+    {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+
+        $validated = $request->validate([
+            'snapshot_id' => ['nullable', 'integer'],
+        ]);
+
+        $fileSaleLandService->applyExemptionToCollective(
+            $project,
+            $collective,
+            ! empty($validated['snapshot_id']) ? (int) $validated['snapshot_id'] : null,
+        );
+
+        return redirect()
+            ->route('sale.files.collectives.show', [$project, $collective])
+            ->with('success', 'Exemption re-applied to '.$collective->name.'.');
     }
 }

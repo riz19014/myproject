@@ -347,6 +347,12 @@ class ProjectController extends Controller
         $customers = Customer::query()->orderBy('name')->get();
         $saleLandModalData = $this->buildSaleLandModalData($project, $saleLandSheet);
         $movedToFileSaleIds = app(FileSaleLandService::class)->movedSaleLandIds($project);
+        $openCollectives = app(FileSaleLandService::class)->openCollectives($project)->map(fn ($c) => [
+            'id' => (int) $c->id,
+            'name' => $c->name,
+            'file_count' => (int) ($c->file_sale_lands_count ?? 0),
+        ])->values()->all();
+        $suggestedCollectiveName = app(FileSaleLandService::class)->nextCollectiveName($project);
 
         return view('projects.sale-land', compact(
             'project',
@@ -357,6 +363,8 @@ class ProjectController extends Controller
             'customers',
             'saleLandModalData',
             'movedToFileSaleIds',
+            'openCollectives',
+            'suggestedCollectiveName',
         ));
     }
 
@@ -485,16 +493,42 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'purchase_file_ids' => ['required', 'array', 'min:1'],
             'purchase_file_ids.*' => ['required', 'integer', 'distinct'],
+            'placement' => ['nullable', 'string', Rule::in([
+                FileSaleLandService::PLACEMENT_SEPARATE,
+                FileSaleLandService::PLACEMENT_NEW_COLLECTIVE,
+                FileSaleLandService::PLACEMENT_EXISTING_COLLECTIVE,
+            ])],
+            'collective_id' => ['nullable', 'integer'],
+            'name' => ['nullable', 'string', 'max:150'],
         ]);
 
-        $result = $fileSaleLandService->moveToFileSale($project, $validated['purchase_file_ids']);
+        $placement = $validated['placement'] ?? FileSaleLandService::PLACEMENT_SEPARATE;
+
+        $result = $fileSaleLandService->moveToFileSale(
+            $project,
+            $validated['purchase_file_ids'],
+            $placement,
+            isset($validated['collective_id']) ? (int) $validated['collective_id'] : null,
+            isset($validated['name']) ? trim((string) $validated['name']) : null,
+        );
 
         $message = count($result['moved']) > 0
             ? count($result['moved']).' sale land file(s) moved to file sale.'
             : 'Selected file(s) were already in file sale.';
 
+        if (! empty($result['collective']['name'])) {
+            $message .= ' Sale file: '.$result['collective']['name'].'.';
+        }
+
         if ($request->expectsJson()) {
-            return response()->json(array_merge($result, ['message' => $message]));
+            return response()->json(array_merge($result, [
+                'message' => $message,
+                'open_collectives' => $fileSaleLandService->openCollectives($project)->map(fn ($c) => [
+                    'id' => (int) $c->id,
+                    'name' => $c->name,
+                    'file_count' => (int) ($c->file_sale_lands_count ?? 0),
+                ])->values()->all(),
+            ]));
         }
 
         return back()->with(

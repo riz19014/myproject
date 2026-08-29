@@ -343,12 +343,175 @@
             min-width: 25%;
         }
     }
+
+    .collective-sheet {
+        border: 2px solid #334155;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .collective-sheet__head {
+        display: grid;
+        grid-template-columns: minmax(5.5rem, auto) 1fr minmax(9rem, 1.2fr);
+        gap: 0;
+        border-bottom: 2px solid #334155;
+        background: #f8fafc;
+    }
+    .collective-sheet__head-cell {
+        padding: 0.75rem 0.9rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.15rem;
+        min-width: 0;
+    }
+    .collective-sheet__head-cell + .collective-sheet__head-cell {
+        border-left: 2px solid #334155;
+    }
+    .collective-sheet__head-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .collective-sheet__head-value {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.25;
+        word-break: break-word;
+    }
+    .collective-sheet__table {
+        width: 100%;
+        margin: 0;
+        border-collapse: collapse;
+    }
+    .collective-sheet__table th,
+    .collective-sheet__table td {
+        border: 1px solid #cbd5e1;
+        padding: 0.65rem 0.75rem;
+        vertical-align: middle;
+    }
+    .collective-sheet__table thead th {
+        background: #f1f5f9;
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #334155;
+        text-align: center;
+    }
+    .collective-sheet__files-cell {
+        font-weight: 700;
+        color: #0f172a;
+        white-space: nowrap;
+    }
+    .collective-sheet__files-cell .collective-sheet__eq {
+        color: #64748b;
+        font-weight: 600;
+        margin: 0 0.25rem;
+    }
+    .collective-sheet__sold-cell {
+        text-align: center;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+    .collective-sheet__sold-cell.is-done {
+        color: #15803d;
+    }
+    .collective-sheet__bal-cell {
+        text-align: center;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #9a3412;
+    }
+    .collective-sheet__row--residential td:first-child {
+        box-shadow: inset 3px 0 0 #2563eb;
+    }
+    .collective-sheet__row--commercial td:first-child {
+        box-shadow: inset 3px 0 0 #c026d3;
+    }
+    .collective-sheet__next {
+        border-top: 2px solid #334155;
+        padding: 0.85rem 1rem 1rem;
+        background: #fffbeb;
+    }
+    .collective-sheet__next-title {
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #92400e;
+        margin-bottom: 0.45rem;
+    }
+    .collective-sheet__next-box {
+        border: 2px dashed #f59e0b;
+        border-radius: 10px;
+        min-height: 3.25rem;
+        padding: 0.75rem 0.9rem;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .collective-sheet__next-land {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .collective-sheet__next-note {
+        font-size: 0.82rem;
+        color: #78716c;
+    }
+    @media (max-width: 767.98px) {
+        .collective-sheet__head {
+            grid-template-columns: 1fr;
+        }
+        .collective-sheet__head-cell + .collective-sheet__head-cell {
+            border-left: 0;
+            border-top: 1px solid #cbd5e1;
+        }
+    }
+
+    .saved-sale-file-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.7rem 1rem;
+        border: 1.5px solid rgba(249, 115, 22, 0.35);
+        border-radius: 12px;
+        background: linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+        color: #9a3412;
+        font-size: 1.05rem;
+        font-weight: 800;
+        text-decoration: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .saved-sale-file-link:hover,
+    .saved-sale-file-link:focus {
+        border-color: rgba(249, 115, 22, 0.65);
+        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+        color: #7c2d12;
+        background: #ffedd5;
+    }
+    .saved-sale-file-link__meta {
+        font-size: 0.75rem;
+        font-weight: 650;
+        color: #64748b;
+    }
+    .saved-sale-files-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
 </style>
 @endpush
 
 @section('content')
 @php
-    $summary = $fileSaleSummary ?? ['totals' => [], 'moved_files' => [], 'files_land_columns' => [], 'leftover_balance' => []];
+    $summary = $fileSaleSummary ?? ['totals' => [], 'moved_files' => [], 'files_land_columns' => [], 'leftover_balance' => [], 'collectives' => [], 'separate_files' => [], 'open_collectives' => []];
     $totals = $summary['totals'] ?? [];
     $movedFiles = $summary['moved_files'] ?? [];
     $filesLandColumns = $summary['files_land_columns'] ?? [];
@@ -356,7 +519,24 @@
     $leftoverColumns = $leftover['formula_columns'] ?? [];
     $leftoverFiles = $leftover['files'] ?? [];
     $leftoverTotals = $leftover['totals'] ?? [];
+    $collectives = $summary['collectives'] ?? [];
+    $separateFiles = $summary['separate_files'] ?? [];
+    $openCollectives = $summary['open_collectives'] ?? [];
+    $suggestedSaleFileName = 'Collective-'.(count($collectives) + 1);
 @endphp
+
+@if(session('success'))
+    <div class="alert alert-success small">{{ session('success') }}</div>
+@endif
+@if($errors->any())
+    <div class="alert alert-danger small">
+        <ul class="mb-0 ps-3">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
@@ -388,9 +568,16 @@
         @if($filesLandColumns !== [])
             <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h2 class="h6 mb-0">Total land &amp; files</h2>
-                <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">
-                    Print PDF
-                </a>
+                <div class="d-flex flex-wrap gap-2">
+                    @if($separateFiles !== [])
+                        <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
+                            Save as sale file
+                        </button>
+                    @endif
+                    <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">
+                        Print PDF
+                    </a>
+                </div>
             </div>
             <div class="card-body pt-4">
                 <div id="file-sale-files-popover-content" class="d-none">
@@ -452,6 +639,105 @@
     </div>
 
     <div class="card card-theme mb-4">
+        <div class="card-header py-3">
+            <h2 class="h6 mb-0">Saved sale files</h2>
+            <p class="text-muted small mb-0">Click land to open Files / Sold / File Bal listing.</p>
+        </div>
+        <div class="card-body">
+            @if($collectives === [])
+                <p class="text-muted small mb-0">
+                    No saved sale files yet.
+                    @if($separateFiles !== [])
+                        Click <strong>Save as sale file</strong> above to name this collective group and store header + lines.
+                    @else
+                        Move files from Sale land first.
+                    @endif
+                </p>
+            @else
+                <div class="saved-sale-files-list">
+                    @foreach($collectives as $collective)
+                        <a
+                            href="{{ route('sale.files.collectives.show', [$project, $collective['id']]) }}"
+                            class="saved-sale-file-link"
+                            title="Open {{ $collective['name'] }}"
+                        >
+                            <span>{{ $collective['total_land_sheet'] ?? $collective['total_land_area'] }}</span>
+                            <span class="saved-sale-file-link__meta">
+                                {{ $collective['file_count'] }} {{ $collective['file_count'] === 1 ? 'file' : 'files' }}
+                                · {{ $collective['is_open'] ? 'Open' : 'Completed' }}
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    </div>
+
+    @if($separateFiles !== [])
+        <div class="card card-theme mb-4">
+            <div class="card-header py-3">
+                <h2 class="h6 mb-0">Separate files (not yet saved)</h2>
+                <p class="text-muted small mb-0">Select files and save as a named sale file, or add into an open one.</p>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ route('sale.files.collectives.group', $project) }}" id="file-sale-group-form">
+                    @csrf
+                    <div class="row g-3">
+                        <div class="col-lg-7">
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="file-sale-group-check-all">Select all</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="file-sale-group-check-none">Clear</button>
+                            </div>
+                            <div class="border rounded-3 p-2" style="max-height: 220px; overflow: auto;">
+                                @foreach($separateFiles as $file)
+                                    <label class="d-flex align-items-center gap-2 py-1 px-1 mb-0">
+                                        <input type="checkbox" class="form-check-input file-sale-group-check" name="sale_land_ids[]" value="{{ $file['id'] }}">
+                                        <span>{{ $file['name'] }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="mb-3">
+                                <label class="form-label">Placement</label>
+                                <div class="d-flex flex-column gap-2">
+                                    <label class="mb-0">
+                                        <input type="radio" name="placement" value="new_collective" class="form-check-input me-1" checked>
+                                        New sale file
+                                    </label>
+                                    <label class="mb-0 {{ $openCollectives === [] ? 'opacity-50' : '' }}">
+                                        <input type="radio" name="placement" value="existing_collective" class="form-check-input me-1"
+                                               @disabled($openCollectives === [])>
+                                        Existing open sale file
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="file-sale-group-name-wrap">
+                                <label for="file-sale-group-name" class="form-label">Sale file name</label>
+                                <input type="text" name="name" id="file-sale-group-name" class="form-control form-control-theme"
+                                       value="{{ old('name', $suggestedSaleFileName) }}" maxlength="150">
+                            </div>
+                            @if($openCollectives !== [])
+                                <div class="mb-3">
+                                    <label for="file-sale-group-collective-id" class="form-label">Open sale file</label>
+                                    <select name="collective_id" id="file-sale-group-collective-id" class="form-select">
+                                        @foreach($openCollectives as $collective)
+                                            <option value="{{ $collective['id'] }}">
+                                                {{ $collective['name'] }} ({{ $collective['file_count'] }} file{{ $collective['file_count'] === 1 ? '' : 's' }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+                            <button type="submit" class="btn btn-pink">Save selected</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    <div class="card card-theme mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h2 class="h6 mb-0">Leftover land balance</h2>
@@ -472,30 +758,110 @@
     </div>
 @endif
 
+@if($separateFiles !== [])
+@push('modals')
+<div class="modal fade" id="save-sale-file-modal" tabindex="-1" aria-labelledby="save-sale-file-modal-title" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="{{ route('sale.files.collectives.store', $project) }}" class="modal-content card-theme">
+            @csrf
+            <div class="modal-header">
+                <h2 class="modal-title h5 mb-0" id="save-sale-file-modal-title">Save as sale file</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Saves <strong>{{ count($separateFiles) }}</strong> separate file(s) as header + lines, and stores the current exemption formula scenario on the header.
+                </p>
+                <div class="mb-3">
+                    <label for="save-sale-file-name" class="form-label">Sale file name</label>
+                    <input type="text" name="name" id="save-sale-file-name" class="form-control form-control-theme"
+                           value="{{ old('name', $suggestedSaleFileName) }}" required maxlength="150">
+                </div>
+                @foreach($separateFiles as $file)
+                    <input type="hidden" name="sale_land_ids[]" value="{{ $file['id'] }}">
+                @endforeach
+                <div class="small text-muted">
+                    <div class="fw-semibold text-body mb-1">Lines that will be saved</div>
+                    <ul class="mb-0 ps-3">
+                        @foreach($separateFiles as $file)
+                            <li>{{ $file['name'] }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-pink">Save sale file</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endpush
+@endif
+
 @if($movedFiles !== [])
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('file-sale-files-count-btn');
     var content = document.getElementById('file-sale-files-popover-content');
-    if (!btn || !content || typeof bootstrap === 'undefined' || !bootstrap.Popover) return;
+    if (btn && content && typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+        var popover = new bootstrap.Popover(btn, {
+            title: 'Sale land files',
+            content: content.innerHTML,
+            html: true,
+            trigger: 'click',
+            placement: 'bottom',
+            customClass: 'file-sale-popover',
+            sanitize: false
+        });
 
-    var popover = new bootstrap.Popover(btn, {
-        title: 'Sale land files',
-        content: content.innerHTML,
-        html: true,
-        trigger: 'click',
-        placement: 'bottom',
-        customClass: 'file-sale-popover',
-        sanitize: false
-    });
+        document.addEventListener('click', function (e) {
+            var pop = document.querySelector('.file-sale-popover');
+            if (!btn.contains(e.target) && !(pop && pop.contains(e.target))) {
+                popover.hide();
+            }
+        });
+    }
 
-    document.addEventListener('click', function (e) {
-        var pop = document.querySelector('.file-sale-popover');
-        if (!btn.contains(e.target) && !(pop && pop.contains(e.target))) {
-            popover.hide();
-        }
-    });
+    var checkAll = document.getElementById('file-sale-group-check-all');
+    var checkNone = document.getElementById('file-sale-group-check-none');
+    var groupForm = document.getElementById('file-sale-group-form');
+    if (checkAll) {
+        checkAll.addEventListener('click', function () {
+            document.querySelectorAll('.file-sale-group-check').forEach(function (cb) { cb.checked = true; });
+        });
+    }
+    if (checkNone) {
+        checkNone.addEventListener('click', function () {
+            document.querySelectorAll('.file-sale-group-check').forEach(function (cb) { cb.checked = false; });
+        });
+    }
+    if (groupForm) {
+        groupForm.addEventListener('submit', function (e) {
+            var selected = document.querySelectorAll('.file-sale-group-check:checked');
+            if (!selected.length) {
+                e.preventDefault();
+                alert('Select at least one separate file.');
+                return;
+            }
+            var placement = groupForm.querySelector('input[name="placement"]:checked');
+            if (placement && placement.value === 'existing_collective') {
+                var select = document.getElementById('file-sale-group-collective-id');
+                if (!select || !select.value) {
+                    e.preventDefault();
+                    alert('Select an open sale file.');
+                }
+            }
+            if (placement && placement.value === 'new_collective') {
+                var nameInput = document.getElementById('file-sale-group-name');
+                if (!nameInput || !String(nameInput.value || '').trim()) {
+                    e.preventDefault();
+                    alert('Enter a sale file name.');
+                }
+            }
+        });
+    }
 });
 </script>
 @endpush
