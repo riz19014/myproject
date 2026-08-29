@@ -399,6 +399,64 @@
         background: #ffedd5;
         color: #9a3412;
     }
+    .exemption-pick-breakdown {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        margin-top: 0.15rem;
+    }
+    .exemption-pick-comp {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        padding: 0.55rem 0.7rem;
+    }
+    .exemption-pick-option input:checked + .exemption-pick-card .exemption-pick-comp {
+        border-color: rgba(194, 65, 12, 0.25);
+        background: #fff7ed;
+    }
+    .exemption-pick-comp__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.25rem 0.75rem;
+        margin-bottom: 0.35rem;
+    }
+    .exemption-pick-comp__title {
+        font-size: 0.82rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .exemption-pick-comp__pool {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #9a3412;
+    }
+    .exemption-pick-comp__plots {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+    .exemption-pick-comp__plots li {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.25rem 0.75rem;
+        font-size: 0.76rem;
+        color: #475569;
+    }
+    .exemption-pick-comp__plots strong {
+        color: #0f172a;
+        font-weight: 700;
+    }
+    .exemption-pick-comp__empty {
+        font-size: 0.74rem;
+        color: #94a3b8;
+    }
     .exemption-pick-empty {
         border: 1px dashed rgba(15, 23, 42, 0.15);
         border-radius: 12px;
@@ -628,11 +686,31 @@
                                     @endif
                                 </div>
                                 @if(!empty($option['components']))
-                                    <div class="exemption-pick-chips">
+                                    <div class="exemption-pick-breakdown">
                                         @foreach($option['components'] as $component)
-                                            <span class="exemption-pick-chip">
-                                                {{ $component['label'] ?? '' }} {{ $component['percent'] ?? '' }}
-                                            </span>
+                                            <div class="exemption-pick-comp">
+                                                <div class="exemption-pick-comp__head">
+                                                    <span class="exemption-pick-comp__title">{{ $component['label'] ?? '' }}</span>
+                                                    <span class="exemption-pick-comp__pool">Pool {{ $component['percent'] ?? '' }}</span>
+                                                </div>
+                                                @if(!empty($component['plots']))
+                                                    <ul class="exemption-pick-comp__plots">
+                                                        @foreach($component['plots'] as $plot)
+                                                            <li>
+                                                                <span>{{ $plot['label'] ?? 'Plot' }}</span>
+                                                                <span>
+                                                                    <strong>{{ $plot['marla_label'] ?? '—' }}</strong>
+                                                                    @if(!empty($plot['share_label']) && ($plot['share_percent'] ?? 0) > 0)
+                                                                        · share {{ $plot['share_label'] }}
+                                                                    @endif
+                                                                </span>
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                @else
+                                                    <div class="exemption-pick-comp__empty">No plot marla configured</div>
+                                                @endif
+                                            </div>
                                         @endforeach
                                     </div>
                                 @endif

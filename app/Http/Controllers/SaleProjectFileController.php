@@ -310,17 +310,53 @@ class SaleProjectFileController extends Controller
         abort_unless(is_array($collectiveSummary), 404);
 
         $currentPayload = $fileSaleLandService->currentExemptionPayload($project);
-        $currentComponents = collect($currentPayload['components'] ?? [])->map(function (array $component) {
-            $pct = rtrim(rtrim(number_format((float) ($component['pool_percent'] ?? 0), 4, '.', ''), '0'), '.');
 
-            return [
-                'label' => trim((string) ($component['label'] ?? $component['slug'] ?? '')),
-                'percent' => $pct.'%',
-                'plots' => collect($component['plot_types'] ?? [])->map(fn (array $plot) => [
-                    'label' => (string) ($plot['label'] ?? $plot['slug'] ?? ''),
-                ])->values()->all(),
-            ];
-        })->values()->all();
+        $formatPct = static function (float $value): string {
+            return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
+        };
+        $formatNum = static function (float $value): string {
+            return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
+        };
+        $mapOptionComponents = static function (array $components) use ($formatPct, $formatNum): array {
+            return collect($components)->map(function (array $component) use ($formatPct, $formatNum) {
+                $pool = (float) ($component['pool_percent'] ?? 0);
+                $plots = collect($component['plot_types'] ?? [])->map(function (array $plot) use ($formatPct, $formatNum) {
+                    $marla = (float) ($plot['marla_per_plot'] ?? 0);
+                    $nominal = (float) ($plot['nominal_marla'] ?? $marla);
+                    $share = (float) ($plot['share_percent'] ?? 0);
+                    $label = (string) ($plot['label'] ?? $plot['slug'] ?? '');
+
+                    return [
+                        'label' => $label,
+                        'marla_per_plot' => $marla,
+                        'marla_label' => $formatNum($marla).'M',
+                        'nominal_marla' => $nominal,
+                        'nominal_label' => $formatNum($nominal).'M',
+                        'share_percent' => $share,
+                        'share_label' => $formatPct($share).'%',
+                        'detail' => trim($label).' · '.$formatNum($marla).'M'
+                            .($share > 0 ? ' · share '.$formatPct($share).'%' : ''),
+                    ];
+                })->values()->all();
+
+                $marlaSummary = collect($plots)
+                    ->map(fn (array $plot) => $plot['marla_label'] ?? '')
+                    ->filter()
+                    ->unique()
+                    ->implode(', ');
+
+                return [
+                    'slug' => (string) ($component['slug'] ?? ''),
+                    'label' => trim((string) ($component['label'] ?? $component['slug'] ?? '')),
+                    'percent' => $formatPct($pool).'%',
+                    'pool_percent' => $pool,
+                    'marla_summary' => $marlaSummary !== '' ? $marlaSummary : '—',
+                    'plots' => $plots,
+                ];
+            })->values()->all();
+        };
+
+        $currentComponents = $mapOptionComponents($currentPayload['components'] ?? []);
 
         $currentOption = [
             'id' => null,
@@ -329,24 +365,14 @@ class SaleProjectFileController extends Controller
             'badge' => 'Live',
             'summary' => collect($currentComponents)->map(fn (array $c) => trim(($c['label'] ?? '').' '.($c['percent'] ?? '')))->filter()->implode(' · ') ?: '—',
             'marla_per_acre' => (float) ($currentPayload['marla_per_acre'] ?? 160),
-            'marla_label' => '1 acre = '.rtrim(rtrim(number_format((float) ($currentPayload['marla_per_acre'] ?? 160), 4, '.', ''), '0'), '.').'M',
+            'marla_label' => '1 acre = '.$formatNum((float) ($currentPayload['marla_per_acre'] ?? 160)).'M',
             'date_label' => 'Always uses the latest project exemption',
             'components' => $currentComponents,
             'is_current' => true,
         ];
 
-        $snapshotOptions = $project->saleExemptionSnapshots()->get()->map(function ($snapshot) {
-            $components = collect($snapshot->components())->map(function (array $component) {
-                $pct = rtrim(rtrim(number_format((float) ($component['pool_percent'] ?? 0), 4, '.', ''), '0'), '.');
-
-                return [
-                    'label' => trim((string) ($component['label'] ?? $component['slug'] ?? '')),
-                    'percent' => $pct.'%',
-                    'plots' => collect($component['plot_types'] ?? [])->map(fn (array $plot) => [
-                        'label' => (string) ($plot['label'] ?? $plot['slug'] ?? ''),
-                    ])->values()->all(),
-                ];
-            })->values()->all();
+        $snapshotOptions = $project->saleExemptionSnapshots()->get()->map(function ($snapshot) use ($mapOptionComponents, $formatNum) {
+            $components = $mapOptionComponents($snapshot->components());
 
             return [
                 'id' => (int) $snapshot->id,
@@ -355,7 +381,7 @@ class SaleProjectFileController extends Controller
                 'badge' => $snapshot->created_at->format('d M Y'),
                 'summary' => $snapshot->summaryLabel(),
                 'marla_per_acre' => $snapshot->marlaPerAcre(),
-                'marla_label' => '1 acre = '.rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.').'M',
+                'marla_label' => '1 acre = '.$formatNum($snapshot->marlaPerAcre()).'M',
                 'date_label' => 'Saved '.$snapshot->created_at->format('d M Y, h:i A'),
                 'components' => $components,
                 'is_current' => false,
@@ -367,13 +393,6 @@ class SaleProjectFileController extends Controller
         $activePayload = is_array($collectiveSummary['exemption_payload'] ?? null)
             ? $collectiveSummary['exemption_payload']
             : ($collective->exemption_payload ?: $currentPayload);
-
-        $formatPct = static function (float $value): string {
-            return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
-        };
-        $formatNum = static function (float $value): string {
-            return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
-        };
 
         $activeComponents = collect($activePayload['components'] ?? [])->map(function (array $component) use ($formatPct, $formatNum) {
             $pool = (float) ($component['pool_percent'] ?? 0);
