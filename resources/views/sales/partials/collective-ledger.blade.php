@@ -10,10 +10,14 @@
         'components' => [],
     ];
     $activeFileCalculator = $collective['active_file_calculator'] ?? [];
-    $pickOptions = $exemptionPickOptions ?? ($exemptionOptions ?? []);
+    $pickOptions = $collective['exemption_pick_options'] ?? ($exemptionPickOptions ?? ($exemptionOptions ?? []));
     $chooseModalId = 'collectiveExemptionModal-'.$collectiveId;
     $viewModalId = 'activeExemptionViewModal-'.$collectiveId;
     $isOpen = ! empty($collective['is_open']);
+    $appliedPickIndex = collect($pickOptions)->search(fn ($option) => ! empty($option['is_applied']));
+    if ($appliedPickIndex === false) {
+        $appliedPickIndex = 0;
+    }
 @endphp
 
 <div class="saved-sale-panel {{ $isOpen ? 'is-open' : 'is-done' }}" id="{{ $panelId }}">
@@ -62,22 +66,25 @@
                 </p>
                 <div class="exemption-pick-list mt-3" role="radiogroup" aria-label="Exemption options">
                     @forelse($pickOptions as $index => $option)
-                        <label class="exemption-pick-option">
+                        <label class="exemption-pick-option {{ !empty($option['is_applied']) ? 'is-applied' : '' }}">
                             <input
                                 type="radio"
                                 name="snapshot_id"
                                 value="{{ $option['id'] ?? '' }}"
-                                @checked($index === 0)
+                                @checked($index === $appliedPickIndex)
                             >
-                            <div class="exemption-pick-card">
+                            <div class="exemption-pick-card {{ !empty($option['is_applied']) ? 'is-applied' : '' }}">
                                 <div class="exemption-pick-card__top">
                                     <h3 class="exemption-pick-card__title">{{ $option['title'] ?? ($option['label'] ?? 'Exemption') }}</h3>
                                     @if(!empty($option['badge']))
-                                        <span class="exemption-pick-card__badge {{ !empty($option['is_current']) ? 'is-live' : '' }}">
+                                        <span class="exemption-pick-card__badge {{ !empty($option['is_applied']) ? 'is-applied' : (!empty($option['is_current']) ? 'is-live' : '') }}">
                                             {{ $option['badge'] }}
                                         </span>
                                     @endif
                                 </div>
+                                @if(!empty($option['is_applied']))
+                                    <div class="exemption-pick-card__applied-note">Currently drives Plot files left on this sale file</div>
+                                @endif
                                 <div class="exemption-pick-card__summary">{{ $option['summary'] ?? ($option['label'] ?? '—') }}</div>
                                 <div class="exemption-pick-card__meta">
                                     {{ $option['marla_label'] ?? '' }}
@@ -153,12 +160,16 @@
         <div class="modal-content exemption-modal-content">
             <div class="modal-header exemption-modal-header">
                 <div>
-                    <h2 class="modal-title h5 mb-1" id="{{ $viewModalId }}-title">Active exemption</h2>
-                    <p class="small text-muted mb-0">Full formula currently applied on {{ $collective['name'] ?? 'this sale file' }} ({{ $landLabel }}).</p>
+                    <h2 class="modal-title h5 mb-1" id="{{ $viewModalId }}-title">Applied exemption</h2>
+                    <p class="small text-muted mb-0">This formula is active on {{ $collective['name'] ?? 'this sale file' }} and drives Plot files left ({{ $landLabel }}).</p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" style="padding: 1.2rem 1.35rem; background: #f8fafc;">
+                <div class="exemption-view-applied-banner">
+                    <span class="exemption-view-applied-banner__badge">Applied</span>
+                    <span>Matches Available / Sold / Left in Plot files left</span>
+                </div>
                 <div class="exemption-view-meta">
                     <span><strong>Summary:</strong> {{ $activeExemption['summary'] ?? '—' }}</span>
                     <span><strong>{{ $activeExemption['marla_label'] ?? '' }}</strong></span>

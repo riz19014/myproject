@@ -29,7 +29,7 @@ class SaleProjectFileController extends Controller
         $exemptionPickOptions = $this->buildExemptionPickOptions($project, $fileSaleLandService);
 
         $fileSaleSummary['collectives'] = collect($fileSaleSummary['collectives'] ?? [])
-            ->map(function (array $collective) use ($project) {
+            ->map(function (array $collective) use ($project, $exemptionPickOptions) {
                 $payload = is_array($collective['exemption_payload'] ?? null)
                     ? $collective['exemption_payload']
                     : [];
@@ -39,6 +39,10 @@ class SaleProjectFileController extends Controller
                 $collective['active_file_calculator'] = SaleExemptionFileCalculator::calculate(
                     (float) ($collective['total_land_marla'] ?? 0),
                     $config
+                );
+                $collective['exemption_pick_options'] = $this->markAppliedExemptionOptions(
+                    $exemptionPickOptions,
+                    $payload
                 );
 
                 return $collective;
@@ -79,10 +83,13 @@ class SaleProjectFileController extends Controller
             'date_label' => 'Always uses the latest project exemption',
             'components' => $currentComponents,
             'is_current' => true,
+            'is_applied' => false,
+            'fingerprint' => $this->exemptionPayloadFingerprint($currentPayload),
         ];
 
         $snapshotOptions = $project->saleExemptionSnapshots()->get()->map(function ($snapshot) {
             $components = $this->mapExemptionOptionComponents($snapshot->components());
+            $payload = is_array($snapshot->payload) ? $snapshot->payload : [];
 
             return [
                 'id' => (int) $snapshot->id,
@@ -93,6 +100,8 @@ class SaleProjectFileController extends Controller
                 'date_label' => 'Saved '.$snapshot->created_at->format('d M Y, h:i A'),
                 'components' => $components,
                 'is_current' => false,
+                'is_applied' => false,
+                'fingerprint' => $this->exemptionPayloadFingerprint($payload),
             ];
         })->values()->all();
 
@@ -211,6 +220,106 @@ class SaleProjectFileController extends Controller
                 'plots' => $plots,
             ];
         })->values()->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $options
+     * @param  array<string, mixed>  $appliedPayload
+     * @return list<array<string, mixed>>
+     */
+    private function markAppliedExemptionOptions(array $options, array $appliedPayload): array
+    {
+        $appliedFp = $this->exemptionPayloadFingerprint($appliedPayload);
+
+        // Drop "Live / current project setup" when a saved snapshot already has the same formula.
+        $snapshotFingerprints = collect($options)
+            ->filter(fn (array $option) => empty($option['is_current']) && ($option['fingerprint'] ?? '') !== '')
+            ->pluck('fingerprint')
+            ->all();
+
+        $options = collect($options)
+            ->reject(function (array $option) use ($snapshotFingerprints) {
+                return ! empty($option['is_current'])
+                    && in_array($option['fingerprint'] ?? '', $snapshotFingerprints, true);
+            })
+            ->values();
+
+        // Prefer a saved snapshot as the single Applied match; fall back to Live.
+        $appliedId = $options
+            ->first(function (array $option) use ($appliedFp) {
+                return empty($option['is_current'])
+                    && ($option['fingerprint'] ?? '') !== ''
+                    && ($option['fingerprint'] ?? '') === $appliedFp;
+            });
+
+        if ($appliedId === null) {
+            $appliedId = $options->first(function (array $option) use ($appliedFp) {
+                return ($option['fingerprint'] ?? '') !== ''
+                    && ($option['fingerprint'] ?? '') === $appliedFp;
+            });
+        }
+
+        $appliedKey = $appliedId !== null
+            ? (($appliedId['id'] ?? null) === null ? 'live' : 'snap:'.(int) $appliedId['id'])
+            : null;
+
+        return $options->map(function (array $option) use ($appliedKey) {
+            $key = ($option['id'] ?? null) === null ? 'live' : 'snap:'.(int) $option['id'];
+            $isApplied = $appliedKey !== null && $key === $appliedKey;
+            $option['is_applied'] = $isApplied;
+
+            if ($isApplied) {
+                $option['badge'] = ! empty($option['is_current']) ? 'Applied · Live' : 'Applied';
+            } elseif (! empty($option['is_current'])) {
+                $option['badge'] = 'Live';
+            }
+
+            return $option;
+        })->values()->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function exemptionPayloadFingerprint(array $payload): string
+    {
+        $normalized = [
+            'marla' => round((float) ($payload['marla_per_acre'] ?? 160), 4),
+            'components' => collect($payload['components'] ?? [])
+                ->map(function ($component) {
+                    if (! is_array($component)) {
+                        return null;
+                    }
+
+                    return [
+                        'slug' => (string) ($component['slug'] ?? ''),
+                        'pool' => round((float) ($component['pool_percent'] ?? 0), 4),
+                        'plots' => collect($component['plot_types'] ?? [])
+                            ->map(function ($plot) {
+                                if (! is_array($plot)) {
+                                    return null;
+                                }
+
+                                return [
+                                    'slug' => (string) ($plot['slug'] ?? ''),
+                                    'marla' => round((float) ($plot['marla_per_plot'] ?? 0), 4),
+                                    'nominal' => round((float) ($plot['nominal_marla'] ?? 0), 4),
+                                    'share' => round((float) ($plot['share_percent'] ?? 0), 4),
+                                ];
+                            })
+                            ->filter()
+                            ->sortBy('slug')
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->filter()
+                ->sortBy('slug')
+                ->values()
+                ->all(),
+        ];
+
+        return hash('sha256', json_encode($normalized));
     }
 
     private function formatExemptionNumber(float $value): string

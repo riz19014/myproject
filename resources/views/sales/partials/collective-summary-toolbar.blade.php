@@ -19,17 +19,18 @@
 <div class="ssf-toolbar">
     <div class="ssf-toolbar__exemption">
         <div class="ssf-toolbar__exemption-copy">
-            <span class="ssf-toolbar__kicker">Active exemption</span>
+            <span class="ssf-toolbar__kicker">Applied exemption</span>
             <button
                 type="button"
                 class="ssf-toolbar__exemption-value"
                 data-bs-toggle="modal"
                 data-bs-target="#{{ $viewModalId }}"
-                title="View full exemption"
+                title="View applied exemption (Plot files left)"
             >
                 {{ $activeExemption['summary'] ?? ($collective['exemption_summary'] ?? '—') }}
             </button>
             <div class="ssf-toolbar__exemption-meta-row">
+                <span class="ssf-toolbar__applied-badge">Applied</span>
                 @if(!empty($activeExemption['marla_label']))
                     <span class="ssf-toolbar__exemption-meta">{{ $activeExemption['marla_label'] }}</span>
                 @endif

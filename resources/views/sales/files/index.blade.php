@@ -1198,8 +1198,61 @@
         color: #475569;
     }
     .exemption-pick-card__badge.is-live {
+        background: #ffedd5;
+        color: #9a3412;
+    }
+    .exemption-pick-card__badge.is-applied {
         background: #dcfce7;
         color: #166534;
+    }
+    .exemption-pick-card.is-applied {
+        border-color: rgba(22, 163, 74, 0.45);
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18);
+        background: linear-gradient(180deg, #f0fdf4 0%, #fff 55%);
+    }
+    .exemption-pick-card__applied-note {
+        margin: 0 0 0.4rem;
+        font-size: 0.74rem;
+        font-weight: 750;
+        color: #15803d;
+    }
+    .exemption-view-applied-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+        margin-bottom: 0.85rem;
+        padding: 0.7rem 0.85rem;
+        border-radius: 12px;
+        border: 1px solid rgba(22, 163, 74, 0.28);
+        background: linear-gradient(180deg, #ecfdf5 0%, #fff 100%);
+        color: #166534;
+        font-size: 0.86rem;
+        font-weight: 650;
+    }
+    .exemption-view-applied-banner__badge {
+        display: inline-flex;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        background: #166534;
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .ssf-toolbar__applied-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        background: #dcfce7;
+        border: 1px solid rgba(22, 163, 74, 0.28);
+        color: #166534;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
     }
     .exemption-pick-card__summary {
         font-size: 0.88rem;
