@@ -594,6 +594,13 @@ final class FileSaleLandService
                 }
             }
 
+            $leftoverBalance = $this->buildLeftoverBalance(
+                $project,
+                $memberIds,
+                $exemptionConfig,
+                $members,
+            );
+
             return [
                 'id' => (int) $collective->id,
                 'name' => $collective->name,
@@ -625,6 +632,7 @@ final class FileSaleLandService
                 'exemption_payload' => $exemptionPayload,
                 'formula_columns' => $formulaColumns,
                 'balance_rows' => $balanceRows,
+                'leftover_balance' => $leftoverBalance,
                 'marla_per_acre' => (float) ($exemptionPayload['marla_per_acre'] ?? $config->marlaPerAcreLand()),
             ];
         })->values()->all();

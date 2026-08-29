@@ -346,13 +346,17 @@ class ProjectController extends Controller
         $marlaPerAcreLand = $exemptionConfig->marlaPerAcreLand();
         $customers = Customer::query()->orderBy('name')->get();
         $saleLandModalData = $this->buildSaleLandModalData($project, $saleLandSheet);
-        $movedToFileSaleIds = app(FileSaleLandService::class)->movedSaleLandIds($project);
-        $openCollectives = app(FileSaleLandService::class)->openCollectives($project)->map(fn ($c) => [
+        $fileSaleLandService = app(FileSaleLandService::class);
+        $movedToFileSaleIds = $fileSaleLandService->movedSaleLandIds($project);
+        $movedSaleLandFiles = $fileSaleLandService->movedSaleLandFiles($project);
+        $fileSaleCollectives = $fileSaleLandService->buildCollectivesSummary($project, $movedSaleLandFiles);
+        $separateMovedFiles = $fileSaleLandService->separateMovedFiles($project, $movedSaleLandFiles);
+        $openCollectives = $fileSaleLandService->openCollectives($project)->map(fn ($c) => [
             'id' => (int) $c->id,
             'name' => $c->name,
             'file_count' => (int) ($c->file_sale_lands_count ?? 0),
         ])->values()->all();
-        $suggestedCollectiveName = app(FileSaleLandService::class)->nextCollectiveName($project);
+        $suggestedCollectiveName = $fileSaleLandService->nextCollectiveName($project);
 
         return view('projects.sale-land', compact(
             'project',
@@ -363,6 +367,8 @@ class ProjectController extends Controller
             'customers',
             'saleLandModalData',
             'movedToFileSaleIds',
+            'fileSaleCollectives',
+            'separateMovedFiles',
             'openCollectives',
             'suggestedCollectiveName',
         ));

@@ -235,7 +235,7 @@
 <table class="top-line">
     <tr>
         <td>
-            <div class="doc-title">Leftover land balance</div>
+            <div class="doc-title">Leftover land balance{{ !empty($pdfSubtitle) ? ' — '.$pdfSubtitle : '' }}</div>
             <div class="project-line">Project: <strong>{{ $project->labeledName() }}</strong></div>
         </td>
         <td class="generated">{{ $generatedAt->format('d M Y, h:i A') }}</td>

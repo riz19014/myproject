@@ -19,7 +19,7 @@
         ? route('sale.projects.exemption.snapshot.update', [$project, $snapshot])
         : route('sale.projects.exemption.update', $project);
     $backUrl = $returnCollectiveId
-        ? route('sale.files.collectives.show', [$project, $returnCollectiveId])
+        ? route('sale.files.index', $project).'#collective-'.$returnCollectiveId
         : route('sale.files.index', $project);
     $backLabel = $returnCollectiveId ? 'Back to sale file' : 'Back to files';
 @endphp

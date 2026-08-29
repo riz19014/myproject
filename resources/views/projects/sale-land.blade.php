@@ -10,10 +10,20 @@
     $scopedPurchaseFiles = $scopedPurchaseFiles ?? collect();
     $scopedPurchaseFileIds = $scopedPurchaseFiles->pluck('id')->all();
     $movedToFileSaleIds = $movedToFileSaleIds ?? [];
+    $fileSaleCollectives = $fileSaleCollectives ?? [];
+    $separateMovedFiles = $separateMovedFiles ?? [];
     $openCollectives = $openCollectives ?? [];
     $suggestedCollectiveName = $suggestedCollectiveName ?? 'Collective-1';
-    $fileCount = collect($sheetRows)->where('show_file_name', true)->count();
+    $allFileCount = collect($sheetRows)->where('show_file_name', true)->count();
+    $availableSheetRows = collect($sheetRows)
+        ->reject(fn (array $row) => in_array((int) ($row['purchase_file_id'] ?? 0), $movedToFileSaleIds, true))
+        ->values()
+        ->all();
+    $availableFileCount = collect($availableSheetRows)->where('show_file_name', true)->count();
+    $availableRowCount = count($availableSheetRows);
+    $movedFileCount = count($movedToFileSaleIds);
     $rowCount = count($sheetRows);
+    $fileCount = $allFileCount;
 @endphp
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
@@ -27,8 +37,10 @@
         </p>
         @if($sheetRows !== [])
             <p class="text-muted small mb-0">
-                {{ $fileCount }} {{ $fileCount === 1 ? 'file' : 'files' }}
-                · {{ $rowCount }} mouza {{ $rowCount === 1 ? 'row' : 'rows' }}
+                {{ $availableFileCount }} ready to move
+                @if($movedFileCount > 0)
+                    · {{ $movedFileCount }} in sale file {{ $movedFileCount === 1 ? 'clump' : 'clumps' }}
+                @endif
                 · Total land: <strong>{{ $formulaTotals['total_land'] }}</strong>
             </p>
         @endif
@@ -57,29 +69,186 @@
         </div>
     </div>
 @else
-    <div class="card card-theme mb-4">
-        <div class="card-body border-bottom py-3">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-5">
-                    <label for="sale-land-search" class="form-label small mb-1">Search</label>
-                    <input type="search"
-                           id="sale-land-search"
-                           class="form-control form-control-theme form-control-sm"
-                           placeholder="File, LP, owner, mouza, khasra…"
-                           autocomplete="off">
+    @if($fileSaleCollectives !== [] || $separateMovedFiles !== [])
+        <div class="card card-theme mb-4 sale-land-clumps">
+            <div class="card-body border-bottom py-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                    <div>
+                        <h2 class="h6 mb-1">Sent to sale files</h2>
+                        <p class="text-muted small mb-0">
+                            Files already moved are grouped as clumps — easier to find than a long list.
+                        </p>
+                    </div>
+                    <a href="{{ route('sale.files.index', $project) }}" class="btn btn-sm btn-outline-theme">Open sale files</a>
                 </div>
-                <div class="col-md-7 d-flex flex-wrap align-items-center justify-content-md-end gap-2">
-                    <span class="small text-muted" id="sale-land-search-count"></span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-move-check-all">Select all for move</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-move-check-none">Clear move</button>
-                    <button type="button" class="btn btn-sm btn-pink" id="sale-land-move-to-file-sale">Move to File Sale</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-all">Select all PDF</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-none">Clear PDF</button>
-                    <a href="{{ route('sale.projects.exemption.edit', $project) }}" class="btn btn-sm btn-outline-secondary">Exemption setup</a>
+            </div>
+            <div class="card-body">
+                <div class="sale-land-clump-grid">
+                    @foreach($fileSaleCollectives as $collective)
+                        <div class="sale-land-clump {{ !empty($collective['is_open']) ? 'is-open' : 'is-done' }}">
+                            <div class="sale-land-clump__top">
+                                <div>
+                                    <div class="sale-land-clump__label">Sale file clump</div>
+                                    <h3 class="sale-land-clump__title">{{ $collective['name'] }}</h3>
+                                </div>
+                                <span class="sale-land-clump__badge {{ !empty($collective['is_open']) ? 'is-open' : 'is-done' }}">
+                                    {{ !empty($collective['is_open']) ? 'Open' : 'Completed' }}
+                                </span>
+                            </div>
+                            <div class="sale-land-clump__meta">
+                                {{ $collective['file_count'] }} {{ ($collective['file_count'] ?? 0) === 1 ? 'file' : 'files' }}
+                                · {{ $collective['total_land_sheet'] ?? ($collective['total_land_area'] ?? '—') }}
+                            </div>
+                            @if(!empty($collective['exemption_summary']) && $collective['exemption_summary'] !== '—')
+                                <div class="sale-land-clump__exemption">{{ $collective['exemption_summary'] }}</div>
+                            @endif
+                            <div class="sale-land-clump__files">
+                                @foreach(($collective['files'] ?? []) as $file)
+                                    <a href="{{ route('purchase.files.show', $file['id']) }}" class="sale-land-clump__chip" title="Open purchase file">
+                                        {{ $file['name'] }}
+                                    </a>
+                                @endforeach
+                            </div>
+                            <div class="sale-land-clump__actions">
+                                <a href="{{ route('sale.files.index', $project) }}#collective-{{ $collective['id'] }}" class="btn btn-sm btn-pink">
+                                    View clump
+                                </a>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    @if($separateMovedFiles !== [])
+                        <div class="sale-land-clump is-separate">
+                            <div class="sale-land-clump__top">
+                                <div>
+                                    <div class="sale-land-clump__label">Not named yet</div>
+                                    <h3 class="sale-land-clump__title">Separate files</h3>
+                                </div>
+                                <span class="sale-land-clump__badge is-separate">Separate</span>
+                            </div>
+                            <div class="sale-land-clump__meta">
+                                {{ count($separateMovedFiles) }} {{ count($separateMovedFiles) === 1 ? 'file' : 'files' }}
+                                · save as a named sale file on Sale files
+                            </div>
+                            <div class="sale-land-clump__files">
+                                @foreach($separateMovedFiles as $file)
+                                    <a href="{{ route('purchase.files.show', $file['id']) }}" class="sale-land-clump__chip" title="Open purchase file">
+                                        {{ $file['name'] }}
+                                    </a>
+                                @endforeach
+                            </div>
+                            <div class="sale-land-clump__actions">
+                                <a href="{{ route('sale.files.index', $project) }}" class="btn btn-sm btn-outline-theme">
+                                    Save as sale file
+                                </a>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <div class="card card-theme mb-4 sale-land-ready-card">
+        <div class="sale-land-ready-toolbar">
+            <div class="sale-land-ready-toolbar__intro">
+                <div class="sale-land-ready-toolbar__heading">
+                    <div>
+                        <p class="sale-land-ready-toolbar__eyebrow mb-0">Sale land queue</p>
+                        <h2 class="sale-land-ready-toolbar__title">Ready to move</h2>
+                    </div>
+                    <div class="sale-land-ready-toolbar__stats">
+                        <span class="sale-land-ready-stat">
+                            <strong>{{ $availableFileCount }}</strong>
+                            {{ $availableFileCount === 1 ? 'file' : 'files' }}
+                        </span>
+                        <span class="sale-land-ready-stat">
+                            <strong>{{ $availableRowCount }}</strong>
+                            mouza {{ $availableRowCount === 1 ? 'row' : 'rows' }}
+                        </span>
+                    </div>
+                </div>
+                <p class="sale-land-ready-toolbar__hint mb-0">
+                    @if($availableFileCount === 0)
+                        All sale land files are already in clumps above.
+                    @else
+                        Tick <strong>Move</strong> on files below, then send them into a sale file clump. Use <strong>PDF</strong> only when downloading.
+                    @endif
+                </p>
+                <div class="sale-land-ready-search">
+                    <label for="sale-land-search" class="form-label small mb-1">Search ready files</label>
+                    <div class="sale-land-ready-search__row">
+                        <input type="search"
+                               id="sale-land-search"
+                               class="form-control form-control-theme form-control-sm"
+                               placeholder="File, LP, owner, mouza, khasra…"
+                               autocomplete="off"
+                               @disabled($availableFileCount === 0)>
+                        <span class="small text-muted sale-land-ready-search__count" id="sale-land-search-count"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sale-land-ready-actions">
+                <div class="sale-land-ready-action-group sale-land-ready-action-group--move">
+                    <div class="sale-land-ready-action-group__head">
+                        <span class="sale-land-ready-action-group__dot" aria-hidden="true"></span>
+                        <span>Move to sale file</span>
+                    </div>
+                    <div class="sale-land-ready-action-group__btns">
+                        <button type="button" class="btn btn-sm btn-outline-theme" id="sale-land-move-check-all" @disabled($availableFileCount === 0)>
+                            Select all
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-move-check-none" @disabled($availableFileCount === 0)>
+                            Clear
+                        </button>
+                        <button type="button" class="btn btn-sm btn-pink" id="sale-land-move-to-file-sale" @disabled($availableFileCount === 0)>
+                            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                            Move to File Sale
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sale-land-ready-action-group sale-land-ready-action-group--pdf">
+                    <div class="sale-land-ready-action-group__head">
+                        <span class="sale-land-ready-action-group__dot" aria-hidden="true"></span>
+                        <span>PDF download</span>
+                    </div>
+                    <div class="sale-land-ready-action-group__btns">
+                        <button type="button" class="btn btn-sm btn-outline-theme" id="sale-land-check-all" @disabled($availableFileCount === 0)>
+                            Select all
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="sale-land-check-none" @disabled($availableFileCount === 0)>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sale-land-ready-action-group sale-land-ready-action-group--tools">
+                    <div class="sale-land-ready-action-group__head">
+                        <span class="sale-land-ready-action-group__dot" aria-hidden="true"></span>
+                        <span>Tools</span>
+                    </div>
+                    <div class="sale-land-ready-action-group__btns">
+                        <a href="{{ route('sale.projects.exemption.edit', $project) }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-sliders" aria-hidden="true"></i>
+                            Exemption setup
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="card-body p-0">
+            @if($availableSheetRows === [])
+                <div class="sale-land-ready-empty">
+                    <p class="mb-1 fw-semibold">Nothing left to move</p>
+                    <p class="text-muted small mb-0">
+                        Every sale land file is already in a sale file clump.
+                        Add more from <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}">purchase files</a>,
+                        or open a clump above.
+                    </p>
+                </div>
+            @else
             <div class="sale-land-sheet-split" id="sale-land-sheet-split">
                 <div class="sale-land-sheet-split__frozen">
                     <table class="table table-sm table-bordered table-theme mb-0 align-middle sale-land-sheet sale-land-sheet--frozen">
@@ -90,41 +259,42 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($sheetRows as $row)
+                            @foreach($availableSheetRows as $row)
                                 @php
-                                    $isInFileSale = in_array($row['purchase_file_id'], $movedToFileSaleIds, true);
+                                    $isInFileSale = false;
                                 @endphp
                                 <tr data-row-idx="{{ $loop->index }}"
                                     data-purchase-file-id="{{ $row['purchase_file_id'] }}"
-                                    class="{{ trim(($row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '').' '.($isInFileSale ? 'sale-land-sheet__row--in-file-sale' : '')) }}">
+                                    class="{{ $row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '' }}">
                                     @if($row['show_file_name'])
                                         <td class="sale-land-sheet__file-name-cell" rowspan="{{ $row['file_name_rowspan'] }}">
                                             <div class="sale-land-sheet__file-name-wrap">
                                                 <div class="sale-land-sheet__file-name-main">
-                                                    <div class="sale-land-sheet__file-checks">
-                                                        <input type="checkbox"
-                                                               class="form-check-input sale-land-file-move-check"
-                                                               value="{{ $row['purchase_file_id'] }}"
-                                                               id="sale-land-move-{{ $row['purchase_file_id'] }}"
-                                                               aria-label="Move {{ $row['file_name'] }} to file sale"
-                                                               @checked($isInFileSale)
-                                                               @disabled($isInFileSale)>
-                                                        <input type="checkbox"
-                                                               class="form-check-input sale-land-file-check"
-                                                               value="{{ $row['purchase_file_id'] }}"
-                                                               id="sale-land-file-{{ $row['purchase_file_id'] }}"
-                                                               aria-label="Include {{ $row['file_name'] }} in PDF"
-                                                               @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
-                                                    </div>
                                                     <div class="sale-land-sheet__file-name-text mb-0">
                                                         <a href="{{ route('purchase.files.show', $row['purchase_file_id']) }}"
                                                            class="sale-land-sheet__file-name-link text-decoration-none"
                                                            title="View payment details">
                                                             {{ $row['file_name'] }}
                                                         </a>
-                                                        @if($isInFileSale)
-                                                            <span class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1">In file sale</span>
-                                                        @endif
+                                                    </div>
+                                                    <div class="sale-land-sheet__file-checks">
+                                                        <label class="sale-land-check-label sale-land-check-label--move" for="sale-land-move-{{ $row['purchase_file_id'] }}">
+                                                            <input type="checkbox"
+                                                                   class="form-check-input sale-land-file-move-check"
+                                                                   value="{{ $row['purchase_file_id'] }}"
+                                                                   id="sale-land-move-{{ $row['purchase_file_id'] }}"
+                                                                   aria-label="Move {{ $row['file_name'] }} to file sale">
+                                                            <span class="sale-land-check-label__text">Move</span>
+                                                        </label>
+                                                        <label class="sale-land-check-label sale-land-check-label--pdf" for="sale-land-file-{{ $row['purchase_file_id'] }}">
+                                                            <input type="checkbox"
+                                                                   class="form-check-input sale-land-file-check"
+                                                                   value="{{ $row['purchase_file_id'] }}"
+                                                                   id="sale-land-file-{{ $row['purchase_file_id'] }}"
+                                                                   aria-label="Include {{ $row['file_name'] }} in PDF"
+                                                                   @checked(in_array($row['purchase_file_id'], $scopedPurchaseFileIds, true))>
+                                                            <span class="sale-land-check-label__text">PDF</span>
+                                                        </label>
                                                     </div>
                                                 </div>
                                                 <div class="sale-land-sheet__file-actions">
@@ -166,7 +336,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="sale-land-sheet__totals-row">
-                                <td colspan="2" class="fw-semibold small">Total</td>
+                                <td colspan="2" class="fw-semibold small">Ready total</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -189,12 +359,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($sheetRows as $row)
-                                @php
-                                    $isInFileSale = in_array($row['purchase_file_id'], $movedToFileSaleIds, true);
-                                @endphp
+                            @foreach($availableSheetRows as $row)
                                 <tr data-row-idx="{{ $loop->index }}"
-                                    class="{{ trim(($row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '').' '.($isInFileSale ? 'sale-land-sheet__row--in-file-sale' : '')) }}"
+                                    class="{{ $row['show_file_name'] ? 'sale-land-sheet__file-group-start' : '' }}"
                                     data-purchase-file-id="{{ $row['purchase_file_id'] }}"
                                     data-moza-key="{{ $row['moza_key'] }}"
                                     data-search-text="{{ e(strtolower(implode(' ', array_filter([
@@ -244,7 +411,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="sale-land-sheet__totals-row">
-                                <td colspan="5" class="fw-semibold small">Total</td>
+                                <td colspan="5" class="fw-semibold small">Project total (all sale land)</td>
                                 <td class="sale-land-sheet__land-col fw-semibold">{{ $formulaTotals['total_land'] }}</td>
                                 @foreach($formulaColumns as $column)
                                     @php
@@ -267,6 +434,7 @@
                 </div>
             </div>
             <p class="text-muted small text-center py-4 mb-0 d-none" id="sale-land-search-empty">No rows match your search.</p>
+            @endif
         </div>
     </div>
 @endif
@@ -456,6 +624,253 @@
 
 @push('head')
 <style>
+    .sale-land-clump-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 0.9rem;
+    }
+    .sale-land-clump {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #f8fafc 0%, #fff 70%);
+        min-height: 100%;
+    }
+    .sale-land-clump.is-open {
+        border-color: rgba(34, 197, 94, 0.28);
+        background: linear-gradient(180deg, #f0fdf4 0%, #fff 72%);
+    }
+    .sale-land-clump.is-done {
+        border-color: rgba(100, 116, 139, 0.28);
+        background: linear-gradient(180deg, #f8fafc 0%, #fff 72%);
+    }
+    .sale-land-clump.is-separate {
+        border-color: rgba(245, 158, 11, 0.35);
+        background: linear-gradient(180deg, #fffbeb 0%, #fff 72%);
+    }
+    .sale-land-clump__top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.6rem;
+    }
+    .sale-land-clump__label {
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.15rem;
+    }
+    .sale-land-clump__title {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+        line-height: 1.25;
+    }
+    .sale-land-clump__badge {
+        flex: 0 0 auto;
+        font-size: 0.68rem;
+        font-weight: 800;
+        padding: 0.22rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid transparent;
+    }
+    .sale-land-clump__badge.is-open {
+        color: #166534;
+        background: #dcfce7;
+        border-color: rgba(22, 101, 52, 0.15);
+    }
+    .sale-land-clump__badge.is-done {
+        color: #475569;
+        background: #e2e8f0;
+        border-color: rgba(71, 85, 105, 0.12);
+    }
+    .sale-land-clump__badge.is-separate {
+        color: #92400e;
+        background: #fef3c7;
+        border-color: rgba(146, 64, 14, 0.15);
+    }
+    .sale-land-clump__meta {
+        font-size: 0.82rem;
+        color: #475569;
+        font-weight: 600;
+    }
+    .sale-land-clump__exemption {
+        font-size: 0.76rem;
+        color: #9a3412;
+        background: #ffedd5;
+        border-radius: 8px;
+        padding: 0.35rem 0.5rem;
+    }
+    .sale-land-clump__files {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .sale-land-clump__chip {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+        padding: 0.22rem 0.55rem;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        color: #0f172a;
+        font-size: 0.74rem;
+        font-weight: 650;
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .sale-land-clump__chip:hover,
+    .sale-land-clump__chip:focus-visible {
+        border-color: rgba(249, 115, 22, 0.45);
+        color: #c2410c;
+    }
+    .sale-land-clump__actions {
+        margin-top: auto;
+        padding-top: 0.25rem;
+    }
+    .sale-land-ready-empty {
+        padding: 2rem 1.25rem;
+        text-align: center;
+        background: #f8fafc;
+    }
+    .sale-land-ready-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.95fr);
+        gap: 1rem 1.25rem;
+        padding: 1.1rem 1.2rem 1.15rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background:
+            linear-gradient(135deg, rgba(255, 247, 237, 0.85) 0%, rgba(255, 255, 255, 0.95) 42%, #fff 100%);
+    }
+    .sale-land-ready-toolbar__eyebrow {
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #c2410c;
+        margin-bottom: 0.2rem;
+    }
+    .sale-land-ready-toolbar__title {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+    }
+    .sale-land-ready-toolbar__heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.65rem 1rem;
+        margin-bottom: 0.45rem;
+    }
+    .sale-land-ready-toolbar__stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .sale-land-ready-stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.28rem 0.6rem;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        font-size: 0.76rem;
+        color: #475569;
+        font-weight: 600;
+    }
+    .sale-land-ready-stat strong {
+        color: #0f172a;
+        font-weight: 800;
+    }
+    .sale-land-ready-toolbar__hint {
+        font-size: 0.84rem;
+        color: #64748b;
+        margin-bottom: 0.85rem !important;
+        max-width: 38rem;
+    }
+    .sale-land-ready-search__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.55rem 0.75rem;
+    }
+    .sale-land-ready-search .form-control {
+        max-width: 22rem;
+    }
+    .sale-land-ready-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+    .sale-land-ready-action-group {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+        background: #fff;
+        padding: 0.7rem 0.8rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .sale-land-ready-action-group__head {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .sale-land-ready-action-group__dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: #94a3b8;
+    }
+    .sale-land-ready-action-group--move .sale-land-ready-action-group__dot {
+        background: #ea580c;
+    }
+    .sale-land-ready-action-group--pdf .sale-land-ready-action-group__dot {
+        background: #2563eb;
+    }
+    .sale-land-ready-action-group--tools .sale-land-ready-action-group__dot {
+        background: #64748b;
+    }
+    .sale-land-ready-action-group--move {
+        border-color: rgba(234, 88, 12, 0.18);
+        background: linear-gradient(180deg, #fff7ed 0%, #fff 70%);
+    }
+    .sale-land-ready-action-group--pdf {
+        border-color: rgba(37, 99, 235, 0.16);
+        background: linear-gradient(180deg, #eff6ff 0%, #fff 70%);
+    }
+    .sale-land-ready-action-group__btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .sale-land-ready-action-group__btns .btn i {
+        margin-right: 0.2rem;
+    }
+    @media (max-width: 991.98px) {
+        .sale-land-ready-toolbar {
+            grid-template-columns: 1fr;
+        }
+    }
+
     .sale-land-sheet-split {
         display: flex;
         align-items: flex-start;
@@ -475,7 +890,7 @@
     }
     .sale-land-sheet {
         --sale-land-sr-width: 48px;
-        --sale-land-file-width: 190px;
+        --sale-land-file-width: 250px;
         margin-bottom: 0;
     }
     .sale-land-sheet thead th {
@@ -526,7 +941,8 @@
         flex: 1 1 auto;
         min-width: 0;
         display: flex;
-        align-items: flex-start;
+        flex-direction: column;
+        align-items: stretch;
         gap: 0.4rem;
     }
     .sale-land-sheet__file-name-text {
@@ -535,6 +951,7 @@
         word-break: break-word;
         cursor: pointer;
         font-weight: 600;
+        line-height: 1.3;
     }
     .sale-land-sheet__file-name-link {
         color: inherit;
@@ -544,15 +961,60 @@
         color: var(--accent-orange, #f97316);
         text-decoration: underline !important;
     }
-    .sale-land-file-check {
-        flex: 0 0 auto;
-        margin-top: 0.2rem;
-    }
     .sale-land-sheet__file-checks {
         display: flex;
-        flex-direction: column;
+        flex-wrap: wrap;
         gap: 0.35rem;
         flex: 0 0 auto;
+    }
+    .sale-land-check-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin: 0;
+        padding: 0.18rem 0.45rem 0.18rem 0.3rem;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        background: #fff;
+        cursor: pointer;
+        user-select: none;
+        line-height: 1.1;
+    }
+    .sale-land-check-label:hover {
+        border-color: rgba(15, 23, 42, 0.2);
+    }
+    .sale-land-check-label__text {
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .sale-land-check-label--move {
+        background: #fff7ed;
+        border-color: rgba(194, 65, 12, 0.22);
+    }
+    .sale-land-check-label--move .sale-land-check-label__text {
+        color: #c2410c;
+    }
+    .sale-land-check-label--pdf {
+        background: #eff6ff;
+        border-color: rgba(37, 99, 235, 0.22);
+    }
+    .sale-land-check-label--pdf .sale-land-check-label__text {
+        color: #1d4ed8;
+    }
+    .sale-land-check-label .form-check-input {
+        margin: 0;
+        float: none;
+        flex: 0 0 auto;
+        cursor: pointer;
+    }
+    .sale-land-check-label:has(.form-check-input:checked) {
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+    .sale-land-check-label:has(.form-check-input:disabled) {
+        opacity: 0.65;
+        cursor: default;
     }
     .sale-land-sheet__row--in-file-sale td {
         background: rgba(34, 197, 94, 0.12) !important;

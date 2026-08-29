@@ -295,7 +295,7 @@ class ProjectSaleExemptionController extends Controller
                 );
 
                 return redirect()
-                    ->route('sale.files.collectives.show', [$project, $collective])
+                    ->to(route('sale.files.index', $project).'#collective-'.$collective->id)
                     ->with('success', 'Exemption saved and applied to '.$collective->name.'.');
             }
         }
