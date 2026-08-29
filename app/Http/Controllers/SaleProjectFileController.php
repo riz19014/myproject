@@ -309,18 +309,120 @@ class SaleProjectFileController extends Controller
 
         abort_unless(is_array($collectiveSummary), 404);
 
-        $exemptionOptions = $project->saleExemptionSnapshots()->get()->map(fn ($snapshot) => [
-            'id' => (int) $snapshot->id,
-            'label' => $snapshot->summaryLabel()
-                .' · 1 acre = '.rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.').'M'
-                .' · '.$snapshot->created_at->format('d M Y'),
-        ])->values()->all();
+        $currentPayload = $fileSaleLandService->currentExemptionPayload($project);
+        $currentComponents = collect($currentPayload['components'] ?? [])->map(function (array $component) {
+            $pct = rtrim(rtrim(number_format((float) ($component['pool_percent'] ?? 0), 4, '.', ''), '0'), '.');
+
+            return [
+                'label' => trim((string) ($component['label'] ?? $component['slug'] ?? '')),
+                'percent' => $pct.'%',
+                'plots' => collect($component['plot_types'] ?? [])->map(fn (array $plot) => [
+                    'label' => (string) ($plot['label'] ?? $plot['slug'] ?? ''),
+                ])->values()->all(),
+            ];
+        })->values()->all();
+
+        $currentOption = [
+            'id' => null,
+            'key' => 'current',
+            'title' => 'Current project setup',
+            'badge' => 'Live',
+            'summary' => collect($currentComponents)->map(fn (array $c) => trim(($c['label'] ?? '').' '.($c['percent'] ?? '')))->filter()->implode(' · ') ?: '—',
+            'marla_per_acre' => (float) ($currentPayload['marla_per_acre'] ?? 160),
+            'marla_label' => '1 acre = '.rtrim(rtrim(number_format((float) ($currentPayload['marla_per_acre'] ?? 160), 4, '.', ''), '0'), '.').'M',
+            'date_label' => 'Always uses the latest project exemption',
+            'components' => $currentComponents,
+            'is_current' => true,
+        ];
+
+        $snapshotOptions = $project->saleExemptionSnapshots()->get()->map(function ($snapshot) {
+            $components = collect($snapshot->components())->map(function (array $component) {
+                $pct = rtrim(rtrim(number_format((float) ($component['pool_percent'] ?? 0), 4, '.', ''), '0'), '.');
+
+                return [
+                    'label' => trim((string) ($component['label'] ?? $component['slug'] ?? '')),
+                    'percent' => $pct.'%',
+                    'plots' => collect($component['plot_types'] ?? [])->map(fn (array $plot) => [
+                        'label' => (string) ($plot['label'] ?? $plot['slug'] ?? ''),
+                    ])->values()->all(),
+                ];
+            })->values()->all();
+
+            return [
+                'id' => (int) $snapshot->id,
+                'key' => 'snapshot-'.$snapshot->id,
+                'title' => 'Saved exemption',
+                'badge' => $snapshot->created_at->format('d M Y'),
+                'summary' => $snapshot->summaryLabel(),
+                'marla_per_acre' => $snapshot->marlaPerAcre(),
+                'marla_label' => '1 acre = '.rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.').'M',
+                'date_label' => 'Saved '.$snapshot->created_at->format('d M Y, h:i A'),
+                'components' => $components,
+                'is_current' => false,
+            ];
+        })->values()->all();
+
+        $exemptionOptions = collect([$currentOption])->merge($snapshotOptions)->values()->all();
+
+        $activePayload = is_array($collectiveSummary['exemption_payload'] ?? null)
+            ? $collectiveSummary['exemption_payload']
+            : ($collective->exemption_payload ?: $currentPayload);
+
+        $formatPct = static function (float $value): string {
+            return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
+        };
+        $formatNum = static function (float $value): string {
+            return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
+        };
+
+        $activeComponents = collect($activePayload['components'] ?? [])->map(function (array $component) use ($formatPct, $formatNum) {
+            $pool = (float) ($component['pool_percent'] ?? 0);
+
+            return [
+                'slug' => (string) ($component['slug'] ?? ''),
+                'label' => trim((string) ($component['label'] ?? $component['slug'] ?? '')),
+                'pool_percent' => $pool,
+                'pool_percent_label' => $formatPct($pool).'%',
+                'plot_types' => collect($component['plot_types'] ?? [])->map(function (array $plot) use ($formatPct, $formatNum) {
+                    return [
+                        'slug' => (string) ($plot['slug'] ?? ''),
+                        'label' => (string) ($plot['label'] ?? $plot['slug'] ?? ''),
+                        'marla_per_plot' => (float) ($plot['marla_per_plot'] ?? 0),
+                        'marla_per_plot_label' => $formatNum((float) ($plot['marla_per_plot'] ?? 0)).'M',
+                        'nominal_marla' => (float) ($plot['nominal_marla'] ?? 0),
+                        'nominal_marla_label' => $formatNum((float) ($plot['nominal_marla'] ?? 0)).'M',
+                        'share_percent' => (float) ($plot['share_percent'] ?? 0),
+                        'share_percent_label' => $formatPct((float) ($plot['share_percent'] ?? 0)).'%',
+                    ];
+                })->values()->all(),
+            ];
+        })->values()->all();
+
+        $activeMarlaPerAcre = (float) ($activePayload['marla_per_acre'] ?? $collectiveSummary['marla_per_acre'] ?? 160);
+        $activeExemption = [
+            'summary' => (string) ($collectiveSummary['exemption_summary'] ?? '—'),
+            'marla_per_acre' => $activeMarlaPerAcre,
+            'marla_label' => '1 acre = '.$formatNum($activeMarlaPerAcre).'M',
+            'components' => $activeComponents,
+            'has_details' => $activeComponents !== [],
+        ];
+
+        $activeExemptionConfig = SaleExemptionConfig::fromSnapshotData(
+            $project,
+            is_array($activePayload) ? $activePayload : []
+        );
+        $activeFileCalculator = SaleExemptionFileCalculator::calculate(
+            (float) ($collectiveSummary['total_land_marla'] ?? $collective->total_land_marla ?? 0),
+            $activeExemptionConfig
+        );
 
         return view('sales.files.collective-show', [
             'project' => $project,
             'collectiveModel' => $collective,
             'collective' => $collectiveSummary,
             'exemptionOptions' => $exemptionOptions,
+            'activeExemption' => $activeExemption,
+            'activeFileCalculator' => $activeFileCalculator,
         ]);
     }
 

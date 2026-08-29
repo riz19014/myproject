@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FileSaleCollective;
 use App\Models\Project;
 use App\Models\ProjectSaleExemptionSnapshot;
+use App\Support\FileSaleLandService;
 use App\Support\LandMeasure;
 use App\Support\ProjectExemptionDefaults;
 use App\Support\SaleExemptionConfig;
@@ -81,6 +83,17 @@ class ProjectSaleExemptionController extends Controller
             SaleExemptionConfig::forProject($project)
         );
 
+        $returnCollectiveId = $request->integer('return_collective_id') ?: null;
+        if ($returnCollectiveId) {
+            $belongs = FileSaleCollective::query()
+                ->where('project_id', $project->id)
+                ->whereKey($returnCollectiveId)
+                ->exists();
+            if (! $belongs) {
+                $returnCollectiveId = null;
+            }
+        }
+
         return view('sales.exemption-config', compact(
             'project',
             'trialAcre',
@@ -94,6 +107,7 @@ class ProjectSaleExemptionController extends Controller
             'snapshot' => null,
             'formComponents' => null,
             'formMarlaPerAcre' => null,
+            'returnCollectiveId' => $returnCollectiveId,
         ]);
     }
 
@@ -264,7 +278,27 @@ class ProjectSaleExemptionController extends Controller
         });
 
         $project->refresh();
-        ProjectSaleExemptionSnapshot::storeFromProject($project);
+        $snapshot = ProjectSaleExemptionSnapshot::storeFromProject($project);
+
+        $returnCollectiveId = $request->integer('return_collective_id') ?: null;
+        if ($returnCollectiveId) {
+            $collective = FileSaleCollective::query()
+                ->where('project_id', $project->id)
+                ->whereKey($returnCollectiveId)
+                ->first();
+
+            if ($collective) {
+                app(FileSaleLandService::class)->applyExemptionToCollective(
+                    $project,
+                    $collective,
+                    (int) $snapshot->id,
+                );
+
+                return redirect()
+                    ->route('sale.files.collectives.show', [$project, $collective])
+                    ->with('success', 'Exemption saved and applied to '.$collective->name.'.');
+            }
+        }
 
         return redirect()
             ->route('sale.exemption.index')

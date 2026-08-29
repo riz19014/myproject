@@ -8,12 +8,20 @@
     $isEditingSnapshot = $snapshot !== null;
     $defaultComponents = $formComponents ?? $project->saleExemptionComponents;
     $defaultMarlaPerAcre = $formMarlaPerAcre ?? ($project->marla_per_acre ?? 160);
+    $returnCollectiveId = $returnCollectiveId ?? null;
     $trialFormAction = $isEditingSnapshot
         ? route('sale.projects.exemption.snapshot.edit', [$project, $snapshot])
-        : route('sale.projects.exemption.edit', $project);
+        : route('sale.projects.exemption.edit', array_filter([
+            'project' => $project,
+            'return_collective_id' => $returnCollectiveId,
+        ]));
     $saveFormAction = $isEditingSnapshot
         ? route('sale.projects.exemption.snapshot.update', [$project, $snapshot])
         : route('sale.projects.exemption.update', $project);
+    $backUrl = $returnCollectiveId
+        ? route('sale.files.collectives.show', [$project, $returnCollectiveId])
+        : route('sale.files.index', $project);
+    $backLabel = $returnCollectiveId ? 'Back to sale file' : 'Back to files';
 @endphp
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
@@ -23,11 +31,14 @@
             @if($isEditingSnapshot)
                 · Saved {{ $snapshot->created_at->format('d M Y, h:i A') }}
             @endif
+            @if($returnCollectiveId)
+                · Creating for a saved sale file — save will apply it automatically
+            @endif
         </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('sale.exemption.index') }}" class="btn btn-outline-theme">All projects</a>
-        <a href="{{ route('sale.files.index', $project) }}" class="btn btn-outline-theme">Back to files</a>
+        <a href="{{ $backUrl }}" class="btn btn-outline-theme">{{ $backLabel }}</a>
     </div>
 </div>
 
@@ -83,6 +94,15 @@
         <form method="post" action="{{ $saveFormAction }}" id="exemption-config-form">
             @csrf
             @method('PUT')
+            @if($returnCollectiveId)
+                <input type="hidden" name="return_collective_id" value="{{ $returnCollectiveId }}">
+            @endif
+
+            @if($returnCollectiveId)
+                <div class="alert alert-info small mb-4">
+                    You came from a saved sale file. After you save this exemption, it will be applied there automatically.
+                </div>
+            @endif
 
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
