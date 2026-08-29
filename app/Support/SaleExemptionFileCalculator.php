@@ -230,6 +230,56 @@ final class SaleExemptionFileCalculator
         return self::formatMarla($marla).'M';
     }
 
+    /** Whole marla from a decimal-in-marla value (e.g. 11.5 → 11). */
+    public static function wholeMarlaPart(float $marla): int
+    {
+        if ($marla <= 0) {
+            return 0;
+        }
+
+        return (int) floor($marla + 1e-9);
+    }
+
+    /** Fractional marla after the whole part (e.g. 11.5 → 0.5). */
+    public static function fractionalMarlaPart(float $marla): float
+    {
+        if ($marla <= 0) {
+            return 0.0;
+        }
+
+        $frac = $marla - self::wholeMarlaPart($marla);
+
+        return $frac > 1e-9 ? round($frac, 4) : 0.0;
+    }
+
+    /**
+     * Remaining fraction of marla as sq ft (1 marla = 225 sq ft).
+     * e.g. 11.5M → 0.5M → 112.5 SQFT
+     */
+    public static function remainderSqftFromMarla(float $marla): float
+    {
+        $frac = self::fractionalMarlaPart($marla);
+        if ($frac <= 0) {
+            return 0.0;
+        }
+
+        return round($frac * LandMeasure::SQFT_PER_MARLA, 4);
+    }
+
+    public static function formatSqft(float $sqft): string
+    {
+        if ($sqft <= 0) {
+            return '—';
+        }
+
+        $rounded = round($sqft, 4);
+        if (abs($rounded - (int) $rounded) < 1e-9) {
+            return ((int) $rounded).' SQFT';
+        }
+
+        return rtrim(rtrim(number_format($rounded, 4, '.', ''), '0'), '.').' SQFT';
+    }
+
     public static function formatFileCount(float $count): string
     {
         return self::formatMarla($count);
