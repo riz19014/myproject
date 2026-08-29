@@ -1,6 +1,7 @@
 @php
     $collective = $collective ?? [];
     $collectiveId = (int) ($collectiveId ?? ($collective['id'] ?? 0));
+    $isOpen = ! empty($collective['is_open']);
     $activeExemption = $activeExemption ?? [
         'summary' => $collective['exemption_summary'] ?? '—',
         'marla_label' => '',
@@ -39,22 +40,27 @@
                         @endforeach
                     </span>
                 @endif
+                @unless($isOpen)
+                    <span class="ssf-toolbar__locked">Locked on completed file</span>
+                @endunless
             </div>
         </div>
         <div class="ssf-toolbar__btns ssf-toolbar__btns--primary">
             <button type="button" class="btn btn-sm btn-outline-theme" data-bs-toggle="modal" data-bs-target="#{{ $viewModalId }}">
                 <i class="bi bi-eye" aria-hidden="true"></i> View
             </button>
-            <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#{{ $chooseModalId }}">
-                <i class="bi bi-sliders" aria-hidden="true"></i> Choose
-            </button>
-            @if($project->isDha())
-                <a
-                    href="{{ route('sale.projects.exemption.edit', ['project' => $project, 'return_collective_id' => $collectiveId]) }}"
-                    class="btn btn-sm btn-outline-theme"
-                >
-                    <i class="bi bi-plus-lg" aria-hidden="true"></i> Add
-                </a>
+            @if($isOpen)
+                <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#{{ $chooseModalId }}">
+                    <i class="bi bi-sliders" aria-hidden="true"></i> Choose
+                </button>
+                @if($project->isDha())
+                    <a
+                        href="{{ route('sale.projects.exemption.edit', ['project' => $project, 'return_collective_id' => $collectiveId]) }}"
+                        class="btn btn-sm btn-outline-theme"
+                    >
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add
+                    </a>
+                @endif
             @endif
         </div>
     </div>
@@ -75,9 +81,9 @@
         <div class="ssf-toolbar__group">
             <span class="ssf-toolbar__group-label"><i class="bi bi-flag" aria-hidden="true"></i> Status</span>
             <div class="ssf-toolbar__btns">
-                @if(!empty($collective['is_open']))
+                @if($isOpen)
                     <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collectiveId]) }}"
-                          onsubmit="return confirm('Mark {{ $collective['name'] }} complete? It will no longer accept new files.');">
+                          onsubmit="return confirm('Mark {{ $collective['name'] }} complete? It will no longer accept new files or exemption changes.');">
                         @csrf
                         <button type="submit" class="btn btn-sm btn-outline-theme">
                             <i class="bi bi-check2-circle" aria-hidden="true"></i> Mark complete

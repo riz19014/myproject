@@ -40,6 +40,7 @@
 </div>
 
 @push('modals')
+@if($isOpen)
 <div class="modal fade" id="{{ $chooseModalId }}" tabindex="-1" aria-labelledby="{{ $chooseModalId }}-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <form
@@ -145,6 +146,7 @@
         </form>
     </div>
 </div>
+@endif
 
 <div class="modal fade" id="{{ $viewModalId }}" tabindex="-1" aria-labelledby="{{ $viewModalId }}-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
@@ -213,15 +215,19 @@
             </div>
             <div class="modal-footer justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Close</button>
-                <button
-                    type="button"
-                    class="btn btn-pink"
-                    data-bs-dismiss="modal"
-                    data-bs-toggle="modal"
-                    data-bs-target="#{{ $chooseModalId }}"
-                >
-                    Choose exemption
-                </button>
+                @if($isOpen)
+                    <button
+                        type="button"
+                        class="btn btn-pink"
+                        data-bs-dismiss="modal"
+                        data-bs-toggle="modal"
+                        data-bs-target="#{{ $chooseModalId }}"
+                    >
+                        Choose exemption
+                    </button>
+                @else
+                    <span class="small text-muted">Exemption is locked while this sale file is completed.</span>
+                @endif
             </div>
         </div>
     </div>

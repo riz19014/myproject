@@ -398,8 +398,9 @@ final class FileSaleLandService
     }
 
     /**
-     * Re-apply an exemption formula to a saved sale file (works even when completed).
+     * Re-apply an exemption formula to an open saved sale file.
      * Pass a saved snapshot id, or null to use the current project exemption setup.
+     * Completed sale files are locked — reopen first to change exemption.
      */
     public function applyExemptionToCollective(
         Project $project,
@@ -409,6 +410,12 @@ final class FileSaleLandService
         if ((int) $collective->project_id !== (int) $project->id) {
             throw ValidationException::withMessages([
                 'collective' => ['Sale file does not belong to this project.'],
+            ]);
+        }
+
+        if ($collective->isCompleted() || ! $collective->isOpen()) {
+            throw ValidationException::withMessages([
+                'collective' => ['This sale file is completed. Reopen it before choosing or adding an exemption.'],
             ]);
         }
 
@@ -796,8 +803,10 @@ final class FileSaleLandService
                 'total_files_count' => round($totalFilesCount, 4),
                 'grand_total_amount' => round($grandTotalAmount, 2),
                 'grand_total_amount_formatted' => 'Rs '.number_format($grandTotalAmount, 0),
+                'grand_total_amount_short' => SaleExemptionFileCalculator::formatRsShort($grandTotalAmount),
                 'sale_files_amount' => round($saleFilesAmount, 2),
                 'sale_files_amount_formatted' => 'Rs '.number_format($saleFilesAmount, 0),
+                'sale_files_amount_short' => SaleExemptionFileCalculator::formatRsShort($saleFilesAmount),
             ],
             'daybook_rows' => $this->buildDaybookSummary($project, $purchaseFileIds),
             'moved_files' => $files->map(fn (PurchaseFile $file) => array_merge(
@@ -852,7 +861,7 @@ final class FileSaleLandService
             ];
         }
 
-        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, $purchaseFileIds);
+        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, $purchaseFileIds, $config);
         $formulaColumns = collect($sheet['formula_columns'] ?? [])
             ->map(function (array $column) {
                 return array_merge($column, [
@@ -1029,7 +1038,7 @@ final class FileSaleLandService
             ];
         }
 
-        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, $purchaseFileIds);
+        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, $purchaseFileIds, $config);
         $formulaColumns = collect($sheet['formula_columns'] ?? [])
             ->map(function (array $column) {
                 return array_merge($column, [

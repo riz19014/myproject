@@ -679,6 +679,18 @@
         gap: 0.45rem 0.65rem;
         margin-top: 0.35rem;
     }
+    .ssf-toolbar__locked {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #475569;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
     .ssf-toolbar__plots {
         display: inline-flex;
         flex-wrap: wrap;
@@ -927,32 +939,63 @@
     .file-sale-strip__amount-card {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
-        padding: 0.85rem 1rem;
+        gap: 0.35rem;
+        padding: 0.95rem 1.05rem;
         border-radius: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        background: #1e293b;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: #0f172a;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .file-sale-strip__amount-card.is-sale {
-        background: linear-gradient(180deg, rgba(154, 52, 18, 0.32) 0%, #1e293b 85%);
-        border-color: rgba(251, 146, 60, 0.35);
+        background: linear-gradient(145deg, #7c2d12 0%, #9a3412 42%, #1e293b 100%);
+        border-color: rgba(253, 186, 116, 0.55);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 20px rgba(154, 52, 18, 0.25);
     }
     .file-sale-strip__amount-label {
-        font-size: 0.66rem;
+        font-size: 0.7rem;
         font-weight: 800;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: #94a3b8;
+        color: #cbd5e1;
+    }
+    .file-sale-strip__amount-card.is-sale .file-sale-strip__amount-label {
+        color: #ffedd5;
+    }
+    .file-sale-strip__amount-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.35rem 0.75rem;
     }
     .file-sale-strip__amount-value {
-        font-size: 1.05rem;
+        font-size: 1.12rem;
         font-weight: 800;
-        color: #f8fafc;
+        color: #ffffff !important;
         letter-spacing: -0.01em;
         line-height: 1.3;
     }
+    .file-sale-strip__amount-short {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.22rem 0.6rem;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.55);
+        border: 1px solid rgba(226, 232, 240, 0.28);
+        color: #e2e8f0;
+        font-size: 0.84rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+    }
     .file-sale-strip__amount-card.is-sale .file-sale-strip__amount-value {
-        color: #fdba74;
+        color: #fff7ed !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    }
+    .file-sale-strip__amount-card.is-sale .file-sale-strip__amount-short {
+        background: rgba(15, 23, 42, 0.45);
+        border-color: rgba(255, 237, 213, 0.45);
+        color: #ffedd5;
     }
 
     .collective-sheet {
@@ -1418,11 +1461,21 @@
                     <div class="file-sale-strip__amounts">
                         <div class="file-sale-strip__amount-card">
                             <span class="file-sale-strip__amount-label">Total amount land</span>
-                            <strong class="file-sale-strip__amount-value">{{ $totals['grand_total_amount_formatted'] ?? '—' }}</strong>
+                            <div class="file-sale-strip__amount-row">
+                                <strong class="file-sale-strip__amount-value">{{ $totals['grand_total_amount_formatted'] ?? '—' }}</strong>
+                                @if(!empty($totals['grand_total_amount_short']))
+                                    <span class="file-sale-strip__amount-short">{{ $totals['grand_total_amount_short'] }}</span>
+                                @endif
+                            </div>
                         </div>
                         <div class="file-sale-strip__amount-card is-sale">
                             <span class="file-sale-strip__amount-label">Sale files amount</span>
-                            <strong class="file-sale-strip__amount-value">{{ $totals['sale_files_amount_formatted'] ?? '—' }}</strong>
+                            <div class="file-sale-strip__amount-row">
+                                <strong class="file-sale-strip__amount-value">{{ $totals['sale_files_amount_formatted'] ?? '—' }}</strong>
+                                @if(!empty($totals['sale_files_amount_short']))
+                                    <span class="file-sale-strip__amount-short">{{ $totals['sale_files_amount_short'] }}</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </div>

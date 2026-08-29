@@ -201,6 +201,27 @@ final class SaleExemptionFileCalculator
         return '';
     }
 
+    /** Compact amount label for UI, e.g. 2.30 cr / 5.50 lac. */
+    public static function formatRsShort(?float $amount): string
+    {
+        if ($amount === null || $amount <= 0) {
+            return '';
+        }
+
+        $intPart = (int) round($amount);
+        if ($intPart >= 10000000) {
+            return number_format($intPart / 10000000, 2, '.', '').' cr';
+        }
+        if ($intPart >= 100000) {
+            return number_format($intPart / 100000, 2, '.', '').' lac';
+        }
+        if ($intPart >= 1000) {
+            return number_format($intPart / 1000, 2, '.', '').' th';
+        }
+
+        return '';
+    }
+
     private static function scaleAmountWords(float $value): string
     {
         return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');

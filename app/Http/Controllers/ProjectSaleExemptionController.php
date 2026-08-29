@@ -288,15 +288,21 @@ class ProjectSaleExemptionController extends Controller
                 ->first();
 
             if ($collective) {
-                app(FileSaleLandService::class)->applyExemptionToCollective(
-                    $project,
-                    $collective,
-                    (int) $snapshot->id,
-                );
+                if ($collective->isOpen()) {
+                    app(FileSaleLandService::class)->applyExemptionToCollective(
+                        $project,
+                        $collective,
+                        (int) $snapshot->id,
+                    );
+
+                    return redirect()
+                        ->to(route('sale.files.index', $project).'#collective-'.$collective->id)
+                        ->with('success', 'Exemption saved and applied to '.$collective->name.'.');
+                }
 
                 return redirect()
                     ->to(route('sale.files.index', $project).'#collective-'.$collective->id)
-                    ->with('success', 'Exemption saved and applied to '.$collective->name.'.');
+                    ->with('success', 'Exemption saved. '.$collective->name.' is completed, so it was not applied. Reopen the sale file to apply.');
             }
         }
 

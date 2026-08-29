@@ -19,9 +19,12 @@ final class SaleLandMozaGroups
      *   formula_totals: array{total_land: string, formula_values: array<string, array{display: string, breakdown: string}>}
      * }
      */
-    public static function spreadsheetForProject(Project $project, ?array $purchaseFileIds = null): array
-    {
-        $config = SaleExemptionConfig::forProject($project);
+    public static function spreadsheetForProject(
+        Project $project,
+        ?array $purchaseFileIds = null,
+        ?SaleExemptionConfig $config = null,
+    ): array {
+        $config ??= SaleExemptionConfig::forProject($project);
         $formulaColumns = self::formulaColumnsFromConfig($config);
 
         $filesQuery = $project->purchaseFiles()
