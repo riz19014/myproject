@@ -9,6 +9,10 @@
     $summaryBadgeClass = $summaryBadgeClass ?? '';
     $variant = $variant ?? 'default';
     $detailsId = $idPrefix.'-details';
+    $canExcludeToSaleLand = ! empty($canExcludeToSaleLand);
+    $excludeProject = $excludeProject ?? null;
+    $excludeCollectiveId = (int) ($excludeCollectiveId ?? 0);
+    $excludeCollectiveName = $excludeCollectiveName ?? 'this sale file';
     $totalPlotChips = [];
     foreach ($leftoverColumns as $column) {
         $plot = ($leftoverTotals['formula_remaining'] ?? [])[$column['plot_key'] ?? ''] ?? null;
@@ -164,25 +168,48 @@
                                     $detailId = $idPrefix.'-file-'.$file['purchase_file_id'];
                                 @endphp
                                 <div class="leftover-land-balance__item leftover-land-balance__item--nested">
-                                    <button
-                                        type="button"
-                                        class="leftover-land-balance__summary leftover-land-balance__summary--nested"
-                                        data-bs-toggle="collapse"
-                                        data-bs-target="#{{ $detailId }}"
-                                        aria-expanded="false"
-                                        aria-controls="{{ $detailId }}"
-                                    >
-                                        <span class="leftover-land-balance__chevron" aria-hidden="true"></span>
-                                        <span class="leftover-land-balance__meta">
-                                            <strong>{{ $file['file_name'] }}</strong>
-                                            <span class="leftover-land-balance__meta-sep">·</span>
-                                            <span>Mouza {{ $file['moza'] }}</span>
-                                            <span class="leftover-land-balance__meta-sep">·</span>
-                                            <span>{{ (int) ($file['items_count'] ?? 0) }} {{ (int) ($file['items_count'] ?? 0) === 1 ? 'khasra' : 'khasras' }}</span>
-                                            <span class="leftover-land-balance__meta-sep">·</span>
-                                            <span class="leftover-land-balance__meta-left">Left {{ $file['remaining_land'] }}</span>
-                                        </span>
-                                    </button>
+                                    <div class="leftover-land-balance__file-row">
+                                        <button
+                                            type="button"
+                                            class="leftover-land-balance__summary leftover-land-balance__summary--nested"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#{{ $detailId }}"
+                                            aria-expanded="false"
+                                            aria-controls="{{ $detailId }}"
+                                        >
+                                            <span class="leftover-land-balance__chevron" aria-hidden="true"></span>
+                                            <span class="leftover-land-balance__meta">
+                                                <strong>{{ $file['file_name'] }}</strong>
+                                                <span class="leftover-land-balance__meta-sep">·</span>
+                                                <span>Mouza {{ $file['moza'] }}</span>
+                                                <span class="leftover-land-balance__meta-sep">·</span>
+                                                <span>{{ (int) ($file['items_count'] ?? 0) }} {{ (int) ($file['items_count'] ?? 0) === 1 ? 'khasra' : 'khasras' }}</span>
+                                                <span class="leftover-land-balance__meta-sep">·</span>
+                                                <span class="leftover-land-balance__meta-left">Left {{ $file['remaining_land'] }}</span>
+                                            </span>
+                                        </button>
+                                        @if($canExcludeToSaleLand && $excludeProject && $excludeCollectiveId > 0)
+                                            <form
+                                                method="post"
+                                                action="{{ route('sale.files.collectives.exclude', [$excludeProject, $excludeCollectiveId, $file['purchase_file_id']]) }}"
+                                                class="leftover-land-balance__exclude-form"
+                                            >
+                                                @csrf
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-danger leftover-land-balance__exclude-btn btn-delete-confirm"
+                                                    data-title="Exclude to Sale Land?"
+                                                    data-text="Remove &quot;{{ $file['file_name'] }}&quot; from {{ $excludeCollectiveName }} and return it to Sale Land? It can be moved to File Sale again later."
+                                                    data-confirm="Yes, exclude"
+                                                    title="Exclude to Sale Land"
+                                                    aria-label="Exclude {{ $file['file_name'] }} to Sale Land"
+                                                >
+                                                    <i class="bi bi-box-arrow-left" aria-hidden="true"></i>
+                                                    <span>Exclude</span>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
                                     <div class="collapse leftover-land-balance__detail" id="{{ $detailId }}">
                                         <div class="leftover-land-balance__detail-inner leftover-land-balance__detail-inner--nested">
                                             <div class="leftover-land-balance__stats leftover-land-balance__stats--nested">

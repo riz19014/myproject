@@ -7,6 +7,7 @@ use App\Models\FileSaleCollective;
 use App\Models\Party;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\PurchaseFile;
 use App\Models\Sale;
 use App\Support\FileSaleLandService;
 use App\Support\LandMeasure;
@@ -681,6 +682,27 @@ class SaleProjectFileController extends Controller
         return redirect()
             ->to(route('sale.files.index', $project).'#collective-'.$collective->id)
             ->with('success', $collective->name.' reopened. Files can be added again.');
+    }
+
+    public function excludeFromCollective(
+        Project $project,
+        FileSaleCollective $collective,
+        PurchaseFile $purchase_file,
+        FileSaleLandService $fileSaleLandService
+    ) {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+        abort_unless((int) $purchase_file->project_id === (int) $project->id, 404);
+
+        $result = $fileSaleLandService->excludeFromCollectiveToSaleLand($project, $collective, $purchase_file);
+
+        $message = '"'.$result['file_name'].'" excluded from '.$result['collective_name'].' and returned to Sale Land.';
+        if ($result['remaining_files'] === 0) {
+            $message .= ' This sale file has no files left.';
+        }
+
+        return redirect()
+            ->to(route('sale.files.index', $project).'#collective-'.$collective->id)
+            ->with('success', $message);
     }
 
     public function applyExemption(Request $request, Project $project, FileSaleCollective $collective, FileSaleLandService $fileSaleLandService)

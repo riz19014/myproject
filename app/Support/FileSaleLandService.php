@@ -1263,6 +1263,76 @@ final class FileSaleLandService
             ->delete();
     }
 
+    /**
+     * Remove a purchase file from an open sale-file collective back to Sale Land
+     * (keeps sale_land_at; deletes the File Sale link).
+     *
+     * @return array{file_name: string, collective_name: string, collective_id: int, remaining_files: int}
+     */
+    public function excludeFromCollectiveToSaleLand(
+        Project $project,
+        FileSaleCollective $collective,
+        PurchaseFile $purchaseFile
+    ): array {
+        if ((int) $collective->project_id !== (int) $project->id) {
+            throw ValidationException::withMessages([
+                'collective' => ['Sale file does not belong to this project.'],
+            ]);
+        }
+
+        if ((int) $purchaseFile->project_id !== (int) $project->id) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => ['File does not belong to this project.'],
+            ]);
+        }
+
+        if (! $collective->isOpen()) {
+            throw ValidationException::withMessages([
+                'collective' => ['Only open sale files can exclude files. Reopen first.'],
+            ]);
+        }
+
+        $link = FileSaleLand::query()
+            ->where('project_id', $project->id)
+            ->where('collective_id', $collective->id)
+            ->where('sale_land_id', $purchaseFile->id)
+            ->first();
+
+        if (! $link) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => ['This file is not in the selected sale file.'],
+            ]);
+        }
+
+        $hasSales = Sale::query()
+            ->where('project_id', $project->id)
+            ->where('purchase_file_id', $purchaseFile->id)
+            ->where('sale_type', Sale::TYPE_SALE_LAND)
+            ->exists();
+
+        if ($hasSales) {
+            throw ValidationException::withMessages([
+                'purchase_file_id' => ['This file already has sale land sales recorded. It cannot be excluded.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($link, $collective) {
+            $link->delete();
+            $this->refreshCollectiveTotals($collective->fresh());
+        });
+
+        $remaining = FileSaleLand::query()
+            ->where('collective_id', $collective->id)
+            ->count();
+
+        return [
+            'file_name' => $purchaseFile->file_name,
+            'collective_name' => $collective->name,
+            'collective_id' => (int) $collective->id,
+            'remaining_files' => $remaining,
+        ];
+    }
+
     public function formatFileCalculationBreakdown(int $fullFiles, float $fractionFiles, float $fractionMarla): string
     {
         if ($fullFiles < 1 && $fractionFiles <= 0) {

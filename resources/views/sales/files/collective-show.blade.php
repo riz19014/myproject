@@ -503,15 +503,26 @@
     <div class="d-flex flex-wrap gap-2">
         <a href="{{ route('sale.files.index', $project) }}" class="btn btn-outline-theme">Back to File Sale</a>
         @if($collective['is_open'])
-            <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collective['id']]) }}"
-                  onsubmit="return confirm('Mark {{ $collective['name'] }} complete? It will no longer accept new files.');">
+            <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collective['id']]) }}">
                 @csrf
-                <button type="submit" class="btn btn-outline-theme">Mark complete</button>
+                <button
+                    type="button"
+                    class="btn btn-outline-theme btn-delete-confirm"
+                    data-title="Mark complete?"
+                    data-text="Mark {{ $collective['name'] }} complete? It will no longer accept new files or exemption changes."
+                    data-confirm="Yes, mark complete"
+                >Mark complete</button>
             </form>
         @else
             <form method="post" action="{{ route('sale.files.collectives.reopen', [$project, $collective['id']]) }}">
                 @csrf
-                <button type="submit" class="btn btn-outline-secondary">Reopen</button>
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-delete-confirm"
+                    data-title="Reopen sale file?"
+                    data-text="Reopen {{ $collective['name'] }} so files and exemptions can be changed again?"
+                    data-confirm="Yes, reopen"
+                >Reopen</button>
             </form>
         @endif
     </div>
@@ -765,7 +776,7 @@
             <div class="modal-header">
                 <div>
                     <h2 class="modal-title h5 mb-1" id="activeExemptionViewModalTitle">Active exemption</h2>
-                    <p class="small text-muted mb-0">Full formula currently applied on {{ $landLabel }}.</p>
+                    <p class="small text-muted mb-0">Full formula currently applied on33 {{ $landLabel }}.</p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>

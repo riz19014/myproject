@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::post('sale/projects/{project}/files/collectives/group', [SaleProjectFileController::class, 'groupCollective'])->name('sale.files.collectives.group');
     Route::post('sale/projects/{project}/files/collectives/{collective}/complete', [SaleProjectFileController::class, 'completeCollective'])->name('sale.files.collectives.complete');
     Route::post('sale/projects/{project}/files/collectives/{collective}/reopen', [SaleProjectFileController::class, 'reopenCollective'])->name('sale.files.collectives.reopen');
+    Route::post('sale/projects/{project}/files/collectives/{collective}/exclude/{purchase_file}', [SaleProjectFileController::class, 'excludeFromCollective'])->name('sale.files.collectives.exclude');
     Route::post('sale/projects/{project}/files/collectives/{collective}/apply-exemption', [SaleProjectFileController::class, 'applyExemption'])->name('sale.files.collectives.apply-exemption');
     Route::get('sale/projects/{project}/files/create', [SaleProjectFileController::class, 'create'])->name('sale.files.create');
     Route::post('sale/projects/{project}/files', [SaleProjectFileController::class, 'store'])->name('sale.files.store');

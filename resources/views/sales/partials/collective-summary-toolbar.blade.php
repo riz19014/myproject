@@ -83,17 +83,28 @@
             <span class="ssf-toolbar__group-label"><i class="bi bi-flag" aria-hidden="true"></i> Status</span>
             <div class="ssf-toolbar__btns">
                 @if($isOpen)
-                    <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collectiveId]) }}"
-                          onsubmit="return confirm('Mark {{ $collective['name'] }} complete? It will no longer accept new files or exemption changes.');">
+                    <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collectiveId]) }}">
                         @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-theme">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-theme btn-delete-confirm"
+                            data-title="Mark complete?"
+                            data-text="Mark {{ $collective['name'] ?? 'this sale file' }} complete? It will no longer accept new files or exemption changes."
+                            data-confirm="Yes, mark complete"
+                        >
                             <i class="bi bi-check2-circle" aria-hidden="true"></i> Mark complete
                         </button>
                     </form>
                 @else
                     <form method="post" action="{{ route('sale.files.collectives.reopen', [$project, $collectiveId]) }}">
                         @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary btn-delete-confirm"
+                            data-title="Reopen sale file?"
+                            data-text="Reopen {{ $collective['name'] ?? 'this sale file' }} so files and exemptions can be changed again?"
+                            data-confirm="Yes, reopen"
+                        >
                             <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reopen
                         </button>
                     </form>

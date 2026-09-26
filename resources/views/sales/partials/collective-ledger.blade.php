@@ -31,6 +31,10 @@
         'summaryBadge' => $isOpen ? 'Open' : 'Completed',
         'summaryBadgeClass' => $isOpen ? 'is-open' : 'is-done',
         'variant' => 'sale-file',
+        'canExcludeToSaleLand' => $isOpen,
+        'excludeProject' => $project,
+        'excludeCollectiveId' => $collectiveId,
+        'excludeCollectiveName' => $collective['name'] ?? 'this sale file',
         'beforeStatsView' => 'sales.partials.collective-summary-toolbar',
         'beforeStatsData' => [
             'project' => $project,

@@ -319,6 +319,34 @@
         color: #047857;
         font-weight: 700;
     }
+    .leftover-land-balance__file-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 0.45rem;
+    }
+    .leftover-land-balance__file-row .leftover-land-balance__summary--nested {
+        flex: 1 1 14rem;
+        min-width: 0;
+    }
+    .leftover-land-balance__exclude-form {
+        display: flex;
+        align-items: center;
+        flex: 0 0 auto;
+        padding: 0.15rem 0.15rem 0.15rem 0;
+    }
+    .leftover-land-balance__exclude-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        white-space: nowrap;
+        font-weight: 650;
+        border-radius: 999px;
+        padding: 0.28rem 0.7rem;
+    }
+    .leftover-land-balance__exclude-btn i {
+        font-size: 0.9rem;
+    }
     .leftover-land-balance__plots {
         display: flex;
         flex-wrap: wrap;
