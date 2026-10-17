@@ -13,17 +13,8 @@
     $excludeProject = $excludeProject ?? null;
     $excludeCollectiveId = (int) ($excludeCollectiveId ?? 0);
     $excludeCollectiveName = $excludeCollectiveName ?? 'this sale file';
-    $totalPlotChips = [];
-    foreach ($leftoverColumns as $column) {
-        $plot = ($leftoverTotals['formula_remaining'] ?? [])[$column['plot_key'] ?? ''] ?? null;
-        if (! $plot) {
-            continue;
-        }
-        $totalPlotChips[] = [
-            'code' => $column['column_code'] ?? '',
-            'left' => $plot['remaining_display'] ?? '—',
-        ];
-    }
+    $isSaleFile = $variant === 'sale-file';
+    $filesCount = (int) ($leftoverTotals['files_count'] ?? count($leftoverFiles));
 @endphp
 
 <div class="leftover-land-balance leftover-land-balance--{{ $variant }}">
@@ -33,99 +24,99 @@
         <div class="leftover-land-balance__item leftover-land-balance__item--summary">
             <button
                 type="button"
-                class="leftover-land-balance__summary"
+                class="leftover-land-balance__summary {{ $isSaleFile ? 'leftover-land-balance__summary--simple' : '' }}"
                 data-bs-toggle="collapse"
                 data-bs-target="#{{ $detailsId }}"
                 aria-expanded="false"
                 aria-controls="{{ $detailsId }}"
             >
-                <span class="leftover-land-balance__chevron" aria-hidden="true"></span>
-                <span class="leftover-land-balance__summary-block">
-                    <span class="leftover-land-balance__summary-top">
-                        <span class="leftover-land-balance__summary-title-wrap">
-                            @if($variant === 'sale-file')
-                                <span class="leftover-land-balance__eyebrow">Sale file</span>
+                @if($isSaleFile)
+                    <span class="ssf-simple-row">
+                        <span class="ssf-simple-row__main">
+                            <span class="leftover-land-balance__summary-title">{{ $summaryTitle }}</span>
+                            @if($summaryBadge)
+                                <span class="leftover-land-balance__status {{ $summaryBadgeClass }}">{{ $summaryBadge }}</span>
                             @endif
-                            <span class="leftover-land-balance__summary-title-row">
-                                <span class="leftover-land-balance__summary-title">{{ $summaryTitle }}</span>
-                                @if($summaryBadge)
-                                    <span class="leftover-land-balance__status {{ $summaryBadgeClass }}">{{ $summaryBadge }}</span>
+                            <span class="ssf-simple-row__meta">{{ $filesCount }} {{ $filesCount === 1 ? 'file' : 'files' }}</span>
+                        </span>
+                        <span class="ssf-simple-row__left">
+                            <span class="ssf-simple-row__left-value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
+                            <span class="ssf-simple-row__left-label">left</span>
+                        </span>
+                        <span class="ssf-simple-row__chevron" aria-hidden="true"></span>
+                    </span>
+                @else
+                    <span class="leftover-land-balance__chevron" aria-hidden="true"></span>
+                    <span class="leftover-land-balance__summary-block">
+                        <span class="leftover-land-balance__summary-top">
+                            <span class="leftover-land-balance__summary-title-wrap">
+                                <span class="leftover-land-balance__summary-title-row">
+                                    <span class="leftover-land-balance__summary-title">{{ $summaryTitle }}</span>
+                                    @if($summaryBadge)
+                                        <span class="leftover-land-balance__status {{ $summaryBadgeClass }}">{{ $summaryBadge }}</span>
+                                    @endif
+                                </span>
+                                @if($summarySubtitle)
+                                    <span class="leftover-land-balance__summary-sub">Total {{ $summarySubtitle }}</span>
                                 @endif
                             </span>
-                            @if($summarySubtitle)
-                                <span class="leftover-land-balance__summary-sub">Total {{ $summarySubtitle }}</span>
-                            @endif
+                            <span class="leftover-land-balance__hero">
+                                <span class="leftover-land-balance__hero-label">Leftover</span>
+                                <span class="leftover-land-balance__hero-value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
+                            </span>
                         </span>
-                        <span class="leftover-land-balance__hero">
-                            <span class="leftover-land-balance__hero-label">Leftover</span>
-                            <span class="leftover-land-balance__hero-value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
+                        <ul class="leftover-land-balance__summary-list mb-0">
+                            <li>
+                                <span class="leftover-land-balance__metric-label">Total land</span>
+                                <span class="leftover-land-balance__land">{{ $leftoverTotals['total_land'] ?? '—' }}</span>
+                            </li>
+                            <li>
+                                <span class="leftover-land-balance__metric-label">Sold</span>
+                                <strong class="leftover-land-balance__metric-sold">{{ $leftoverTotals['sold_land'] ?? '—' }}</strong>
+                            </li>
+                            <li>
+                                <span class="leftover-land-balance__metric-label">Files · Mouzas</span>
+                                <strong>{{ (int) ($leftoverTotals['files_count'] ?? 0) }} · {{ (int) ($leftoverTotals['mouzas_count'] ?? 0) }}</strong>
+                            </li>
+                            <li>
+                                <span class="leftover-land-balance__metric-label">Khasras</span>
+                                <strong>{{ (int) ($leftoverTotals['total_khasras'] ?? 0) }}</strong>
+                            </li>
+                        </ul>
+                        <span class="leftover-land-balance__hint">
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            Open details
                         </span>
                     </span>
-
-                    <ul class="leftover-land-balance__summary-list mb-0">
-                        <li>
-                            <span class="leftover-land-balance__metric-label">Total land</span>
-                            <span class="leftover-land-balance__land">{{ $leftoverTotals['total_land'] ?? '—' }}</span>
-                        </li>
-                        <li>
-                            <span class="leftover-land-balance__metric-label">Sold</span>
-                            <strong class="leftover-land-balance__metric-sold">{{ $leftoverTotals['sold_land'] ?? '—' }}</strong>
-                        </li>
-                        <li>
-                            <span class="leftover-land-balance__metric-label">Files · Mouzas</span>
-                            <strong>{{ (int) ($leftoverTotals['files_count'] ?? 0) }} · {{ (int) ($leftoverTotals['mouzas_count'] ?? 0) }}</strong>
-                            @if(($leftoverTotals['mouzas_names'] ?? '—') !== '—')
-                                <span class="leftover-land-balance__metric-note">{{ $leftoverTotals['mouzas_names'] }}</span>
-                            @endif
-                        </li>
-                        <li>
-                            <span class="leftover-land-balance__metric-label">Khasras</span>
-                            <strong>{{ (int) ($leftoverTotals['total_khasras'] ?? 0) }}</strong>
-                        </li>
-                    </ul>
-
-                    @if($totalPlotChips !== [])
-                        <div class="leftover-land-balance__plots leftover-land-balance__plots--summary">
-                            @foreach($totalPlotChips as $chip)
-                                <span class="leftover-land-balance__plot-chip">
-                                    <span class="leftover-land-balance__plot-code">{{ $chip['code'] }}</span>
-                                    <span class="leftover-land-balance__plot-left">{{ $chip['left'] }} left</span>
-                                </span>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    <span class="leftover-land-balance__hint">
-                        <i class="bi bi-chevron-down" aria-hidden="true"></i>
-                        Open for exemptions, PDF, and file breakdown
-                    </span>
-                </span>
+                @endif
             </button>
 
             <div class="collapse leftover-land-balance__detail" id="{{ $detailsId }}">
-                <div class="leftover-land-balance__detail-inner">
+                <div class="leftover-land-balance__detail-inner {{ $isSaleFile ? 'leftover-land-balance__detail-inner--simple' : '' }}">
                     @if(!empty($beforeStatsView))
                         @include($beforeStatsView, $beforeStatsData ?? [])
                     @endif
 
-                    <div class="leftover-land-balance__stats">
-                        <div class="leftover-land-balance__stat is-total">
-                            <span class="leftover-land-balance__stat-label">Total land</span>
-                            <span class="leftover-land-balance__stat-value">{{ $leftoverTotals['total_land'] ?? '—' }}</span>
+                    @unless($isSaleFile)
+                        <div class="leftover-land-balance__stats">
+                            <div class="leftover-land-balance__stat is-total">
+                                <span class="leftover-land-balance__stat-label">Total land</span>
+                                <span class="leftover-land-balance__stat-value">{{ $leftoverTotals['total_land'] ?? '—' }}</span>
+                            </div>
+                            <div class="leftover-land-balance__stat is-sold">
+                                <span class="leftover-land-balance__stat-label">Sold</span>
+                                <span class="leftover-land-balance__stat-value">{{ $leftoverTotals['sold_land'] ?? '—' }}</span>
+                            </div>
+                            <div class="leftover-land-balance__stat is-left">
+                                <span class="leftover-land-balance__stat-label">Leftover</span>
+                                <span class="leftover-land-balance__stat-value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
+                            </div>
                         </div>
-                        <div class="leftover-land-balance__stat is-sold">
-                            <span class="leftover-land-balance__stat-label">Sold</span>
-                            <span class="leftover-land-balance__stat-value">{{ $leftoverTotals['sold_land'] ?? '—' }}</span>
-                        </div>
-                        <div class="leftover-land-balance__stat is-left">
-                            <span class="leftover-land-balance__stat-label">Leftover</span>
-                            <span class="leftover-land-balance__stat-value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
-                        </div>
-                    </div>
+                    @endunless
 
                     @if($leftoverColumns !== [])
                         <div class="leftover-land-balance__section">
-                            <h3 class="leftover-land-balance__section-title">Plot files left</h3>
+                            <h3 class="leftover-land-balance__section-title">{{ $isSaleFile ? 'Plots left' : 'Plot files left' }}</h3>
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle leftover-land-balance__table mb-0">
                                     <thead>
@@ -161,7 +152,7 @@
                     @endif
 
                     <div class="leftover-land-balance__section">
-                        <h3 class="leftover-land-balance__section-title">Files breakdown</h3>
+                        <h3 class="leftover-land-balance__section-title">{{ $isSaleFile ? 'Files' : 'Files breakdown' }}</h3>
                         <div class="leftover-land-balance__list">
                             @foreach($leftoverFiles as $file)
                                 @php
@@ -180,12 +171,17 @@
                                             <span class="leftover-land-balance__chevron" aria-hidden="true"></span>
                                             <span class="leftover-land-balance__meta">
                                                 <strong>{{ $file['file_name'] }}</strong>
-                                                <span class="leftover-land-balance__meta-sep">·</span>
-                                                <span>Mouza {{ $file['moza'] }}</span>
-                                                <span class="leftover-land-balance__meta-sep">·</span>
-                                                <span>{{ (int) ($file['items_count'] ?? 0) }} {{ (int) ($file['items_count'] ?? 0) === 1 ? 'khasra' : 'khasras' }}</span>
-                                                <span class="leftover-land-balance__meta-sep">·</span>
-                                                <span class="leftover-land-balance__meta-left">Left {{ $file['remaining_land'] }}</span>
+                                                @if($isSaleFile)
+                                                    <span class="leftover-land-balance__meta-sep">·</span>
+                                                    <span class="leftover-land-balance__meta-left">Left {{ $file['remaining_land'] }}</span>
+                                                @else
+                                                    <span class="leftover-land-balance__meta-sep">·</span>
+                                                    <span>Mouza {{ $file['moza'] }}</span>
+                                                    <span class="leftover-land-balance__meta-sep">·</span>
+                                                    <span>{{ (int) ($file['items_count'] ?? 0) }} {{ (int) ($file['items_count'] ?? 0) === 1 ? 'khasra' : 'khasras' }}</span>
+                                                    <span class="leftover-land-balance__meta-sep">·</span>
+                                                    <span class="leftover-land-balance__meta-left">Left {{ $file['remaining_land'] }}</span>
+                                                @endif
                                             </span>
                                         </button>
                                         @if($canExcludeToSaleLand && $excludeProject && $excludeCollectiveId > 0)
@@ -199,53 +195,41 @@
                                                     type="button"
                                                     class="btn btn-sm btn-outline-danger leftover-land-balance__exclude-btn btn-delete-confirm"
                                                     data-title="Exclude to Sale Land?"
-                                                    data-text="Remove &quot;{{ $file['file_name'] }}&quot; from {{ $excludeCollectiveName }} and return it to Sale Land? It can be moved to File Sale again later."
+                                                    data-text="Remove &quot;{{ $file['file_name'] }}&quot; from {{ $excludeCollectiveName }} and return it to Sale Land?"
                                                     data-confirm="Yes, exclude"
                                                     title="Exclude to Sale Land"
                                                     aria-label="Exclude {{ $file['file_name'] }} to Sale Land"
                                                 >
-                                                    <i class="bi bi-box-arrow-left" aria-hidden="true"></i>
-                                                    <span>Exclude</span>
+                                                    Exclude
                                                 </button>
                                             </form>
                                         @endif
                                     </div>
                                     <div class="collapse leftover-land-balance__detail" id="{{ $detailId }}">
                                         <div class="leftover-land-balance__detail-inner leftover-land-balance__detail-inner--nested">
-                                            <div class="leftover-land-balance__stats leftover-land-balance__stats--nested">
-                                                <div class="leftover-land-balance__stat">
-                                                    <span class="leftover-land-balance__stat-label">File</span>
-                                                    <a href="{{ route('purchase.files.show', $file['purchase_file_id']) }}" class="leftover-land-balance__stat-value text-decoration-none">
-                                                        {{ $file['file_name'] }}
-                                                    </a>
-                                                </div>
-                                                <div class="leftover-land-balance__stat">
-                                                    <span class="leftover-land-balance__stat-label">Status</span>
-                                                    <span class="leftover-land-balance__stat-value">
-                                                        @if(($file['status'] ?? '') === 'Fully Sold')
-                                                            <span class="badge text-bg-secondary">Fully Sold</span>
-                                                        @elseif(($file['status'] ?? '') === 'Partially Sold')
-                                                            <span class="badge text-bg-warning">Partially Sold</span>
-                                                        @else
-                                                            <span class="badge text-bg-success">{{ $file['status'] ?? 'Available' }}</span>
-                                                        @endif
-                                                    </span>
-                                                </div>
-                                                <div class="leftover-land-balance__stat is-total">
-                                                    <span class="leftover-land-balance__stat-label">Total</span>
-                                                    <span class="leftover-land-balance__stat-value">{{ $file['total_land'] }}</span>
-                                                </div>
-                                                <div class="leftover-land-balance__stat is-sold">
-                                                    <span class="leftover-land-balance__stat-label">Sold</span>
-                                                    <span class="leftover-land-balance__stat-value">{{ $file['sold_land'] }}</span>
-                                                </div>
-                                                <div class="leftover-land-balance__stat is-left">
-                                                    <span class="leftover-land-balance__stat-label">Left</span>
-                                                    <span class="leftover-land-balance__stat-value">{{ $file['remaining_land'] }}</span>
-                                                </div>
+                                            <div class="ssf-file-mini">
+                                                <a href="{{ route('purchase.files.show', $file['purchase_file_id']) }}" class="ssf-file-mini__link">
+                                                    Open purchase file
+                                                </a>
+                                                <span class="ssf-file-mini__sep">·</span>
+                                                <span>
+                                                    @if(($file['status'] ?? '') === 'Fully Sold')
+                                                        Fully sold
+                                                    @elseif(($file['status'] ?? '') === 'Partially Sold')
+                                                        Partially sold
+                                                    @else
+                                                        {{ $file['status'] ?? 'Available' }}
+                                                    @endif
+                                                </span>
+                                                <span class="ssf-file-mini__sep">·</span>
+                                                <span>Total {{ $file['total_land'] }}</span>
+                                                <span class="ssf-file-mini__sep">·</span>
+                                                <span>Sold {{ $file['sold_land'] }}</span>
+                                                <span class="ssf-file-mini__sep">·</span>
+                                                <span class="text-success fw-semibold">Left {{ $file['remaining_land'] }}</span>
                                             </div>
                                             @if($leftoverColumns !== [])
-                                                <div class="table-responsive">
+                                                <div class="table-responsive mt-2">
                                                     <table class="table table-sm align-middle leftover-land-balance__table mb-0">
                                                         <thead>
                                                             <tr>

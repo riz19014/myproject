@@ -4,55 +4,7 @@
 
 @push('head')
 <style>
-    .file-sale-strip__files {
-        flex: 0 0 auto;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.35rem;
-        min-width: 5.5rem;
-        padding: 0.15rem 0.25rem 0.15rem 0;
-    }
-    .file-sale-strip__count-btn {
-        border: 1px solid rgba(251, 146, 60, 0.4);
-        background: linear-gradient(180deg, rgba(251, 146, 60, 0.22) 0%, rgba(15, 23, 42, 0.55) 100%);
-        border-radius: 14px;
-        padding: 0.55rem 0.85rem;
-        cursor: pointer;
-        line-height: 1.2;
-        min-width: 4.5rem;
-        transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .file-sale-strip__count-btn:hover,
-    .file-sale-strip__count-btn:focus {
-        background: rgba(251, 146, 60, 0.28);
-        border-color: rgba(251, 146, 60, 0.7);
-        box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.18);
-        outline: none;
-    }
-    .file-sale-strip__count-num {
-        display: block;
-        font-size: 1.45rem;
-        font-weight: 800;
-        color: #fdba74;
-        line-height: 1.1;
-        letter-spacing: -0.02em;
-    }
-    .file-sale-strip__count-text {
-        display: block;
-        font-size: 0.66rem;
-        font-weight: 800;
-        color: #fed7aa;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-top: 0.15rem;
-    }
-    .file-sale-strip__files-hint {
-        font-size: 0.66rem;
-        font-weight: 650;
-        color: #94a3b8;
-    }
+
     .file-sale-popover {
         max-width: min(320px, calc(100vw - 2rem));
     }
@@ -568,76 +520,191 @@
     .leftover-land-balance__left-cell {
         color: #047857;
     }
-    .saved-sale-files-card__header {
-        background: linear-gradient(135deg, #fff7ed 0%, #fff 55%, #f8fafc 100%);
-        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-    }
-    .saved-sale-files-card__count {
-        display: inline-flex;
+    .ssf-simple-row {
+        display: flex;
         align-items: center;
-        justify-content: center;
-        min-width: 1.55rem;
-        height: 1.55rem;
-        padding: 0 0.4rem;
-        border-radius: 999px;
-        background: #fff7ed;
-        border: 1px solid rgba(194, 65, 12, 0.2);
-        color: #c2410c;
-        font-size: 0.75rem;
-        font-weight: 800;
+        gap: 0.5rem 0.65rem;
+        width: 100%;
+        min-width: 0;
     }
-    .saved-sale-files-card__body {
+    .ssf-simple-row__main {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 0.35rem 0.45rem;
+        text-align: left;
+        overflow: hidden;
+    }
+    .leftover-land-balance--sale-file .leftover-land-balance__summary-title {
+        font-size: 0.92rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 12rem;
+    }
+    .leftover-land-balance--sale-file .leftover-land-balance__status {
+        padding: 0.1rem 0.4rem;
+        font-size: 0.62rem;
+        flex: 0 0 auto;
+    }
+    .leftover-land-balance__summary--simple {
+        padding: 0.55rem 0.75rem;
+        align-items: center;
+    }
+    .leftover-land-balance__summary--simple:hover,
+    .leftover-land-balance__summary--simple:focus {
         background: #f8fafc;
     }
-    .saved-sale-files-empty {
-        text-align: center;
-        padding: 1.75rem 1rem;
-        border: 1px dashed rgba(15, 23, 42, 0.14);
-        border-radius: 16px;
+    .leftover-land-balance__summary--simple[aria-expanded="true"] {
+        background: #fff;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .ssf-simple-row__meta {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        font-weight: 700;
+        flex: 0 0 auto;
+    }
+    .ssf-simple-row__left {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.25rem;
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+    .ssf-simple-row__left-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #059669;
+        text-transform: lowercase;
+    }
+    .ssf-simple-row__left-value {
+        font-size: 0.88rem;
+        font-weight: 800;
+        color: #047857;
+        line-height: 1.2;
+    }
+    .ssf-simple-row__chevron {
+        width: 0.42rem;
+        height: 0.42rem;
+        border-right: 2px solid #94a3b8;
+        border-bottom: 2px solid #94a3b8;
+        transform: rotate(-45deg);
+        flex: 0 0 auto;
+        transition: transform 0.15s ease;
+    }
+    .leftover-land-balance__summary--simple[aria-expanded="true"] .ssf-simple-row__chevron {
+        transform: rotate(45deg);
+        border-color: #c2410c;
+    }
+    .leftover-land-balance__detail-inner--simple {
+        padding: 0.55rem 0.7rem 0.7rem;
+        background: #f8fafc;
+    }
+    .leftover-land-balance__detail-inner--simple .leftover-land-balance__section {
+        margin-bottom: 0.7rem;
+    }
+    .leftover-land-balance__detail-inner--simple .leftover-land-balance__section-title {
+        margin-bottom: 0.35rem;
+        font-size: 0.7rem;
+    }
+    .leftover-land-balance__detail-inner--simple .leftover-land-balance__table thead th,
+    .leftover-land-balance__detail-inner--simple .leftover-land-balance__table tbody td {
+        padding: 0.4rem 0.55rem;
+        font-size: 0.8rem;
+    }
+    .leftover-land-balance__detail-inner--simple .leftover-land-balance__summary--nested {
+        padding: 0.45rem 0.55rem;
+    }
+    .leftover-land-balance__detail-inner--simple .leftover-land-balance__item--nested {
+        border-radius: 8px;
+    }
+    .ssf-toolbar--simple {
+        margin-bottom: 0.55rem;
+    }
+    .ssf-simple-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.4rem 0.55rem;
+        padding: 0.4rem 0.55rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
         background: #fff;
     }
-    .saved-sale-files-empty__icon {
-        width: 2.75rem;
-        height: 2.75rem;
-        margin: 0 auto 0.75rem;
-        display: grid;
-        place-items: center;
-        border-radius: 14px;
-        background: #fff7ed;
-        color: #c2410c;
-        font-size: 1.25rem;
+    .ssf-simple-bar__value {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        margin: 0;
+        text-align: left;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 650;
+        color: #475569;
+        cursor: pointer;
+        min-width: 0;
+        flex: 1 1 8rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
-    .saved-sale-files-empty__title {
+    .ssf-simple-bar__value:hover,
+    .ssf-simple-bar__value:focus-visible {
+        color: #9a3412;
+        text-decoration: underline;
+    }
+    .ssf-simple-bar__locked {
+        display: inline-flex;
+        padding: 0.08rem 0.35rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #475569;
+        font-size: 0.6rem;
         font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .ssf-simple-bar__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    .ssf-simple-bar__actions .btn {
+        padding: 0.15rem 0.45rem;
+        font-size: 0.72rem;
+        line-height: 1.2;
+    }
+    .ssf-file-mini {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.2rem 0.3rem;
+        font-size: 0.74rem;
+        color: #475569;
+        font-weight: 650;
+    }
+    .ssf-file-mini__link {
+        font-weight: 750;
         color: #0f172a;
-        font-size: 0.98rem;
+        text-decoration: none;
+    }
+    .ssf-file-mini__link:hover {
+        color: #c2410c;
+        text-decoration: underline;
+    }
+    .ssf-file-mini__sep {
+        color: #cbd5e1;
     }
     .saved-sale-files-list {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
+        gap: 0.45rem !important;
     }
     .saved-sale-panel {
-        border: 1px solid rgba(15, 23, 42, 0.1);
-        border-radius: 18px;
-        padding: 0;
-        overflow: hidden;
-        background: #fff;
-        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.045);
-        transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-    }
-    .saved-sale-panel:hover {
-        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
-    }
-    .saved-sale-panel.is-open {
-        border-color: rgba(22, 163, 74, 0.28);
-    }
-    .saved-sale-panel.is-done {
-        border-color: rgba(100, 116, 139, 0.28);
-        opacity: 0.97;
-    }
-    .saved-sale-panel .leftover-land-balance--sale-file > .leftover-land-balance__item--summary {
-        background: linear-gradient(145deg, #fffaf5 0%, #ffffff 42%, #f8fafc 100%);
+        border-radius: 10px !important;
+        box-shadow: none !important;
     }
     .ssf-toolbar {
         display: flex;
@@ -776,257 +843,265 @@
         text-transform: uppercase;
         color: #94a3b8;
     }
-    .file-sale-summary-card {
-        border: 1px solid rgba(148, 163, 184, 0.18) !important;
-        background: #0f172a !important;
-        overflow: hidden;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+
+    /* Compact light overview */
+    .fs-page-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
     }
-    .file-sale-summary-card__header {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 70%) !important;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.16) !important;
-        color: #e2e8f0;
-    }
-    .file-sale-summary-card__title {
-        color: #f8fafc !important;
+    .fs-page-header h1 {
+        margin: 0 0 0.2rem;
+        font-size: 1.5rem;
         font-weight: 800;
-        letter-spacing: -0.01em;
+        letter-spacing: -0.02em;
+        color: #0f172a;
     }
-    .file-sale-summary-card__subtitle {
-        font-size: 0.82rem;
-        color: #94a3b8;
+    .fs-page-header__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
     }
-    .file-sale-summary-card__pdf {
-        border-color: rgba(226, 232, 240, 0.35) !important;
-        color: #e2e8f0 !important;
+    .fs-empty {
+        text-align: center;
+        padding: 2rem 1.25rem;
     }
-    .file-sale-summary-card__pdf:hover,
-    .file-sale-summary-card__pdf:focus {
-        background: rgba(248, 250, 252, 0.1) !important;
-        color: #fff !important;
-        border-color: rgba(248, 250, 252, 0.55) !important;
+    .fs-empty__title {
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 0.35rem;
     }
-    .file-sale-summary-card__body {
-        background: #0b1220 !important;
-        color: #e2e8f0;
+    .fs-overview {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        border-radius: 10px;
+        overflow: hidden;
     }
-    .file-sale-strip {
+    .fs-overview .card-body {
+        padding: 0.55rem 0.7rem;
+    }
+    .fs-overview-strip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem 0.75rem;
+    }
+    .fs-overview-strip__files {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex: 0 0 auto;
+    }
+    .fs-files-btn {
+        border: 1px solid rgba(194, 65, 12, 0.22);
+        background: #fff7ed;
+        border-radius: 8px;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        line-height: 1.15;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.25rem;
+    }
+    .fs-files-btn:hover,
+    .fs-files-btn:focus {
+        border-color: rgba(194, 65, 12, 0.45);
+        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.12);
+        outline: none;
+    }
+    .fs-files-btn__num {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #c2410c;
+    }
+    .fs-files-btn__text {
+        font-size: 0.68rem;
+        font-weight: 750;
+        color: #9a3412;
+    }
+    .fs-overview-strip__stats {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.65rem;
+        flex: 1 1 12rem;
+        min-width: 0;
+        font-size: 0.78rem;
+        font-weight: 650;
+        color: #475569;
+    }
+    .fs-overview-strip__stat strong {
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .fs-overview-strip__stat.is-sold strong { color: #c2410c; }
+    .fs-overview-strip__stat.is-left strong { color: #047857; }
+    .fs-overview-strip__stat.is-amount strong { color: #0f172a; }
+    .fs-overview-strip__stat.is-sale strong { color: #9a3412; }
+    .fs-overview-strip__sep {
+        color: #cbd5e1;
+        font-weight: 500;
+    }
+    .fs-overview-strip__plots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        width: 100%;
+    }
+    .fs-plot-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.12rem 0.4rem;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #f8fafc;
+        font-size: 0.7rem;
+        font-weight: 700;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    .fs-plot-chip.is-residential {
+        background: #eff6ff;
+        border-color: rgba(37, 99, 235, 0.2);
+        color: #1d4ed8;
+    }
+    .fs-plot-chip.is-commercial {
+        background: #fff7ed;
+        border-color: rgba(234, 88, 12, 0.22);
+        color: #c2410c;
+    }
+    .fs-plot-chip__meta {
+        color: #64748b;
+        font-weight: 650;
+    }
+    .fs-overview-strip__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-left: auto;
+    }
+    .fs-overview-strip__actions .btn {
+        padding: 0.15rem 0.45rem;
+        font-size: 0.72rem;
+        line-height: 1.2;
+    }
+    .fs-step-card .card-header {
+        background: #fff;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .fs-step-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.4rem;
+        height: 1.4rem;
+        padding: 0 0.35rem;
+        border-radius: 999px;
+        background: #fff7ed;
+        border: 1px solid rgba(194, 65, 12, 0.22);
+        color: #c2410c;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }
+    .fs-file-pick {
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 12px;
+        padding: 0.35rem;
+        max-height: 240px;
+        overflow: auto;
+        background: #f8fafc;
+    }
+    .fs-file-pick label {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.45rem 0.55rem;
+        margin: 0;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .fs-file-pick label:hover { background: #fff; }
+    .fs-place-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 10px;
+        background: #fff;
+        cursor: pointer;
+        margin: 0;
+    }
+    .fs-place-option + .fs-place-option { margin-top: 0.45rem; }
+    .fs-place-option.is-disabled { opacity: 0.5; cursor: not-allowed; }
+    .fs-place-option__title { font-weight: 750; color: #0f172a; font-size: 0.88rem; }
+    .fs-place-option__hint { display: block; font-size: 0.74rem; color: #64748b; margin-top: 0.1rem; }
+    .saved-sale-files-card__header {
+        background: #fff !important;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .saved-sale-files-card__body {
+        background: #fff !important;
+    }
+    .saved-sale-files-card__count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.55rem;
+        height: 1.55rem;
+        padding: 0 0.4rem;
+        border-radius: 999px;
+        background: #fff7ed;
+        border: 1px solid rgba(194, 65, 12, 0.2);
+        color: #c2410c;
+        font-size: 0.75rem;
+        font-weight: 800;
+    }
+    .saved-sale-files-empty {
+        text-align: center;
+        padding: 1.5rem 1rem;
+        border: 1px dashed rgba(15, 23, 42, 0.14);
+        border-radius: 14px;
+        background: #f8fafc;
+    }
+    .saved-sale-files-empty__icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        margin: 0 auto 0.65rem;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: 1.15rem;
+    }
+    .saved-sale-files-empty__title {
+        font-weight: 800;
+        color: #0f172a;
+        font-size: 0.95rem;
+    }
+    .saved-sale-files-list {
         display: flex;
         flex-direction: column;
         gap: 0.85rem;
-        border: 0;
-        border-radius: 0;
-        overflow: visible;
-        background: transparent;
     }
-    .file-sale-strip__main {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: stretch;
-        gap: 0.85rem 1rem;
-        padding: 1rem;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 16px;
-        background: linear-gradient(160deg, #1e293b 0%, #111827 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    }
-    .file-sale-strip__plots {
-        flex: 1 1 14rem;
-        min-width: 0;
-    }
-    .file-sale-strip__section-label {
-        margin: 0 0 0.5rem;
-        font-size: 0.66rem;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #94a3b8;
-    }
-    .file-sale-strip__columns {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-        min-width: 0;
-    }
-    .file-sale-strip__col {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.15rem;
-        min-width: 4.6rem;
-        padding: 0.55rem 0.6rem;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        background: rgba(15, 23, 42, 0.65);
-        text-align: center;
-    }
-    .file-sale-strip__col.is-residential {
-        background: linear-gradient(180deg, rgba(37, 99, 235, 0.28) 0%, rgba(15, 23, 42, 0.7) 90%);
-        border-color: rgba(96, 165, 250, 0.35);
-    }
-    .file-sale-strip__col.is-commercial {
-        background: linear-gradient(180deg, rgba(234, 88, 12, 0.28) 0%, rgba(15, 23, 42, 0.7) 90%);
-        border-color: rgba(251, 146, 60, 0.4);
-    }
-    .file-sale-strip__col-code {
-        font-weight: 800;
-        font-size: 0.88rem;
-        letter-spacing: 0.02em;
-        color: #f8fafc;
-        line-height: 1.2;
-    }
-    .file-sale-strip__col.is-residential .file-sale-strip__col-code {
-        color: #93c5fd;
-    }
-    .file-sale-strip__col.is-commercial .file-sale-strip__col-code {
-        color: #fdba74;
-    }
-    .file-sale-strip__col-type {
-        font-weight: 650;
-        font-size: 0.72rem;
-        color: #94a3b8;
-        line-height: 1.2;
-        white-space: nowrap;
-    }
-    .file-sale-strip__col-count {
-        margin-top: 0.15rem;
-        font-weight: 800;
-        font-size: 0.95rem;
-        color: #f1f5f9;
-        line-height: 1.2;
-    }
-    .file-sale-strip__metrics {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 0.65rem;
-    }
-    @media (min-width: 768px) {
-        .file-sale-strip__metrics {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-    }
-    .file-sale-strip__metric {
-        display: flex;
-        flex-direction: column;
-        gap: 0.3rem;
-        padding: 0.85rem 0.95rem;
+    .saved-sale-panel {
+        border: 1px solid rgba(15, 23, 42, 0.1);
         border-radius: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        background: #1e293b;
-        min-width: 0;
-    }
-    .file-sale-strip__metric.is-total {
-        background: linear-gradient(180deg, #1e293b 0%, #111827 100%);
-    }
-    .file-sale-strip__metric.is-sold {
-        background: linear-gradient(180deg, rgba(154, 52, 18, 0.35) 0%, #1e293b 85%);
-        border-color: rgba(251, 146, 60, 0.35);
-    }
-    .file-sale-strip__metric.is-left {
-        background: linear-gradient(180deg, rgba(4, 120, 87, 0.35) 0%, #1e293b 85%);
-        border-color: rgba(52, 211, 153, 0.3);
-    }
-    .file-sale-strip__metric-label {
-        font-size: 0.66rem;
-        font-weight: 800;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        color: #94a3b8;
-    }
-    .file-sale-strip__metric.is-sold .file-sale-strip__metric-label {
-        color: #fdba74;
-    }
-    .file-sale-strip__metric.is-left .file-sale-strip__metric-label {
-        color: #6ee7b7;
-    }
-    .file-sale-strip__metric-value {
-        font-size: 0.95rem;
-        font-weight: 800;
-        color: #f8fafc;
-        line-height: 1.35;
-        word-break: break-word;
-    }
-    .file-sale-strip__metric.is-sold .file-sale-strip__metric-value {
-        color: #fdba74;
-    }
-    .file-sale-strip__metric.is-left .file-sale-strip__metric-value {
-        color: #6ee7b7;
-    }
-    .file-sale-strip__amounts {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 0.65rem;
         padding: 0;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
-    @media (min-width: 768px) {
-        .file-sale-strip__amounts {
-            grid-template-columns: 1fr 1fr;
-        }
-    }
-    .file-sale-strip__amount-card {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        padding: 0.95rem 1.05rem;
-        border-radius: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        background: #0f172a;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    }
-    .file-sale-strip__amount-card.is-sale {
-        background: linear-gradient(145deg, #7c2d12 0%, #9a3412 42%, #1e293b 100%);
-        border-color: rgba(253, 186, 116, 0.55);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 20px rgba(154, 52, 18, 0.25);
-    }
-    .file-sale-strip__amount-label {
-        font-size: 0.7rem;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #cbd5e1;
-    }
-    .file-sale-strip__amount-card.is-sale .file-sale-strip__amount-label {
-        color: #ffedd5;
-    }
-    .file-sale-strip__amount-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 0.35rem 0.75rem;
-    }
-    .file-sale-strip__amount-value {
-        font-size: 1.12rem;
-        font-weight: 800;
-        color: #ffffff !important;
-        letter-spacing: -0.01em;
-        line-height: 1.3;
-    }
-    .file-sale-strip__amount-short {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.22rem 0.6rem;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.55);
-        border: 1px solid rgba(226, 232, 240, 0.28);
-        color: #e2e8f0;
-        font-size: 0.84rem;
-        font-weight: 800;
-        letter-spacing: 0.01em;
-        white-space: nowrap;
-    }
-    .file-sale-strip__amount-card.is-sale .file-sale-strip__amount-value {
-        color: #fff7ed !important;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-    }
-    .file-sale-strip__amount-card.is-sale .file-sale-strip__amount-short {
-        background: rgba(15, 23, 42, 0.45);
-        border-color: rgba(255, 237, 213, 0.45);
-        color: #ffedd5;
-    }
+    .saved-sale-panel.is-open { border-color: rgba(22, 163, 74, 0.28); }
+    .saved-sale-panel.is-done { border-color: rgba(100, 116, 139, 0.28); }
 
-    .collective-sheet {
+        .collective-sheet {
         border: 2px solid #334155;
         border-radius: 12px;
         overflow: hidden;
@@ -1167,82 +1242,168 @@
         background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 55%, #fff 100%);
         border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     }
-    .exemption-pick-hint {
-        font-size: 0.88rem;
-        color: #64748b;
-    }
     .exemption-pick-list {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
-        max-height: min(58vh, 460px);
+        gap: 0.3rem;
+        max-height: min(50vh, 320px);
         overflow: auto;
-        padding-bottom: 0.5rem;
     }
-    .exemption-pick-option {
-        display: block;
-        position: relative;
-        cursor: pointer;
+    .exemption-pick-line {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
         margin: 0;
+        padding: 0.4rem 0.55rem;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+        min-width: 0;
+        position: relative;
     }
-    .exemption-pick-option input {
+    .exemption-pick-line:hover {
+        border-color: rgba(194, 65, 12, 0.35);
+        background: #fffaf5;
+    }
+    .exemption-pick-line input {
         position: absolute;
         opacity: 0;
         pointer-events: none;
     }
-    .exemption-pick-card {
-        border: 1px solid rgba(15, 23, 42, 0.1);
-        border-radius: 14px;
-        padding: 0.85rem 1rem;
-        background: #fff;
-        transition: border-color .15s ease, box-shadow .15s ease;
+    .exemption-pick-line__radio {
+        width: 0.9rem;
+        height: 0.9rem;
+        border: 2px solid #94a3b8;
+        border-radius: 50%;
+        flex: 0 0 auto;
+        position: relative;
     }
-    .exemption-pick-option:hover .exemption-pick-card {
-        border-color: rgba(194, 65, 12, 0.35);
+    .exemption-pick-line input:checked + .exemption-pick-line__radio {
+        border-color: #c2410c;
     }
-    .exemption-pick-option input:checked + .exemption-pick-card {
-        border-color: rgba(194, 65, 12, 0.55);
-        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    .exemption-pick-line input:checked + .exemption-pick-line__radio::after {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        border-radius: 50%;
+        background: #c2410c;
     }
-    .exemption-pick-card__top {
+    .exemption-pick-line:has(input:checked) {
+        border-color: rgba(194, 65, 12, 0.45);
+        background: #fff7ed;
+    }
+    .exemption-pick-line.is-applied {
+        border-color: rgba(22, 163, 74, 0.35);
+    }
+    .exemption-pick-line__body {
         display: flex;
-        justify-content: space-between;
-        gap: 0.5rem;
-        align-items: flex-start;
-        margin-bottom: 0.35rem;
+        flex-direction: column;
+        gap: 0.3rem;
+        min-width: 0;
+        flex: 1 1 auto;
     }
-    .exemption-pick-card__title {
-        margin: 0;
-        font-size: 0.95rem;
+    .exemption-pick-line__text {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+        font-size: 0.82rem;
+        line-height: 1.25;
+    }
+    .exemption-pick-line__title {
         font-weight: 800;
         color: #0f172a;
+        flex: 0 0 auto;
     }
-    .exemption-pick-card__badge {
-        font-size: 0.68rem;
+    .exemption-pick-line__meta {
+        font-size: 0.74rem;
+        font-weight: 650;
+        color: #64748b;
+        line-height: 1.3;
+    }
+    .exemption-pick-line__badge {
+        flex: 0 0 auto;
+        font-size: 0.6rem;
         font-weight: 800;
-        padding: 0.18rem 0.5rem;
+        padding: 0.1rem 0.35rem;
         border-radius: 999px;
         background: #e2e8f0;
         color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
-    .exemption-pick-card__badge.is-live {
+    .exemption-pick-line__badge.is-live {
         background: #ffedd5;
         color: #9a3412;
     }
-    .exemption-pick-card__badge.is-applied {
+    .exemption-pick-line__badge.is-applied {
         background: #dcfce7;
         color: #166534;
     }
-    .exemption-pick-card.is-applied {
-        border-color: rgba(22, 163, 74, 0.45);
-        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18);
-        background: linear-gradient(180deg, #f0fdf4 0%, #fff 55%);
+    .exemption-pick-line__comps {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
     }
-    .exemption-pick-card__applied-note {
-        margin: 0 0 0.4rem;
-        font-size: 0.74rem;
+    .exemption-pick-line__comp {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 0.4rem 0.5rem;
+    }
+    .exemption-pick-line__comp.is-residential {
+        background: #eff6ff;
+        border-color: rgba(37, 99, 235, 0.18);
+    }
+    .exemption-pick-line__comp.is-commercial {
+        background: #fff7ed;
+        border-color: rgba(234, 88, 12, 0.2);
+    }
+    .exemption-pick-line__comp-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+    .exemption-pick-line__comp-title {
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .exemption-pick-line__comp-pool {
+        font-size: 0.7rem;
         font-weight: 750;
-        color: #15803d;
+        color: #9a3412;
+        white-space: nowrap;
+    }
+    .exemption-pick-line__plot {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.74rem;
+        line-height: 1.3;
+        padding: 0.08rem 0;
+    }
+    .exemption-pick-line__plot + .exemption-pick-line__plot {
+        border-top: 1px solid rgba(15, 23, 42, 0.06);
+    }
+    .exemption-pick-line__plot-name {
+        color: #334155;
+        font-weight: 650;
+        min-width: 0;
+    }
+    .exemption-pick-line__plot-vals {
+        color: #0f172a;
+        font-weight: 750;
+        white-space: nowrap;
+        text-align: right;
+    }
+    .exemption-pick-line__plot-empty {
+        font-size: 0.72rem;
+        color: #94a3b8;
     }
     .exemption-view-applied-banner {
         display: flex;
@@ -1441,51 +1602,50 @@
     </div>
 @endif
 
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+<div class="fs-page-header">
     <div>
-        <h1 class="mb-1">File Sale</h1>
+        <h1>File Sale</h1>
         <p class="text-muted small mb-0">Project: <strong><x-project-name :project="$project" /></strong></p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
-        <a href="{{ route('sale.projects.exemption.edit', $project) }}" class="btn btn-outline-theme">Exemption setup</a>
-        <a href="{{ route('projects.sale-land', $project) }}" class="btn btn-outline-theme">Sale land</a>
-        <a href="{{ route('sale.files.create', $project) }}" class="btn btn-outline-theme">Add project file</a>
-        <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="btn btn-outline-theme">Purchase files</a>
+    <div class="fs-page-header__actions">
         <a href="{{ route('projects.show', $project) }}" class="btn btn-outline-theme">Back to project</a>
-        <a href="{{ route('sale.index') }}" class="btn btn-outline-theme">Sale menu</a>
+        @if($separateFiles !== [])
+            <button type="button" class="btn btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
+                Save as sale file
+            </button>
+        @elseif($movedFiles === [])
+            <a href="{{ route('projects.sale-land', $project) }}" class="btn btn-pink">Go to Sale land</a>
+        @endif
+        <div class="dropdown">
+            <button class="btn btn-outline-theme dropdown-toggle" type="button" id="file-sale-more-menu" data-bs-toggle="dropdown" aria-expanded="false">
+                More
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="file-sale-more-menu">
+                <li><a class="dropdown-item" href="{{ route('projects.sale-land', $project) }}">Sale land</a></li>
+                <li><a class="dropdown-item" href="{{ route('sale.projects.exemption.edit', $project) }}">Exemption setup</a></li>
+                <li><a class="dropdown-item" href="{{ route('sale.files.create', $project) }}">Add project file</a></li>
+                <li><a class="dropdown-item" href="{{ route('purchase.files.index', ['project' => $project->id]) }}">Purchase files</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ route('sale.index') }}">Sale menu</a></li>
+            </ul>
+        </div>
     </div>
 </div>
 
 @if($movedFiles === [])
     <div class="card card-theme mb-4">
-        <div class="card-body">
-            <p class="text-muted mb-0">
-                No sale land files moved to file sale yet. Open
-                <a href="{{ route('projects.sale-land', $project) }}">Sale land</a>,
-                select files, and click <strong>Move to File Sale</strong>.
+        <div class="card-body fs-empty">
+            <p class="fs-empty__title">No files in File Sale yet</p>
+            <p class="text-muted small mb-3">
+                Open Sale land, select files, then click <strong>Move to File Sale</strong>.
             </p>
+            <a href="{{ route('projects.sale-land', $project) }}" class="btn btn-pink">Go to Sale land</a>
         </div>
     </div>
 @else
-    <div class="card card-theme mb-4 file-sale-summary-card">
+    <div class="card card-theme mb-3 fs-overview">
         @if($filesLandColumns !== [])
-            <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 file-sale-summary-card__header">
-                <div>
-                    <h2 class="h6 mb-1 file-sale-summary-card__title">Total land &amp; files</h2>
-                    <p class="file-sale-summary-card__subtitle mb-0">Moved sale land overview — plots, balances, and amounts.</p>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    @if($separateFiles !== [])
-                        <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
-                            Save as sale file
-                        </button>
-                    @endif
-                    <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-light file-sale-summary-card__pdf">
-                        Print PDF
-                    </a>
-                </div>
-            </div>
-            <div class="card-body pt-3 file-sale-summary-card__body">
+            <div class="card-body">
                 <div id="file-sale-files-popover-content" class="d-none">
                     <ul class="file-sale-popover__list">
                         @foreach($movedFiles as $file)
@@ -1494,91 +1654,155 @@
                     </ul>
                 </div>
 
-                <div class="file-sale-strip">
-                    <div class="file-sale-strip__main">
-                        <div class="file-sale-strip__files">
-                            <button type="button"
-                                    class="file-sale-strip__count-btn"
-                                    id="file-sale-files-count-btn"
-                                    aria-label="{{ count($movedFiles) }} sale land files — click to view names">
-                                <span class="file-sale-strip__count-num">{{ count($movedFiles) }}</span>
-                                <span class="file-sale-strip__count-text">{{ count($movedFiles) === 1 ? 'File' : 'Files' }}</span>
+                <div class="fs-overview-strip">
+                    <div class="fs-overview-strip__files">
+                        <button type="button"
+                                class="fs-files-btn"
+                                id="file-sale-files-count-btn"
+                                aria-label="{{ count($movedFiles) }} sale land files — click to view names"
+                                title="Tap to view file names">
+                            <span class="fs-files-btn__num">{{ count($movedFiles) }}</span>
+                            <span class="fs-files-btn__text">{{ count($movedFiles) === 1 ? 'file' : 'files' }}</span>
+                        </button>
+                    </div>
+
+                    <div class="fs-overview-strip__stats">
+                        <span class="fs-overview-strip__stat">Total <strong>{{ $totals['total_land_area'] ?? '—' }}</strong></span>
+                        <span class="fs-overview-strip__sep">·</span>
+                        <span class="fs-overview-strip__stat is-sold">Sold <strong>{{ $totals['sold_land_area'] ?? '—' }}</strong></span>
+                        <span class="fs-overview-strip__sep">·</span>
+                        <span class="fs-overview-strip__stat is-left">Left <strong>{{ $totals['remaining_land_area'] ?? '—' }}</strong></span>
+                        <span class="fs-overview-strip__sep">·</span>
+                        <span class="fs-overview-strip__stat is-amount" title="Total amount land">
+                            Amt <strong>{{ $totals['grand_total_amount_short'] ?? ($totals['grand_total_amount_formatted'] ?? '—') }}</strong>
+                        </span>
+                        <span class="fs-overview-strip__sep">·</span>
+                        <span class="fs-overview-strip__stat is-sale" title="Sale files amount">
+                            Sale <strong>{{ $totals['sale_files_amount_short'] ?? ($totals['sale_files_amount_formatted'] ?? '—') }}</strong>
+                        </span>
+                    </div>
+
+                    <div class="fs-overview-strip__actions">
+                        @if($separateFiles !== [])
+                            <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
+                                Save all
                             </button>
-                            <span class="file-sale-strip__files-hint">Tap to view names</span>
-                        </div>
-
-                        <div class="file-sale-strip__plots">
-                            <div class="file-sale-strip__section-label">Plot files</div>
-                            <div class="file-sale-strip__columns">
-                                @foreach($filesLandColumns as $column)
-                                    @php
-                                        $isCommercial = str_starts_with(strtoupper((string) ($column['column_code'] ?? '')), 'C');
-                                    @endphp
-                                    <div class="file-sale-strip__col {{ $isCommercial ? 'is-commercial' : 'is-residential' }}">
-                                        <span class="file-sale-strip__col-code">{{ $column['column_code'] }}</span>
-                                        <span class="file-sale-strip__col-type">{{ $column['short_label'] }}</span>
-                                        <span class="file-sale-strip__col-count">{{ $column['file_count'] }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
+                        @endif
+                        <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">PDF</a>
                     </div>
 
-                    <div class="file-sale-strip__metrics">
-                        <div class="file-sale-strip__metric is-total">
-                            <span class="file-sale-strip__metric-label">Total land</span>
-                            <span class="file-sale-strip__metric-value">{{ $totals['total_land_area'] ?? '—' }}</span>
+                    @if($filesLandColumns !== [])
+                        <div class="fs-overview-strip__plots">
+                            @foreach($filesLandColumns as $column)
+                                @php
+                                    $isCommercial = str_starts_with(strtoupper((string) ($column['column_code'] ?? '')), 'C');
+                                @endphp
+                                <span class="fs-plot-chip {{ $isCommercial ? 'is-commercial' : 'is-residential' }}" title="{{ $column['short_label'] }}">
+                                    {{ $column['column_code'] }}
+                                    <span class="fs-plot-chip__meta">{{ $column['file_count'] }}</span>
+                                </span>
+                            @endforeach
                         </div>
-                        <div class="file-sale-strip__metric is-sold">
-                            <span class="file-sale-strip__metric-label">Sold</span>
-                            <span class="file-sale-strip__metric-value">{{ $totals['sold_land_area'] ?? '—' }}</span>
-                        </div>
-                        <div class="file-sale-strip__metric is-left">
-                            <span class="file-sale-strip__metric-label">Leftover</span>
-                            <span class="file-sale-strip__metric-value">{{ $totals['remaining_land_area'] ?? '—' }}</span>
-                        </div>
-                    </div>
-
-                    <div class="file-sale-strip__amounts">
-                        <div class="file-sale-strip__amount-card">
-                            <span class="file-sale-strip__amount-label">Total amount land</span>
-                            <div class="file-sale-strip__amount-row">
-                                <strong class="file-sale-strip__amount-value">{{ $totals['grand_total_amount_formatted'] ?? '—' }}</strong>
-                                @if(!empty($totals['grand_total_amount_short']))
-                                    <span class="file-sale-strip__amount-short">{{ $totals['grand_total_amount_short'] }}</span>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="file-sale-strip__amount-card is-sale">
-                            <span class="file-sale-strip__amount-label">Sale files amount</span>
-                            <div class="file-sale-strip__amount-row">
-                                <strong class="file-sale-strip__amount-value">{{ $totals['sale_files_amount_formatted'] ?? '—' }}</strong>
-                                @if(!empty($totals['sale_files_amount_short']))
-                                    <span class="file-sale-strip__amount-short">{{ $totals['sale_files_amount_short'] }}</span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+                    @endif
                 </div>
             </div>
         @else
             <div class="card-body">
-                <p class="text-muted small mb-0">No land area found on the moved sale land files.</p>
+                <p class="text-muted small mb-0">No land area on moved files.</p>
             </div>
         @endif
     </div>
 
-    <div class="card card-theme mb-4 saved-sale-files-card">
-        <div class="card-header py-3 saved-sale-files-card__header">
-            <div class="saved-sale-files-card__heading">
+    @if($separateFiles !== [])
+        <div class="card card-theme mb-4 fs-step-card">
+            <div class="card-header py-3">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                    <h2 class="h6 mb-0">Saved sale files</h2>
-                    @if($collectives !== [])
-                        <span class="saved-sale-files-card__count">{{ count($collectives) }}</span>
-                    @endif
+                    <span class="fs-step-badge">1</span>
+                    <h2 class="h6 mb-0">Save files into a sale file</h2>
                 </div>
-                <p class="text-muted small mb-0">Tap a sale file to manage leftover land, exemptions, and reports.</p>
+                <p class="text-muted small mb-0">Select unsaved files, then save as a new sale file or add them to an open one.</p>
             </div>
+            <div class="card-body">
+                <form method="post" action="{{ route('sale.files.collectives.group', $project) }}" id="file-sale-group-form">
+                    @csrf
+                    <div class="row g-3">
+                        <div class="col-lg-7">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                <span class="small fw-semibold text-secondary">{{ count($separateFiles) }} unsaved {{ count($separateFiles) === 1 ? 'file' : 'files' }}</span>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="file-sale-group-check-all">Select all</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="file-sale-group-check-none">Clear</button>
+                                </div>
+                            </div>
+                            <div class="fs-file-pick">
+                                @foreach($separateFiles as $file)
+                                    <label>
+                                        <input type="checkbox" class="form-check-input file-sale-group-check" name="sale_land_ids[]" value="{{ $file['id'] }}">
+                                        <span>{{ $file['name'] }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="mb-3">
+                                <label class="form-label">Where to save</label>
+                                <label class="fs-place-option">
+                                    <input type="radio" name="placement" value="new_collective" class="form-check-input mt-1" checked>
+                                    <span>
+                                        <span class="fs-place-option__title">New sale file</span>
+                                        <span class="fs-place-option__hint">Create a named sale file with the selected lines.</span>
+                                    </span>
+                                </label>
+                                <label class="fs-place-option {{ $openCollectives === [] ? 'is-disabled' : '' }}">
+                                    <input type="radio" name="placement" value="existing_collective" class="form-check-input mt-1"
+                                           @disabled($openCollectives === [])>
+                                    <span>
+                                        <span class="fs-place-option__title">Existing open sale file</span>
+                                        <span class="fs-place-option__hint">
+                                            @if($openCollectives === [])
+                                                No open sale files yet.
+                                            @else
+                                                Add selected files into one that is still open.
+                                            @endif
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="mb-3" id="file-sale-group-name-wrap">
+                                <label for="file-sale-group-name" class="form-label">Sale file name</label>
+                                <input type="text" name="name" id="file-sale-group-name" class="form-control form-control-theme"
+                                       value="{{ old('name', $suggestedSaleFileName) }}" maxlength="150">
+                            </div>
+                            @if($openCollectives !== [])
+                                <div class="mb-3 d-none" id="file-sale-group-collective-wrap">
+                                    <label for="file-sale-group-collective-id" class="form-label">Open sale file</label>
+                                    <select name="collective_id" id="file-sale-group-collective-id" class="form-select form-select-theme">
+                                        @foreach($openCollectives as $collective)
+                                            <option value="{{ $collective['id'] }}">
+                                                {{ $collective['name'] }} ({{ $collective['file_count'] }} file{{ $collective['file_count'] === 1 ? '' : 's' }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+                            <button type="submit" class="btn btn-pink">Save selected</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    <div class="card card-theme mb-4 saved-sale-files-card fs-step-card">
+        <div class="card-header py-3 saved-sale-files-card__header">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <span class="fs-step-badge">{{ $separateFiles !== [] ? '2' : '1' }}</span>
+                <h2 class="h6 mb-0">Saved sale files</h2>
+                @if($collectives !== [])
+                    <span class="saved-sale-files-card__count">{{ count($collectives) }}</span>
+                @endif
+            </div>
+            <p class="text-muted small mb-0">Tap to open.</p>
         </div>
         <div class="card-body saved-sale-files-card__body">
             @if($collectives === [])
@@ -1587,7 +1811,7 @@
                     <p class="saved-sale-files-empty__title mb-1">No saved sale files yet</p>
                     <p class="text-muted small mb-0">
                         @if($separateFiles !== [])
-                            Select files below and click <strong>Save as sale file</strong> to create one.
+                            Use step 1 above to save selected files.
                         @else
                             Move files from Sale land first, then save them here.
                         @endif
@@ -1607,71 +1831,6 @@
             @endif
         </div>
     </div>
-
-    @if($separateFiles !== [])
-        <div class="card card-theme mb-4">
-            <div class="card-header py-3">
-                <h2 class="h6 mb-0">Separate files (not yet saved)</h2>
-                <p class="text-muted small mb-0">Select files and save as a named sale file, or add into an open one.</p>
-            </div>
-            <div class="card-body">
-                <form method="post" action="{{ route('sale.files.collectives.group', $project) }}" id="file-sale-group-form">
-                    @csrf
-                    <div class="row g-3">
-                        <div class="col-lg-7">
-                            <div class="d-flex flex-wrap gap-2 mb-2">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="file-sale-group-check-all">Select all</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="file-sale-group-check-none">Clear</button>
-                            </div>
-                            <div class="border rounded-3 p-2" style="max-height: 220px; overflow: auto;">
-                                @foreach($separateFiles as $file)
-                                    <label class="d-flex align-items-center gap-2 py-1 px-1 mb-0">
-                                        <input type="checkbox" class="form-check-input file-sale-group-check" name="sale_land_ids[]" value="{{ $file['id'] }}">
-                                        <span>{{ $file['name'] }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
-                        <div class="col-lg-5">
-                            <div class="mb-3">
-                                <label class="form-label">Placement</label>
-                                <div class="d-flex flex-column gap-2">
-                                    <label class="mb-0">
-                                        <input type="radio" name="placement" value="new_collective" class="form-check-input me-1" checked>
-                                        New sale file
-                                    </label>
-                                    <label class="mb-0 {{ $openCollectives === [] ? 'opacity-50' : '' }}">
-                                        <input type="radio" name="placement" value="existing_collective" class="form-check-input me-1"
-                                               @disabled($openCollectives === [])>
-                                        Existing open sale file
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="mb-3" id="file-sale-group-name-wrap">
-                                <label for="file-sale-group-name" class="form-label">Sale file name</label>
-                                <input type="text" name="name" id="file-sale-group-name" class="form-control form-control-theme"
-                                       value="{{ old('name', $suggestedSaleFileName) }}" maxlength="150">
-                            </div>
-                            @if($openCollectives !== [])
-                                <div class="mb-3">
-                                    <label for="file-sale-group-collective-id" class="form-label">Open sale file</label>
-                                    <select name="collective_id" id="file-sale-group-collective-id" class="form-select">
-                                        @foreach($openCollectives as $collective)
-                                            <option value="{{ $collective['id'] }}">
-                                                {{ $collective['name'] }} ({{ $collective['file_count'] }} file{{ $collective['file_count'] === 1 ? '' : 's' }})
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            @endif
-                            <button type="submit" class="btn btn-pink">Save selected</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    @endif
-
 @endif
 
 @if($separateFiles !== [])
@@ -1686,7 +1845,7 @@
             </div>
             <div class="modal-body">
                 <p class="small text-muted mb-3">
-                    Saves <strong>{{ count($separateFiles) }}</strong> separate file(s) as header + lines, and stores the current exemption formula scenario on the header.
+                    Saves all <strong>{{ count($separateFiles) }}</strong> unsaved file(s) into one sale file.
                 </p>
                 <div class="mb-3">
                     <label for="save-sale-file-name" class="form-label">Sale file name</label>
@@ -1697,7 +1856,7 @@
                     <input type="hidden" name="sale_land_ids[]" value="{{ $file['id'] }}">
                 @endforeach
                 <div class="small text-muted">
-                    <div class="fw-semibold text-body mb-1">Lines that will be saved</div>
+                    <div class="fw-semibold text-body mb-1">Files included</div>
                     <ul class="mb-0 ps-3">
                         @foreach($separateFiles as $file)
                             <li>{{ $file['name'] }}</li>
@@ -1743,6 +1902,24 @@ document.addEventListener('DOMContentLoaded', function () {
     var checkAll = document.getElementById('file-sale-group-check-all');
     var checkNone = document.getElementById('file-sale-group-check-none');
     var groupForm = document.getElementById('file-sale-group-form');
+    var nameWrap = document.getElementById('file-sale-group-name-wrap');
+    var collectiveWrap = document.getElementById('file-sale-group-collective-wrap');
+
+    function syncPlacementUi() {
+        if (!groupForm) return;
+        var placement = groupForm.querySelector('input[name="placement"]:checked');
+        var isExisting = placement && placement.value === 'existing_collective';
+        if (nameWrap) nameWrap.classList.toggle('d-none', !!isExisting);
+        if (collectiveWrap) collectiveWrap.classList.toggle('d-none', !isExisting);
+    }
+
+    if (groupForm) {
+        groupForm.querySelectorAll('input[name="placement"]').forEach(function (radio) {
+            radio.addEventListener('change', syncPlacementUi);
+        });
+        syncPlacementUi();
+    }
+
     if (checkAll) {
         checkAll.addEventListener('click', function () {
             document.querySelectorAll('.file-sale-group-check').forEach(function (cb) { cb.checked = true; });

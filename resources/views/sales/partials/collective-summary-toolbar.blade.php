@@ -5,111 +5,53 @@
     $activeExemption = $activeExemption ?? [
         'summary' => $collective['exemption_summary'] ?? '—',
         'marla_label' => '',
-        'plots_line' => '',
-        'plot_chips' => [],
     ];
     $chooseModalId = $chooseModalId ?? ('collectiveExemptionModal-'.$collectiveId);
     $viewModalId = $viewModalId ?? ('activeExemptionViewModal-'.$collectiveId);
-    $plotChips = $activeExemption['plot_chips'] ?? [];
-    if ($plotChips === [] && ! empty($activeExemption['plots_line'])) {
-        $plotChips = array_values(array_filter(array_map('trim', explode(',', (string) $activeExemption['plots_line']))));
-    }
+    $exemptionSummary = $activeExemption['summary'] ?? ($collective['exemption_summary'] ?? '—');
 @endphp
 
-<div class="ssf-toolbar">
-    <div class="ssf-toolbar__exemption">
-        <div class="ssf-toolbar__exemption-copy">
-            <span class="ssf-toolbar__kicker">Applied exemption</span>
-            <button
-                type="button"
-                class="ssf-toolbar__exemption-value"
-                data-bs-toggle="modal"
-                data-bs-target="#{{ $viewModalId }}"
-                title="View applied exemption (Plot files left)"
-            >
-                {{ $activeExemption['summary'] ?? ($collective['exemption_summary'] ?? '—') }}
-            </button>
-            <div class="ssf-toolbar__exemption-meta-row">
-                <span class="ssf-toolbar__applied-badge">Applied</span>
-                @if(!empty($activeExemption['marla_label']))
-                    <span class="ssf-toolbar__exemption-meta">{{ $activeExemption['marla_label'] }}</span>
-                @endif
-                @if($plotChips !== [])
-                    <span class="ssf-toolbar__plots" title="Plot file sizes in this exemption">
-                        @foreach($plotChips as $chip)
-                            <span class="ssf-toolbar__plot-chip">{{ $chip }}</span>
-                        @endforeach
-                    </span>
-                @endif
-                @unless($isOpen)
-                    <span class="ssf-toolbar__locked">Locked on completed file</span>
-                @endunless
-            </div>
-        </div>
-        <div class="ssf-toolbar__btns ssf-toolbar__btns--primary">
-            <button type="button" class="btn btn-sm btn-outline-theme" data-bs-toggle="modal" data-bs-target="#{{ $viewModalId }}">
-                <i class="bi bi-eye" aria-hidden="true"></i> View
-            </button>
+<div class="ssf-toolbar ssf-toolbar--simple">
+    <div class="ssf-simple-bar">
+        <button
+            type="button"
+            class="ssf-simple-bar__value"
+            data-bs-toggle="modal"
+            data-bs-target="#{{ $viewModalId }}"
+            title="View exemption"
+        >
+            {{ \Illuminate\Support\Str::limit($exemptionSummary, 42) }}
+        </button>
+        <div class="ssf-simple-bar__actions">
             @if($isOpen)
-                <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#{{ $chooseModalId }}">
-                    <i class="bi bi-sliders" aria-hidden="true"></i> Choose
-                </button>
-                @if($project->isDha())
-                    <a
-                        href="{{ route('sale.projects.exemption.edit', ['project' => $project, 'return_collective_id' => $collectiveId]) }}"
-                        class="btn btn-sm btn-outline-theme"
-                    >
-                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add
-                    </a>
-                @endif
+                <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#{{ $chooseModalId }}">Change</button>
+            @else
+                <span class="ssf-simple-bar__locked">Locked</span>
             @endif
-        </div>
-    </div>
-
-    <div class="ssf-toolbar__groups">
-        <div class="ssf-toolbar__group">
-            <span class="ssf-toolbar__group-label"><i class="bi bi-printer" aria-hidden="true"></i> Reports</span>
-            <div class="ssf-toolbar__btns">
-                <a href="{{ route('sale.files.collectives.leftover-land.pdf', [$project, $collectiveId]) }}" class="btn btn-sm btn-outline-theme">
-                    Print leftover PDF
-                </a>
-                <a href="{{ route('sale-land.index') }}" class="btn btn-sm btn-outline-theme">
-                    Sold land files
-                </a>
-            </div>
-        </div>
-
-        <div class="ssf-toolbar__group">
-            <span class="ssf-toolbar__group-label"><i class="bi bi-flag" aria-hidden="true"></i> Status</span>
-            <div class="ssf-toolbar__btns">
-                @if($isOpen)
-                    <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collectiveId]) }}">
-                        @csrf
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-theme btn-delete-confirm"
-                            data-title="Mark complete?"
-                            data-text="Mark {{ $collective['name'] ?? 'this sale file' }} complete? It will no longer accept new files or exemption changes."
-                            data-confirm="Yes, mark complete"
-                        >
-                            <i class="bi bi-check2-circle" aria-hidden="true"></i> Mark complete
-                        </button>
-                    </form>
-                @else
-                    <form method="post" action="{{ route('sale.files.collectives.reopen', [$project, $collectiveId]) }}">
-                        @csrf
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-secondary btn-delete-confirm"
-                            data-title="Reopen sale file?"
-                            data-text="Reopen {{ $collective['name'] ?? 'this sale file' }} so files and exemptions can be changed again?"
-                            data-confirm="Yes, reopen"
-                        >
-                            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reopen
-                        </button>
-                    </form>
-                @endif
-            </div>
+            <a href="{{ route('sale.files.collectives.leftover-land.pdf', [$project, $collectiveId]) }}" class="btn btn-sm btn-outline-theme">PDF</a>
+            @if($isOpen)
+                <form method="post" action="{{ route('sale.files.collectives.complete', [$project, $collectiveId]) }}" class="d-inline">
+                    @csrf
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-theme btn-delete-confirm"
+                        data-title="Mark complete?"
+                        data-text="Mark {{ $collective['name'] ?? 'this sale file' }} complete?"
+                        data-confirm="Yes, mark complete"
+                    >Done</button>
+                </form>
+            @else
+                <form method="post" action="{{ route('sale.files.collectives.reopen', [$project, $collectiveId]) }}" class="d-inline">
+                    @csrf
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary btn-delete-confirm"
+                        data-title="Reopen sale file?"
+                        data-text="Reopen {{ $collective['name'] ?? 'this sale file' }}?"
+                        data-confirm="Yes, reopen"
+                    >Reopen</button>
+                </form>
+            @endif
         </div>
     </div>
 </div>

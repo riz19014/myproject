@@ -50,108 +50,106 @@
 @push('modals')
 @if($isOpen)
 <div class="modal fade" id="{{ $chooseModalId }}" tabindex="-1" aria-labelledby="{{ $chooseModalId }}-title" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-md">
         <form
             method="post"
             action="{{ route('sale.files.collectives.apply-exemption', [$project, $collectiveId]) }}"
             class="modal-content exemption-modal-content"
         >
             @csrf
-            <div class="modal-header exemption-modal-header">
-                <div>
-                    <h2 class="modal-title h5 mb-1" id="{{ $chooseModalId }}-title">Choose exemption</h2>
-                    <p class="small text-muted mb-0">Pick which formula to apply on {{ $collective['name'] ?? 'this sale file' }} ({{ $landLabel }}).</p>
-                </div>
+            <div class="modal-header exemption-modal-header py-2 px-3">
+                <h2 class="modal-title h6 mb-0" id="{{ $chooseModalId }}-title">Choose exemption</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" style="background: #f8fafc;">
-                <p class="exemption-pick-hint mb-0">
-                    This updates the plot files left numbers using the selected exemption.
-                </p>
-                <div class="exemption-pick-list mt-3" role="radiogroup" aria-label="Exemption options">
+            <div class="modal-body py-2 px-3">
+                <div class="exemption-pick-list" role="radiogroup" aria-label="Exemption options">
                     @forelse($pickOptions as $index => $option)
-                        <label class="exemption-pick-option {{ !empty($option['is_applied']) ? 'is-applied' : '' }}">
+                        @php
+                            $lineTitle = $option['title'] ?? ($option['label'] ?? 'Exemption');
+                            $lineBadge = $option['badge'] ?? null;
+                            $isApplied = ! empty($option['is_applied']);
+                            $isLive = ! empty($option['is_current']);
+                            $components = $option['components'] ?? [];
+                            $metaParts = array_filter([
+                                $option['marla_label'] ?? null,
+                                $option['date_label'] ?? null,
+                            ]);
+                        @endphp
+                        <label class="exemption-pick-line {{ $isApplied ? 'is-applied' : '' }}">
                             <input
                                 type="radio"
                                 name="snapshot_id"
                                 value="{{ $option['id'] ?? '' }}"
                                 @checked($index === $appliedPickIndex)
                             >
-                            <div class="exemption-pick-card {{ !empty($option['is_applied']) ? 'is-applied' : '' }}">
-                                <div class="exemption-pick-card__top">
-                                    <h3 class="exemption-pick-card__title">{{ $option['title'] ?? ($option['label'] ?? 'Exemption') }}</h3>
-                                    @if(!empty($option['badge']))
-                                        <span class="exemption-pick-card__badge {{ !empty($option['is_applied']) ? 'is-applied' : (!empty($option['is_current']) ? 'is-live' : '') }}">
-                                            {{ $option['badge'] }}
-                                        </span>
+                            <span class="exemption-pick-line__radio" aria-hidden="true"></span>
+                            <span class="exemption-pick-line__body">
+                                <span class="exemption-pick-line__text">
+                                    <span class="exemption-pick-line__title">{{ $lineTitle }}</span>
+                                    @if($isApplied)
+                                        <span class="exemption-pick-line__badge is-applied">Applied</span>
+                                    @elseif($lineBadge)
+                                        <span class="exemption-pick-line__badge {{ $isLive ? 'is-live' : '' }}">{{ $lineBadge }}</span>
                                     @endif
-                                </div>
-                                @if(!empty($option['is_applied']))
-                                    <div class="exemption-pick-card__applied-note">Currently drives Plot files left on this sale file</div>
+                                </span>
+                                @if($metaParts !== [])
+                                    <span class="exemption-pick-line__meta">{{ implode(' · ', $metaParts) }}</span>
                                 @endif
-                                <div class="exemption-pick-card__summary">{{ $option['summary'] ?? ($option['label'] ?? '—') }}</div>
-                                <div class="exemption-pick-card__meta">
-                                    {{ $option['marla_label'] ?? '' }}
-                                    @if(!empty($option['date_label']))
-                                        · {{ $option['date_label'] }}
-                                    @endif
-                                </div>
-                                @if(!empty($option['components']))
-                                    <div class="exemption-pick-breakdown">
-                                        @foreach($option['components'] as $component)
-                                            <div class="exemption-pick-comp">
-                                                <div class="exemption-pick-comp__head">
-                                                    <span class="exemption-pick-comp__title">{{ $component['label'] ?? '' }}</span>
-                                                    <span class="exemption-pick-comp__pool">Pool {{ $component['percent'] ?? '' }}</span>
-                                                </div>
-                                                @if(!empty($component['plots']))
-                                                    <ul class="exemption-pick-comp__plots">
-                                                        @foreach($component['plots'] as $plot)
-                                                            <li>
-                                                                <span>{{ $plot['label'] ?? 'Plot' }}</span>
-                                                                <span>
-                                                                    <strong>{{ $plot['marla_label'] ?? '—' }}</strong>
-                                                                    @if(!empty($plot['share_label']) && ($plot['share_percent'] ?? 0) > 0)
-                                                                        · share {{ $plot['share_label'] }}
-                                                                    @endif
-                                                                </span>
-                                                            </li>
-                                                        @endforeach
-                                                    </ul>
-                                                @else
-                                                    <div class="exemption-pick-comp__empty">No plot marla configured</div>
-                                                @endif
-                                            </div>
+                                @if($components !== [])
+                                    <span class="exemption-pick-line__comps">
+                                        @foreach($components as $component)
+                                            @php
+                                                $compSlug = strtolower((string) ($component['slug'] ?? ''));
+                                                $compClass = str_contains($compSlug, 'commerc') ? 'is-commercial' : (str_contains($compSlug, 'resid') ? 'is-residential' : '');
+                                            @endphp
+                                            <span class="exemption-pick-line__comp {{ $compClass }}">
+                                                <span class="exemption-pick-line__comp-head">
+                                                    <span class="exemption-pick-line__comp-title">{{ $component['label'] ?? 'Component' }}</span>
+                                                    <span class="exemption-pick-line__comp-pool">Pool {{ $component['percent'] ?? '' }}</span>
+                                                </span>
+                                                @forelse(($component['plots'] ?? []) as $plot)
+                                                    <span class="exemption-pick-line__plot">
+                                                        <span class="exemption-pick-line__plot-name">{{ $plot['label'] ?? 'Plot' }}</span>
+                                                        <span class="exemption-pick-line__plot-vals">
+                                                            {{ $plot['marla_label'] ?? '—' }}
+                                                            @if(!empty($plot['share_label']) && ($plot['share_percent'] ?? 0) > 0)
+                                                                · share {{ $plot['share_label'] }}
+                                                            @endif
+                                                        </span>
+                                                    </span>
+                                                @empty
+                                                    <span class="exemption-pick-line__plot-empty">No plot marla configured</span>
+                                                @endforelse
+                                            </span>
                                         @endforeach
-                                    </div>
+                                    </span>
                                 @endif
-                            </div>
+                            </span>
                         </label>
                     @empty
                         <div class="exemption-pick-empty">
-                            No exemption setups found yet.
+                            No exemption setups yet.
                             @if($project->isDha())
-                                Use <strong>Add exemption</strong> to create one, then apply it here.
+                                Use <strong>Add</strong> to create one.
                             @endif
                         </div>
                     @endforelse
                 </div>
             </div>
-            <div class="modal-footer justify-content-between flex-wrap gap-2">
+            <div class="modal-footer py-2 px-3 justify-content-between flex-wrap gap-2">
                 <div>
                     @if($project->isDha())
                         <a
                             href="{{ route('sale.projects.exemption.edit', ['project' => $project, 'return_collective_id' => $collectiveId]) }}"
-                            class="btn btn-outline-theme"
+                            class="btn btn-sm btn-outline-theme"
                         >
-                            <i class="bi bi-plus-lg" aria-hidden="true"></i>
-                            Add exemption
+                            Add
                         </a>
                     @endif
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-outline-theme" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-pink" @disabled(empty($pickOptions))>Apply exemption</button>
+                    <button type="button" class="btn btn-sm btn-outline-theme" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-pink" @disabled(empty($pickOptions))>Apply</button>
                 </div>
             </div>
         </form>
