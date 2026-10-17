@@ -303,6 +303,62 @@
         margin-top: 0.1rem;
         line-height: 1.25;
     }
+    .daybook-page .daybook-opening-form {
+        margin: 0;
+    }
+    .daybook-page .daybook-opening-form__row {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        min-width: 0;
+    }
+    .daybook-page .daybook-opening-form__prefix {
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #0f172a;
+        flex-shrink: 0;
+    }
+    .daybook-page .daybook-opening-form__input {
+        width: 100%;
+        min-width: 0;
+        max-width: 7.5rem;
+        height: 1.55rem;
+        padding: 0.1rem 0.35rem;
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #0f172a;
+        background: #fff;
+        line-height: 1.2;
+    }
+    .daybook-page .daybook-opening-form__input:focus {
+        outline: none;
+        border-color: rgba(100, 116, 139, 0.55);
+        box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.15);
+    }
+    .daybook-page .daybook-opening-form__input.is-invalid {
+        border-color: #dc2626;
+    }
+    .daybook-page .daybook-opening-form__btn {
+        flex-shrink: 0;
+        height: 1.55rem;
+        padding: 0 0.45rem;
+        border: none;
+        border-radius: 6px;
+        background: #475569;
+        color: #fff;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .daybook-page .daybook-opening-form__btn:hover {
+        background: #334155;
+    }
     .daybook-page .daybook-metric__breakdown {
         margin-top: 0.2rem;
         display: flex;

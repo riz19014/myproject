@@ -718,12 +718,15 @@ class DayBookController extends Controller
             }
         }
 
+        $canEditOpening = ! $this->shouldCarryOpeningFromPreviousDay($day);
+
         return view('daybook.index', [
             'day' => $day,
             'prevDay' => $prevDay,
             'entries' => $entries,
             'openingRecord' => $openingRecord,
             'openingAmount' => $openingAmount,
+            'canEditOpening' => $canEditOpening,
             'pettyCashAmount' => $pettyCashAmount,
             'previousDayClosing' => $previousDayClosing,
             'cashIn' => $cashIn,
@@ -1344,6 +1347,35 @@ class DayBookController extends Controller
         return redirect()
             ->route('daybook.index', ['date' => $dateStr])
             ->with('success', 'Petty cash saved.');
+    }
+
+    public function updateOpeningBalance(Request $request)
+    {
+        $validated = $request->validate([
+            'balance_date' => ['required', 'date'],
+            'amount' => ['required', 'numeric'],
+        ]);
+
+        $day = Carbon::parse($validated['balance_date'])->startOfDay();
+        $dateStr = $day->toDateString();
+
+        if ($this->shouldCarryOpeningFromPreviousDay($day)) {
+            return redirect()
+                ->route('daybook.index', ['date' => $dateStr])
+                ->withErrors(['amount' => 'Opening balance is carried from the previous day and cannot be edited.']);
+        }
+
+        $this->syncOpeningFromPreviousDay($day);
+
+        $record = DaybookOpeningBalance::query()
+            ->where('balance_date', $dateStr)
+            ->firstOrFail();
+
+        $record->update(['amount' => $validated['amount']]);
+
+        return redirect()
+            ->route('daybook.index', ['date' => $dateStr])
+            ->with('success', 'Opening balance saved.');
     }
 
     /**

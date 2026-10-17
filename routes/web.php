@@ -97,6 +97,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('projects/{project}/partner-investments/{projectPartner}', [ProjectController::class, 'updatePartnerInvestment'])->name('projects.partner-investments.update');
     Route::delete('projects/{project}/partner-investments/{projectPartner}', [ProjectController::class, 'destroyPartnerInvestment'])->name('projects.partner-investments.destroy');
     Route::delete('projects/{project}/partners/{party}', [ProjectController::class, 'destroyPartner'])->name('projects.partners.destroy');
+    Route::get('projects/{project}/details', [ProjectController::class, 'details'])->name('projects.details');
+    Route::patch('projects/{project}/details/row', [ProjectController::class, 'updateBalanceDetailRow'])->name('projects.details.row.update');
     Route::get('projects/{project}/sale-land', [ProjectController::class, 'saleLand'])->name('projects.sale-land');
     Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
@@ -124,6 +126,7 @@ Route::middleware('auth')->group(function () {
     Route::get('daybook/ledger/pdf', [DayBookController::class, 'ledgerPdf'])->name('daybook.ledger.pdf');
     Route::get('daybook/report/pdf', [DayBookController::class, 'reportPdf'])->name('daybook.report.pdf');
     Route::post('daybook/petty-cash', [DayBookController::class, 'updatePettyCash'])->name('daybook.petty-cash');
+    Route::post('daybook/opening-balance', [DayBookController::class, 'updateOpeningBalance'])->name('daybook.opening-balance');
     Route::get('daybook/sale/file-details', [DayBookController::class, 'fileSaleDetails'])->name('daybook.sale.file-details');
     Route::post('daybook/sale/file', [DayBookController::class, 'storeFileSale'])->name('daybook.sale.file');
     Route::post('daybook/sale/plot', [DayBookController::class, 'storePlotSale'])->name('daybook.sale.plot');

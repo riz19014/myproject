@@ -76,8 +76,30 @@
             </div>
             <div class="daybook-metric__row daybook-metric__row--open">
                 <span class="daybook-metric__label">Opening</span>
-                <span class="daybook-metric__val">Rs {{ number_format($openingAmount, 2) }}</span>
-                <span class="daybook-metric__sub">Carried balance</span>
+                @if($canEditOpening)
+                    <form method="post" action="{{ route('daybook.opening-balance') }}" class="daybook-opening-form">
+                        @csrf
+                        <input type="hidden" name="balance_date" value="{{ $day->toDateString() }}">
+                        <div class="daybook-opening-form__row">
+                            <span class="daybook-opening-form__prefix">Rs</span>
+                            <input
+                                type="number"
+                                name="amount"
+                                id="daybook-opening-amount"
+                                class="daybook-opening-form__input @error('amount') is-invalid @enderror"
+                                value="{{ old('amount', number_format((float) $openingAmount, 2, '.', '')) }}"
+                                step="0.01"
+                                required
+                                aria-label="Opening balance amount"
+                            >
+                            <button type="submit" class="daybook-opening-form__btn">Save</button>
+                        </div>
+                        <span class="daybook-metric__sub">Starting balance</span>
+                    </form>
+                @else
+                    <span class="daybook-metric__val">Rs {{ number_format($openingAmount, 2) }}</span>
+                    <span class="daybook-metric__sub">Carried balance</span>
+                @endif
             </div>
         </div>
     </div>
