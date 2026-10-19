@@ -32,10 +32,14 @@ Route::middleware('auth')->group(function () {
     Route::get('sale', [SaleController::class, 'index'])->name('sale.index');
     Route::get('sale/percentage', [SaleProjectFileController::class, 'percentageIndex'])->name('sale.percentage.index');
     Route::get('sale/exemption', [ProjectSaleExemptionController::class, 'index'])->name('sale.exemption.index');
+    Route::delete('sale/exemption', [ProjectSaleExemptionController::class, 'destroyAll'])->name('sale.exemption.destroy-all');
+    Route::delete('sale/exemption/selected', [ProjectSaleExemptionController::class, 'destroySelected'])->name('sale.exemption.destroy-selected');
     Route::get('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'edit'])->name('sale.projects.exemption.edit');
     Route::put('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'update'])->name('sale.projects.exemption.update');
+    Route::delete('sale/projects/{project}/exemption/snapshots', [ProjectSaleExemptionController::class, 'destroyProjectSnapshots'])->name('sale.projects.exemption.snapshots.destroy-all');
     Route::get('sale/projects/{project}/exemption/snapshots/{snapshot}/edit', [ProjectSaleExemptionController::class, 'editSnapshot'])->name('sale.projects.exemption.snapshot.edit');
     Route::put('sale/projects/{project}/exemption/snapshots/{snapshot}', [ProjectSaleExemptionController::class, 'updateSnapshot'])->name('sale.projects.exemption.snapshot.update');
+    Route::delete('sale/projects/{project}/exemption/snapshots/{snapshot}', [ProjectSaleExemptionController::class, 'destroySnapshot'])->name('sale.projects.exemption.snapshot.destroy');
     Route::get('sale/projects/{project}/files', [SaleProjectFileController::class, 'index'])->name('sale.files.index');
     Route::get('sale/projects/{project}/files/original-formula-pdf', [SaleProjectFileController::class, 'originalFormulaPdf'])->name('sale.files.original-formula.pdf');
     Route::get('sale/projects/{project}/files/leftover-land-pdf', [SaleProjectFileController::class, 'leftoverLandBalancePdf'])->name('sale.files.leftover-land.pdf');

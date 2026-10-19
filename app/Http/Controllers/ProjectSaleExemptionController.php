@@ -160,6 +160,67 @@ class ProjectSaleExemptionController extends Controller
             ->with('success', 'Saved exemption updated for '.$project->name.'.');
     }
 
+    public function destroySnapshot(Project $project, ProjectSaleExemptionSnapshot $snapshot)
+    {
+        abort_unless($project->isDha(), 404);
+        abort_unless((int) $snapshot->project_id === (int) $project->id, 404);
+
+        $snapshot->delete();
+
+        return redirect()
+            ->route('sale.exemption.index')
+            ->with('success', 'Saved exemption deleted for '.$project->name.'.');
+    }
+
+    public function destroyProjectSnapshots(Project $project)
+    {
+        abort_unless($project->isDha(), 404);
+
+        $deleted = ProjectSaleExemptionSnapshot::query()
+            ->where('project_id', $project->id)
+            ->delete();
+
+        return redirect()
+            ->route('sale.exemption.index')
+            ->with('success', $deleted > 0
+                ? 'Deleted '.$deleted.' saved '.($deleted === 1 ? 'exemption' : 'exemptions').' for '.$project->name.'.'
+                : 'No saved exemptions to delete for '.$project->name.'.');
+    }
+
+    public function destroySelected(Request $request)
+    {
+        $validated = $request->validate([
+            'snapshot_ids' => ['required', 'array', 'min:1'],
+            'snapshot_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $ids = collect($validated['snapshot_ids'])->map(fn ($id) => (int) $id)->unique()->values()->all();
+
+        $deleted = ProjectSaleExemptionSnapshot::query()
+            ->whereIn('id', $ids)
+            ->whereHas('project', fn ($q) => $q->where('is_dha', true))
+            ->delete();
+
+        return redirect()
+            ->route('sale.exemption.index')
+            ->with('success', $deleted > 0
+                ? 'Deleted '.$deleted.' selected '.($deleted === 1 ? 'exemption' : 'exemptions').'.'
+                : 'No matching exemptions were deleted.');
+    }
+
+    public function destroyAll()
+    {
+        $deleted = ProjectSaleExemptionSnapshot::query()
+            ->whereHas('project', fn ($q) => $q->where('is_dha', true))
+            ->delete();
+
+        return redirect()
+            ->route('sale.exemption.index')
+            ->with('success', $deleted > 0
+                ? 'Deleted all '.$deleted.' saved '.($deleted === 1 ? 'exemption' : 'exemptions').'.'
+                : 'No saved exemptions to delete.');
+    }
+
     public function update(Request $request, Project $project)
     {
         abort_unless($project->isDha(), 404);

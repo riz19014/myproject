@@ -3,6 +3,9 @@
 @section('title', 'Project exemption')
 
 @section('content')
+@php
+    $totalSavedExemptions = (int) $projects->sum(fn ($p) => (int) $p->sale_exemption_snapshots_count);
+@endphp
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
         <h1 class="mb-1 d-flex align-items-center gap-2">
@@ -11,7 +14,35 @@
         </h1>
         <p class="text-muted small mb-0">DHA projects only. Each save adds a new exemption entry — previous saves stay listed. Use trial land area to preview formula file counts.</p>
     </div>
-    <a href="{{ route('sale.percentage.index') }}" class="btn btn-outline-theme btn-sm">Sale percentage</a>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        @if($totalSavedExemptions > 0)
+            <span class="small text-muted">
+                Total <strong id="exemption-total-count">{{ $totalSavedExemptions }}</strong>
+                · Selected <strong id="exemption-selected-count">0</strong>
+            </span>
+            <label class="btn btn-sm btn-outline-theme mb-0 d-inline-flex align-items-center gap-2">
+                <input type="checkbox" class="form-check-input m-0" id="exemption-select-all" aria-label="Select all exemptions">
+                <span>Select all</span>
+            </label>
+            <form method="post" action="{{ route('sale.exemption.destroy-selected') }}" id="exemption-delete-selected-form" class="d-inline">
+                @csrf
+                @method('DELETE')
+                <div id="exemption-selected-ids"></div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger btn-delete-confirm"
+                    id="exemption-delete-selected-btn"
+                    data-title="Delete selected exemptions?"
+                    data-text="Only the checked saved exemptions will be removed. Sale files that already applied them keep their copy."
+                    data-confirm="Yes, delete selected"
+                    disabled
+                >Delete selected</button>
+            </form>
+        @else
+            <span class="small text-muted">Total <strong>0</strong> exemptions</span>
+        @endif
+        <a href="{{ route('sale.percentage.index') }}" class="btn btn-outline-theme btn-sm">Sale percentage</a>
+    </div>
 </div>
 
 @if(session('success'))
@@ -94,17 +125,38 @@
                         @endphp
                         <div class="{{ ! $loop->last ? 'border-bottom pb-4 mb-4' : '' }}">
                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                                <div>
-                                    <h3 class="h6 mb-1">Saved exemption #{{ $saveNumber }}</h3>
-                                    <p class="text-muted small mb-0">
-                                        {{ $snapshot->created_at->format('d M Y, h:i A') }}
-                                        · {{ $snapshot->summaryLabel() }}
-                                        · 1 acre = {{ rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.') }} marla
-                                    </p>
+                                <div class="d-flex align-items-start gap-2">
+                                    <input
+                                        type="checkbox"
+                                        class="form-check-input mt-1 exemption-snapshot-check"
+                                        value="{{ $snapshot->id }}"
+                                        aria-label="Select saved exemption #{{ $saveNumber }}"
+                                    >
+                                    <div>
+                                        <h3 class="h6 mb-1">Saved exemption #{{ $saveNumber }}</h3>
+                                        <p class="text-muted small mb-0">
+                                            {{ $snapshot->created_at->format('d M Y, h:i A') }}
+                                            · {{ $snapshot->summaryLabel() }}
+                                            · 1 acre = {{ rtrim(rtrim(number_format($snapshot->marlaPerAcre(), 4, '.', ''), '0'), '.') }} marla
+                                        </p>
+                                    </div>
                                 </div>
-                                <a href="{{ route('sale.projects.exemption.snapshot.edit', [$project, $snapshot]) }}" class="btn btn-sm btn-outline-theme">
-                                    Edit
-                                </a>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="{{ route('sale.projects.exemption.snapshot.edit', [$project, $snapshot]) }}" class="btn btn-sm btn-outline-theme">
+                                        Edit
+                                    </a>
+                                    <form method="post" action="{{ route('sale.projects.exemption.snapshot.destroy', [$project, $snapshot]) }}" class="d-inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger btn-delete-confirm"
+                                            data-title="Delete this exemption?"
+                                            data-text="Remove saved exemption #{{ $saveNumber }} for {{ $project->name }}? Sale files that already applied it keep their copy."
+                                            data-confirm="Yes, delete"
+                                        >Delete</button>
+                                    </form>
+                                </div>
                             </div>
                             <div class="row g-3">
                                 <div class="col-lg-5">
@@ -208,3 +260,57 @@
     @endforeach
 @endif
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var checks = Array.prototype.slice.call(document.querySelectorAll('.exemption-snapshot-check'));
+    var btn = document.getElementById('exemption-delete-selected-btn');
+    var idsWrap = document.getElementById('exemption-selected-ids');
+    var selectAll = document.getElementById('exemption-select-all');
+    var selectedCountEl = document.getElementById('exemption-selected-count');
+    if (!checks.length || !btn || !idsWrap) return;
+
+    function syncSelected() {
+        var selected = checks.filter(function (el) { return el.checked; });
+        idsWrap.innerHTML = '';
+        selected.forEach(function (el) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'snapshot_ids[]';
+            input.value = el.value;
+            idsWrap.appendChild(input);
+        });
+        if (selectedCountEl) {
+            selectedCountEl.textContent = String(selected.length);
+        }
+        if (selectAll) {
+            selectAll.checked = selected.length > 0 && selected.length === checks.length;
+            selectAll.indeterminate = selected.length > 0 && selected.length < checks.length;
+        }
+        btn.disabled = selected.length === 0;
+        btn.textContent = selected.length > 0
+            ? ('Delete selected (' + selected.length + ')')
+            : 'Delete selected';
+        btn.dataset.text = selected.length === 1
+            ? 'Delete 1 selected exemption? Sale files that already applied it keep their copy.'
+            : 'Delete ' + selected.length + ' selected exemptions? Sale files that already applied them keep their copy.';
+    }
+
+    checks.forEach(function (el) {
+        el.addEventListener('change', syncSelected);
+    });
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            checks.forEach(function (el) {
+                el.checked = selectAll.checked;
+            });
+            syncSelected();
+        });
+    }
+
+    syncSelected();
+})();
+</script>
+@endpush
