@@ -2934,10 +2934,61 @@
         setText('daybook_sale_info_khatooni', '—');
         setText('daybook_sale_info_khasra', '—');
         setText('daybook_sale_selected_plot_label', '—');
+        setText('daybook_sale_exemption_summary', '—');
+        setText('daybook_sale_exemption_source', '—');
+        setText('daybook_sale_exemption_acres', '—');
+        setText('daybook_sale_exemption_land', '—');
+        setText('daybook_sale_plot_calc', 'Select a plot type');
+        setText('daybook_sale_plot_left_now', '—');
+        setText('daybook_sale_plot_left_after', '—');
         var hint = document.getElementById('daybook_sale_plot_qty_hint');
         if (hint) hint.textContent = '';
         var optionsEl = document.getElementById('daybook_sale_plot_options');
         if (optionsEl) optionsEl.innerHTML = '';
+        renderBalanceTable([]);
+    }
+
+    function formatFilesCount(value) {
+        var n = Number(value);
+        if (!isFinite(n)) return '0';
+        var rounded = Math.round(n * 10000) / 10000;
+        if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+        return String(rounded);
+    }
+
+    function updateSellBalance() {
+        var option = selectedPlotOption;
+        var qtyEl = document.getElementById('daybook_sale_plot_qty');
+        var hint = document.getElementById('daybook_sale_plot_qty_hint');
+        var leftNow = Number(option && option.remaining_files != null ? option.remaining_files : 0) || 0;
+        var qty = qtyEl ? (parseInt(qtyEl.value, 10) || 0) : 0;
+        var leftAfter = Math.max(0, leftNow - qty);
+
+        setText('daybook_sale_plot_left_now', option ? (option.remaining_display || formatFilesCount(leftNow)) : '—');
+        setText('daybook_sale_plot_left_after', option ? formatFilesCount(leftAfter) : '—');
+        setText(
+            'daybook_sale_plot_calc',
+            option
+                ? ((option.code ? String(option.code).replace(/\./g, '') + ' · ' : '') +
+                    (option.calculation_display || 'Formula on this file') +
+                    (option.share_display ? ' · Share ' + option.share_display : ''))
+                : 'Select a plot type'
+        );
+
+        if (hint) {
+            if (!option) {
+                hint.textContent = '';
+            } else if (qty > leftNow) {
+                hint.textContent = 'Cannot sell more than ' + (option.remaining_display || formatFilesCount(leftNow)) + ' left.';
+                hint.classList.add('text-danger');
+            } else {
+                hint.classList.remove('text-danger');
+                hint.textContent = (option.component_label || '') +
+                    (option.marla_per_plot ? ' · ' + option.marla_per_plot + 'M each' : '') +
+                    ' · Selling ' + formatFilesCount(qty) +
+                    ' · Remaining after sale ' + formatFilesCount(leftAfter);
+            }
+        }
     }
 
     function selectPlotOption(option) {
@@ -2945,21 +2996,14 @@
         var componentEl = document.getElementById('daybook_sale_component');
         var plotTypeEl = document.getElementById('daybook_sale_plot_type');
         var qtyEl = document.getElementById('daybook_sale_plot_qty');
-        var hint = document.getElementById('daybook_sale_plot_qty_hint');
         var labelEl = document.getElementById('daybook_sale_selected_plot_label');
         if (componentEl) componentEl.value = option ? (option.component_slug || '') : '';
         if (plotTypeEl) plotTypeEl.value = option ? (option.plot_slug || '') : '';
         if (labelEl) {
             labelEl.textContent = option
-                ? ((option.label || option.plot_label || option.plot_slug) +
-                    (option.remaining_display != null ? ' · ' + option.remaining_display + ' left' : ''))
+                ? ((option.code ? String(option.code).replace(/\./g, '') + ' ' : '') +
+                    (option.label || option.plot_label || option.plot_slug || 'Plot'))
                 : '—';
-        }
-        if (hint) {
-            hint.textContent = option
-                ? ('Available: ' + (option.remaining_display || '0') +
-                    (option.marla_per_plot ? ' · ' + option.marla_per_plot + ' marla each' : ''))
-                : '';
         }
         if (qtyEl && option) {
             var maxQty = Math.max(1, Math.floor(Number(option.remaining_files) || 0));
@@ -2967,6 +3011,9 @@
             var current = parseInt(qtyEl.value, 10) || 1;
             if (current > maxQty) qtyEl.value = String(maxQty);
             if (current < 1) qtyEl.value = '1';
+            qtyEl.disabled = !!option.disabled || maxQty < 1;
+        } else if (qtyEl) {
+            qtyEl.disabled = true;
         }
         var optionsEl = document.getElementById('daybook_sale_plot_options');
         if (optionsEl) {
@@ -2975,6 +3022,44 @@
                 btn.classList.toggle('is-selected', !!(option && key === String(option.plot_key)));
             });
         }
+        var balanceRows = document.querySelectorAll('#daybook_sale_balance_tbody tr[data-plot-key]');
+        balanceRows.forEach(function (row) {
+            row.classList.toggle('is-selected', !!(option && row.getAttribute('data-plot-key') === String(option.plot_key)));
+        });
+        updateSellBalance();
+    }
+
+    function renderBalanceTable(options) {
+        var tbody = document.getElementById('daybook_sale_balance_tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        var list = Array.isArray(options) ? options : [];
+        if (!list.length) {
+            var emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = '<td colspan="5" class="text-muted small">No formula plot sizes on this file.</td>';
+            tbody.appendChild(emptyRow);
+            return;
+        }
+        list.forEach(function (option) {
+            var tr = document.createElement('tr');
+            tr.setAttribute('data-plot-key', option.plot_key || '');
+            if (option.disabled) tr.classList.add('is-disabled');
+            tr.innerHTML =
+                '<td class="fw-semibold">' + (option.code ? String(option.code).replace(/\./g, '') : '—') + '</td>' +
+                '<td><span class="fw-semibold">' + (option.label || option.plot_label || '—') + '</span>' +
+                    '<span class="daybook-sale-balance-table__sub">' + (option.component_label || '') + '</span></td>' +
+                '<td class="text-end">' + (option.available_display || '0') + '</td>' +
+                '<td class="text-end">' + (option.sold_display || '—') + '</td>' +
+                '<td class="text-end fw-semibold">' + (option.remaining_display || '0') + '</td>';
+            if (!option.disabled) {
+                tr.style.cursor = 'pointer';
+                tr.addEventListener('click', function () {
+                    selectPlotOption(option);
+                    showError('');
+                });
+            }
+            tbody.appendChild(tr);
+        });
     }
 
     function renderPlotOptions(options) {
@@ -2982,6 +3067,7 @@
         if (!optionsEl) return;
         optionsEl.innerHTML = '';
         var list = Array.isArray(options) ? options : [];
+        renderBalanceTable(list);
         if (!list.length) {
             var empty = document.createElement('div');
             empty.className = 'daybook-sale-plot-options__empty';
@@ -2999,11 +3085,13 @@
             btn.disabled = !!option.disabled;
             var title = document.createElement('span');
             title.className = 'daybook-sale-plot-option__title';
-            title.textContent = option.label || option.plot_label || option.plot_slug || 'Plot';
+            title.textContent = (option.code ? String(option.code).replace(/\./g, '') + ' · ' : '') +
+                (option.label || option.plot_label || option.plot_slug || 'Plot');
             var meta = document.createElement('span');
             meta.className = 'daybook-sale-plot-option__meta';
             meta.textContent = (option.component_label || option.component_slug || '') +
-                ' · Remaining ' + (option.remaining_display || '0');
+                ' · Left ' + (option.remaining_display || '0') +
+                (option.share_display ? ' · ' + option.share_display : '');
             btn.appendChild(title);
             btn.appendChild(meta);
             btn.addEventListener('click', function () {
@@ -3015,6 +3103,19 @@
         });
         var first = list.find(function (o) { return !o.disabled; }) || null;
         selectPlotOption(first);
+    }
+
+    function applyExemptionDetails(details) {
+        var exemption = details && details.exemption ? details.exemption : null;
+        setText('daybook_sale_exemption_summary', exemption ? (exemption.summary || '—') : '—');
+        setText(
+            'daybook_sale_exemption_source',
+            exemption
+                ? ((exemption.source_type === 'collective' ? 'Applied on ' : '') + (exemption.source || '—'))
+                : '—'
+        );
+        setText('daybook_sale_exemption_acres', exemption ? (exemption.acres_display || '—') : '—');
+        setText('daybook_sale_exemption_land', exemption ? (exemption.total_land || '—') : '—');
     }
 
     function applyFileDetails(details) {
@@ -3029,6 +3130,7 @@
         setText('daybook_sale_info_khewat', details ? details.khewat_no : '—');
         setText('daybook_sale_info_khatooni', details ? details.khatooni_no : '—');
         setText('daybook_sale_info_khasra', details ? details.khasra : '—');
+        applyExemptionDetails(details);
         renderPlotOptions(details ? details.plot_options : []);
     }
 
@@ -3315,8 +3417,13 @@
         var status = statusEl ? statusEl.value : 'complete';
         var note = noteEl && noteEl.value ? noteEl.value.trim() : '';
 
+        var landOwnerEl = document.getElementById('daybook_sale_land_owner');
+        var landProviderEl = document.getElementById('daybook_sale_land_provider');
+        var landOwner = landOwnerEl ? landOwnerEl.value.trim() : '';
+        var landProvider = landProviderEl ? landProviderEl.value.trim() : '';
+
         if (!eStamp) {
-            showError('Enter the eStamp ID.');
+            showError('Enter the intimation letter No.');
             if (eStampEl) eStampEl.focus();
             return;
         }
@@ -3348,6 +3455,8 @@
         formData.append('purchase_file_id', String(selectedItem.id));
         formData.append('e_stamp_id', eStamp);
         formData.append('purchaser_name', purchaser);
+        formData.append('land_owner', landOwner);
+        formData.append('land_provider', landProvider);
         formData.append('component', selectedPlotOption.component_slug || '');
         formData.append('plot_type', selectedPlotOption.plot_slug || '');
         formData.append('plot_quantity', String(qty));
@@ -3423,7 +3532,7 @@
                 ' · ' + purchaser +
                 (plotLabel ? ' · ' + plotLabel + (qty > 1 ? ' ×' + qty : '') : '') +
                 (areaLabel ? ' · ' + areaLabel : '') +
-                ' · eStamp ' + eStamp
+                ' · Letter ' + eStamp
             );
 
             var applied = typeof window.__daybookApplySaleToForm === 'function' && window.__daybookApplySaleToForm({
@@ -3576,6 +3685,12 @@
         docsInput.addEventListener('change', function () {
             addSelectedDocuments(docsInput.files);
         });
+    }
+
+    var plotQtyInput = document.getElementById('daybook_sale_plot_qty');
+    if (plotQtyInput) {
+        plotQtyInput.addEventListener('input', updateSellBalance);
+        plotQtyInput.addEventListener('change', updateSellBalance);
     }
 
     if (projectSearch) {

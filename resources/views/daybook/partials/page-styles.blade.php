@@ -1402,6 +1402,122 @@
         color: #64748b;
         margin-top: 0.2rem;
     }
+    .daybook-sale-exemption {
+        margin-bottom: 0.85rem;
+        padding: 0.7rem 0.85rem;
+        border-radius: 12px;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+    }
+    .daybook-sale-exemption__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.45rem 0.65rem;
+    }
+    .daybook-sale-exemption__label {
+        font-size: 0.68rem;
+        font-weight: 750;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .daybook-sale-exemption__value {
+        font-size: 0.92rem;
+        font-weight: 750;
+        color: #0f172a;
+        word-break: break-word;
+    }
+    .daybook-sale-exemption__meta {
+        margin-top: 0.3rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem 0.55rem;
+        font-size: 0.78rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .daybook-sale-exemption__meta strong {
+        color: #0f172a;
+        font-weight: 750;
+    }
+    .daybook-sale-balance-table {
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .daybook-sale-balance-table thead th {
+        font-size: 0.68rem;
+        font-weight: 750;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #64748b;
+        background: #f8fafc;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        white-space: nowrap;
+        padding: 0.45rem 0.55rem;
+    }
+    .daybook-sale-balance-table tbody td {
+        padding: 0.45rem 0.55rem;
+        font-size: 0.86rem;
+        border-top: 1px solid rgba(15, 23, 42, 0.06);
+        vertical-align: middle;
+    }
+    .daybook-sale-balance-table tbody tr.is-selected td {
+        background: rgba(251, 232, 241, 0.55);
+    }
+    .daybook-sale-balance-table tbody tr.is-disabled td {
+        opacity: 0.55;
+    }
+    .daybook-sale-balance-table__sub {
+        display: block;
+        font-size: 0.72rem;
+        color: #94a3b8;
+        font-weight: 600;
+    }
+    .daybook-sale-sell-box {
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 0.85rem 0.95rem;
+    }
+    .daybook-sale-sell-box__calc {
+        font-size: 0.8rem;
+        font-weight: 650;
+        color: #475569;
+        margin-bottom: 0.7rem;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .daybook-sale-sell-stat {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        border-radius: 12px;
+        padding: 0.55rem 0.7rem;
+        min-height: 3.1rem;
+    }
+    .daybook-sale-sell-stat.is-after {
+        border-color: rgba(22, 163, 74, 0.25);
+        background: #f0fdf4;
+    }
+    .daybook-sale-sell-stat__label {
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 0.15rem;
+    }
+    .daybook-sale-sell-stat__value {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+        word-break: break-word;
+    }
     .daybook-sale-land-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));

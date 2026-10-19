@@ -300,13 +300,27 @@
                                 <p class="daybook-sale-card__hint mb-0" id="daybook_sale_file_summary">—</p>
                             </div>
 
+                            <div class="daybook-sale-exemption" id="daybook_sale_exemption" aria-live="polite">
+                                <div class="daybook-sale-exemption__row">
+                                    <span class="daybook-sale-exemption__label">Exemption</span>
+                                    <span class="daybook-sale-exemption__value" id="daybook_sale_exemption_summary">—</span>
+                                </div>
+                                <div class="daybook-sale-exemption__meta">
+                                    <span id="daybook_sale_exemption_source">—</span>
+                                    <span aria-hidden="true">·</span>
+                                    <span>Acres <strong id="daybook_sale_exemption_acres">—</strong></span>
+                                    <span aria-hidden="true">·</span>
+                                    <span id="daybook_sale_exemption_land">—</span>
+                                </div>
+                            </div>
+
                             <div class="daybook-sale-land-grid" id="daybook_sale_land_grid" aria-live="polite">
                                 <div class="daybook-sale-land-stat">
                                     <span class="daybook-sale-land-stat__label">Total land</span>
                                     <span class="daybook-sale-land-stat__value" id="daybook_sale_info_total_land">—</span>
                                 </div>
                                 <div class="daybook-sale-land-stat">
-                                    <span class="daybook-sale-land-stat__label">Remaining</span>
+                                    <span class="daybook-sale-land-stat__label">Remaining land</span>
                                     <span class="daybook-sale-land-stat__value" id="daybook_sale_info_remaining">—</span>
                                 </div>
                                 <div class="daybook-sale-land-stat">
@@ -330,21 +344,21 @@
 
                         <div class="daybook-sale-card mb-3">
                             <div class="daybook-sale-card__head">
-                                <h3 class="daybook-sale-card__title">Parties &amp; stamp</h3>
-                                <p class="daybook-sale-card__hint mb-0">Owner and provider load from the selected file</p>
+                                <h3 class="daybook-sale-card__title">Parties &amp; letter</h3>
+                                <p class="daybook-sale-card__hint mb-0">Owner and provider load from the selected file — edit if needed</p>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="daybook-modal-label" for="daybook_sale_land_owner">Land owner name</label>
-                                    <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_land_owner" readonly tabindex="-1">
+                                    <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_land_owner" placeholder="Land owner name" autocomplete="off" maxlength="255">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="daybook-modal-label" for="daybook_sale_land_provider">Land provider name</label>
-                                    <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_land_provider" readonly tabindex="-1">
+                                    <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_land_provider" placeholder="Land provider name" autocomplete="off" maxlength="255">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="daybook-modal-label" for="daybook_sale_e_stamp_id">eStamp ID <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_e_stamp_id" placeholder="Enter eStamp ID" autocomplete="off" maxlength="120">
+                                    <label class="daybook-modal-label" for="daybook_sale_e_stamp_id">Intimation letter No. <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_e_stamp_id" placeholder="Enter intimation letter No." autocomplete="off" maxlength="120">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="daybook-modal-label" for="daybook_sale_purchaser_name">File purchaser name <span class="text-danger">*</span></label>
@@ -356,23 +370,62 @@
                         <div class="daybook-sale-card mb-3">
                             <div class="daybook-sale-card__head">
                                 <h3 class="daybook-sale-card__title">Land sold to purchaser</h3>
-                                <p class="daybook-sale-card__hint mb-0">Choose a plot size from the formula options available on this file</p>
+                                <p class="daybook-sale-card__hint mb-0">Pick a plot type, enter files to sell, and check remaining balance</p>
                             </div>
+
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm align-middle mb-0 daybook-sale-balance-table" id="daybook_sale_balance_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Plot</th>
+                                            <th class="text-end">Avail</th>
+                                            <th class="text-end">Sold</th>
+                                            <th class="text-end">Left</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="daybook_sale_balance_tbody">
+                                        <tr>
+                                            <td colspan="5" class="text-muted small">Load a sale file to see formula balance.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
                             <div id="daybook_sale_plot_options" class="daybook-sale-plot-options" role="listbox" aria-label="Available plot sizes"></div>
                             <input type="hidden" id="daybook_sale_component" value="">
                             <input type="hidden" id="daybook_sale_plot_type" value="">
-                            <div class="row g-3 mt-1">
-                                <div class="col-sm-4 col-md-3">
-                                    <label class="daybook-modal-label" for="daybook_sale_plot_qty">Quantity <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_qty" min="1" max="999" step="1" value="1" inputmode="numeric">
-                                    <div class="form-text" id="daybook_sale_plot_qty_hint"></div>
-                                </div>
-                                <div class="col-sm-8 col-md-4 d-flex align-items-end">
-                                    <div class="daybook-sale-selected-plot w-100" id="daybook_sale_selected_plot_meta">
-                                        <span class="daybook-sale-selected-plot__label">Selected</span>
-                                        <span class="daybook-sale-selected-plot__value" id="daybook_sale_selected_plot_label">—</span>
+
+                            <div class="daybook-sale-sell-box mt-3" id="daybook_sale_sell_box">
+                                <div class="daybook-sale-sell-box__calc" id="daybook_sale_plot_calc">Select a plot type</div>
+                                <div class="row g-2 g-md-3 align-items-end">
+                                    <div class="col-6 col-md-3">
+                                        <label class="daybook-modal-label" for="daybook_sale_plot_qty">Files <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_qty" min="1" max="999" step="1" value="1" inputmode="numeric" placeholder="0">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="daybook-sale-sell-stat">
+                                            <span class="daybook-sale-sell-stat__label">Left now</span>
+                                            <span class="daybook-sale-sell-stat__value" id="daybook_sale_plot_left_now">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="daybook-sale-sell-stat is-after">
+                                            <span class="daybook-sale-sell-stat__label">Left after</span>
+                                            <span class="daybook-sale-sell-stat__value" id="daybook_sale_plot_left_after">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="daybook-sale-sell-stat">
+                                            <span class="daybook-sale-sell-stat__label">Selected</span>
+                                            <span class="daybook-sale-sell-stat__value" id="daybook_sale_selected_plot_label">—</span>
+                                        </div>
                                     </div>
                                 </div>
+                                <div class="form-text mt-2 mb-0" id="daybook_sale_plot_qty_hint"></div>
+                            </div>
+
+                            <div class="row g-3 mt-1">
                                 <div class="col-md-5">
                                     <label class="daybook-modal-label" for="daybook_sale_file_amount">Amount (Rs) <span class="text-danger">*</span></label>
                                     <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_file_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">

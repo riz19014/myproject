@@ -1424,6 +1424,8 @@ class DayBookController extends Controller
             'purchase_file_id' => ['required', 'integer', 'exists:purchase_files,id'],
             'e_stamp_id' => ['required', 'string', 'max:120'],
             'purchaser_name' => ['required', 'string', 'max:255'],
+            'land_owner' => ['nullable', 'string', 'max:255'],
+            'land_provider' => ['nullable', 'string', 'max:255'],
             'component' => ['required', 'string', 'max:40'],
             'plot_type' => ['required', 'string', 'max:40'],
             'plot_quantity' => ['required', 'integer', 'min:1', 'max:999'],

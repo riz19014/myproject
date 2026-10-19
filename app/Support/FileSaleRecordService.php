@@ -61,11 +61,22 @@ final class FileSaleRecordService
             ->where('sale_type', Sale::TYPE_SALE_LAND)
             ->get();
 
+        $calc = $totalMarla > 0
+            ? SaleExemptionFileCalculator::calculate($totalMarla, $config)
+            : ['rows' => [], 'acres' => 0.0, 'marla_per_acre' => $config->marlaPerAcreLand(), 'total_marla' => 0.0];
+
         if ($rows->isNotEmpty() && $formulaColumns !== []) {
-            $plotOptions = $this->plotOptionsFromSheet($formulaColumns, $rows, $usedSales, $config);
+            $plotOptions = $this->plotOptionsFromSheet($formulaColumns, $rows, $usedSales, $config, $calc);
         } else {
-            $plotOptions = $this->plotOptionsFromFileMarla($config, $usedSales, $totalMarla);
+            $plotOptions = $this->plotOptionsFromFileMarla($config, $usedSales, $totalMarla, $calc);
         }
+
+        $collective = $purchaseFile->fileSaleLand?->collective;
+        $exemptionPayload = is_array($collective?->exemption_payload) ? $collective->exemption_payload : [];
+        $hasAppliedPayload = ($exemptionPayload['components'] ?? []) !== [];
+        $exemptionSummary = $hasAppliedPayload
+            ? $collective->exemptionSummaryLabel()
+            : $this->liveExemptionSummary($config);
 
         return [
             'purchase_file_id' => $purchaseFile->id,
@@ -85,6 +96,17 @@ final class FileSaleRecordService
             'remaining_land' => LandMeasure::formatAkmsLabelFromMarla($purchaseFile->remainingLandMarla()),
             'plot_options' => $plotOptions,
             'mouza_keys' => $rows->pluck('moza_key')->filter()->unique()->values()->all(),
+            'exemption' => [
+                'summary' => $exemptionSummary,
+                'source' => $hasAppliedPayload
+                    ? (string) ($collective->name ?? 'Sale file')
+                    : 'Live project setup',
+                'source_type' => $hasAppliedPayload ? 'collective' : 'live',
+                'acres' => (float) ($calc['acres'] ?? 0),
+                'acres_display' => SaleExemptionFileCalculator::formatFileCount((float) ($calc['acres'] ?? 0)),
+                'marla_per_acre' => (float) ($calc['marla_per_acre'] ?? $config->marlaPerAcreLand()),
+                'total_land' => $totalMarla > 0 ? LandMeasure::formatAkmsLabelFromMarla($totalMarla) : '—',
+            ],
         ];
     }
 
@@ -101,14 +123,74 @@ final class FileSaleRecordService
         return SaleExemptionConfig::forProject($project);
     }
 
+    private function liveExemptionSummary(SaleExemptionConfig $config): string
+    {
+        $parts = [];
+        foreach ($config->components() as $component) {
+            $label = trim((string) $component->label);
+            $pct = rtrim(rtrim(number_format((float) $component->pool_percent, 4, '.', ''), '0'), '.');
+            $parts[] = ($label !== '' ? $label : $component->slug).' '.$pct.'%';
+        }
+
+        return $parts !== [] ? implode(' · ', $parts) : '—';
+    }
+
+    /**
+     * @param  array<string, mixed>  $calc
+     * @param  array<string, mixed>  $base
+     * @return array<string, mixed>
+     */
+    private function enrichPlotOption(array $base, array $calc, float $available, int $usedQty, float $remaining): array
+    {
+        $calcRow = collect($calc['rows'] ?? [])->first(
+            fn (array $row) => ($row['component_slug'] ?? '') === ($base['component_slug'] ?? '')
+                && ($row['plot_slug'] ?? '') === ($base['plot_slug'] ?? '')
+        ) ?: [];
+
+        $marlaPerPlot = (float) ($calcRow['marla_per_plot'] ?? $base['marla_per_plot'] ?? 0);
+        $nominal = (float) ($calcRow['nominal_marla'] ?? $base['nominal_marla'] ?? 0);
+        $acres = (float) ($calc['acres'] ?? 0);
+        $product = (float) ($calcRow['product_marla'] ?? round($marlaPerPlot * $acres, 4));
+        $share = (float) ($calcRow['share_percent'] ?? 0);
+
+        $calculation = SaleExemptionFileCalculator::formatMarlaWithUnit($marlaPerPlot)
+            .' × '.SaleExemptionFileCalculator::formatFileCount($acres)
+            .' = '.SaleExemptionFileCalculator::formatMarlaWithUnit($product)
+            .' ÷ '.SaleExemptionFileCalculator::formatMarlaWithUnit($nominal);
+
+        return array_merge($base, [
+            'marla_per_plot' => $marlaPerPlot,
+            'nominal_marla' => $nominal,
+            'share_percent' => $share,
+            'share_display' => rtrim(rtrim(number_format($share, 4, '.', ''), '0'), '.').'%',
+            'calculation_display' => $calculation,
+            'available_files' => round($available, 4),
+            'available_display' => SaleExemptionFileCalculator::formatFileCount($available),
+            'remaining_files' => round($remaining, 4),
+            'remaining_display' => SaleExemptionFileCalculator::formatFileCount($remaining),
+            'used_quantity' => $usedQty,
+            'sold_display' => $usedQty > 0 ? (string) $usedQty : '—',
+            'disabled' => $remaining <= 1e-6,
+        ]);
+    }
+
     /**
      * @param  list<array<string, mixed>>  $formulaColumns
      * @param  Collection<int, array<string, mixed>>  $rows
      * @param  Collection<int, Sale>  $usedSales
      * @return list<array<string, mixed>>
      */
-    private function plotOptionsFromSheet(array $formulaColumns, Collection $rows, Collection $usedSales, SaleExemptionConfig $config): array
-    {
+    /**
+     * @param  array<string, mixed>  $calc
+     * @return list<array<string, mixed>>
+     */
+    private function plotOptionsFromSheet(
+        array $formulaColumns,
+        Collection $rows,
+        Collection $usedSales,
+        SaleExemptionConfig $config,
+        array $calc = [],
+    ): array {
         $plotOptions = [];
         foreach ($formulaColumns as $column) {
             $plotKey = $column['plot_key'];
@@ -121,7 +203,7 @@ final class FileSaleRecordService
                 ->sum('plot_quantity');
             $remaining = max(0, $available - $usedQty);
 
-            $plotOptions[] = [
+            $plotOptions[] = $this->enrichPlotOption([
                 'plot_key' => $plotKey,
                 'code' => $column['code'] ?? '',
                 'label' => $column['short_label'] ?? $column['plot_label'],
@@ -130,13 +212,7 @@ final class FileSaleRecordService
                 'component_slug' => $column['component_slug'],
                 'plot_slug' => $column['plot_slug'],
                 'marla_per_plot' => $config->plotMarla($column['component_slug'], $column['plot_slug']),
-                'available_files' => round($available, 4),
-                'available_display' => SaleExemptionFileCalculator::formatFileCount($available),
-                'remaining_files' => round($remaining, 4),
-                'remaining_display' => SaleExemptionFileCalculator::formatFileCount($remaining),
-                'used_quantity' => $usedQty,
-                'disabled' => $remaining <= 1e-6,
-            ];
+            ], $calc, $available, $usedQty, $remaining);
         }
 
         return $plotOptions;
@@ -144,15 +220,22 @@ final class FileSaleRecordService
 
     /**
      * @param  Collection<int, Sale>  $usedSales
+     * @param  array<string, mixed>  $calc
      * @return list<array<string, mixed>>
      */
-    private function plotOptionsFromFileMarla(SaleExemptionConfig $config, Collection $usedSales, float $totalMarla): array
-    {
+    private function plotOptionsFromFileMarla(
+        SaleExemptionConfig $config,
+        Collection $usedSales,
+        float $totalMarla,
+        array $calc = [],
+    ): array {
         if ($totalMarla <= 0) {
             return [];
         }
 
-        $calc = SaleExemptionFileCalculator::calculate($totalMarla, $config);
+        if (($calc['rows'] ?? []) === []) {
+            $calc = SaleExemptionFileCalculator::calculate($totalMarla, $config);
+        }
         $options = [];
 
         foreach ($calc['rows'] as $row) {
@@ -165,7 +248,7 @@ final class FileSaleRecordService
                 ->sum('plot_quantity');
             $remaining = max(0, $available - $usedQty);
 
-            $options[] = [
+            $options[] = $this->enrichPlotOption([
                 'plot_key' => $component.'.'.$plotSlug,
                 'code' => (string) ($row['code'] ?? ''),
                 'label' => (string) ($row['plot_label'] ?? $plotSlug),
@@ -174,13 +257,8 @@ final class FileSaleRecordService
                 'component_slug' => $component,
                 'plot_slug' => $plotSlug,
                 'marla_per_plot' => (float) ($row['marla_per_plot'] ?? $config->plotMarla($component, $plotSlug)),
-                'available_files' => round($available, 4),
-                'available_display' => SaleExemptionFileCalculator::formatFileCount($available),
-                'remaining_files' => round($remaining, 4),
-                'remaining_display' => SaleExemptionFileCalculator::formatFileCount($remaining),
-                'used_quantity' => $usedQty,
-                'disabled' => $remaining <= 1e-6,
-            ];
+                'nominal_marla' => (float) ($row['nominal_marla'] ?? 0),
+            ], $calc, $available, $usedQty, $remaining);
         }
 
         return $options;
@@ -263,13 +341,26 @@ final class FileSaleRecordService
                 ]);
             }
 
+            $landOwner = array_key_exists('land_owner', $data)
+                ? trim((string) $data['land_owner'])
+                : (string) ($details['land_owner'] ?? '');
+            $landProvider = array_key_exists('land_provider', $data)
+                ? trim((string) $data['land_provider'])
+                : (string) ($details['land_provider'] ?? '');
+            if ($landOwner === '—' || $landOwner === '') {
+                $landOwner = '';
+            }
+            if ($landProvider === '—' || $landProvider === '') {
+                $landProvider = '';
+            }
+
             $record = FileSaleRecord::create([
                 'project_id' => $project->id,
                 'purchase_file_id' => $purchaseFile->id,
                 'sale_id' => $sale?->id,
                 'e_stamp_id' => trim((string) $data['e_stamp_id']),
-                'land_owner' => $details['land_owner'] !== '—' ? $details['land_owner'] : null,
-                'land_provider' => $details['land_provider'] !== '—' ? $details['land_provider'] : null,
+                'land_owner' => $landOwner !== '' ? $landOwner : null,
+                'land_provider' => $landProvider !== '' ? $landProvider : null,
                 'purchaser_name' => trim((string) $data['purchaser_name']),
                 'moza' => $details['moza'] !== '—' ? $details['moza'] : null,
                 'khasra' => $details['khasra'] !== '—' ? $details['khasra'] : null,
