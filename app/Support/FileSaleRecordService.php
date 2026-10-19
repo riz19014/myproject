@@ -21,13 +21,12 @@ final class FileSaleRecordService
     public function buildFileDetails(Project $project, PurchaseFile $purchaseFile): array
     {
         ProjectExemptionDefaults::ensureForProject($project);
-        $config = SaleExemptionConfig::forProject($project);
+        $purchaseFile->loadMissing(['purchaseItems.party', 'fileSaleLand.collective', 'sales']);
+        $config = $this->exemptionConfigForPurchaseFile($project, $purchaseFile);
 
-        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, [$purchaseFile->id]);
+        $sheet = SaleLandMozaGroups::spreadsheetForProject($project, [$purchaseFile->id], $config);
         $rows = collect($sheet['rows'] ?? []);
         $formulaColumns = $sheet['formula_columns'] ?? [];
-
-        $purchaseFile->loadMissing(['purchaseItems.party', 'fileSaleLand', 'sales']);
 
         $items = $purchaseFile->purchaseItems;
         $moza = $this->uniqueJoined($items->pluck('moza'));
@@ -87,6 +86,19 @@ final class FileSaleRecordService
             'plot_options' => $plotOptions,
             'mouza_keys' => $rows->pluck('moza_key')->filter()->unique()->values()->all(),
         ];
+    }
+
+    /**
+     * Prefer the sale-file collective's applied exemption; fall back to live project setup.
+     */
+    private function exemptionConfigForPurchaseFile(Project $project, PurchaseFile $purchaseFile): SaleExemptionConfig
+    {
+        $payload = $purchaseFile->fileSaleLand?->collective?->exemption_payload;
+        if (is_array($payload) && ($payload['components'] ?? []) !== []) {
+            return SaleExemptionConfig::fromSnapshotData($project, $payload);
+        }
+
+        return SaleExemptionConfig::forProject($project);
     }
 
     /**
@@ -181,7 +193,8 @@ final class FileSaleRecordService
     public function store(Project $project, PurchaseFile $purchaseFile, array $data, array $documents = []): FileSaleRecord
     {
         ProjectExemptionDefaults::ensureForProject($project);
-        $config = SaleExemptionConfig::forProject($project);
+        $purchaseFile->loadMissing('fileSaleLand.collective');
+        $config = $this->exemptionConfigForPurchaseFile($project, $purchaseFile);
         $details = $this->buildFileDetails($project, $purchaseFile);
 
         $component = (string) $data['component'];
