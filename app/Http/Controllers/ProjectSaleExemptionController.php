@@ -395,14 +395,24 @@ class ProjectSaleExemptionController extends Controller
 
     private function normalizeExemptionRequest(Request $request): void
     {
+        $marlaPerAcreRaw = $this->normalizeDecimalInput($request->input('marla_per_acre'));
+        $marlaPerAcre = is_numeric($marlaPerAcreRaw) ? (float) $marlaPerAcreRaw : 160.0;
+        if ($marlaPerAcre <= 0) {
+            $marlaPerAcre = 160.0;
+        }
+
         $components = collect($request->input('components', []))
-            ->map(function (array $component) {
+            ->map(function (array $component) use ($marlaPerAcre) {
                 $component['pool_percent'] = $this->normalizeDecimalInput($component['pool_percent'] ?? null);
+                $poolPercent = is_numeric($component['pool_percent']) ? (float) $component['pool_percent'] : 0.0;
                 $component['plot_types'] = collect($component['plot_types'] ?? [])
-                    ->map(function (array $plot) {
+                    ->map(function (array $plot) use ($poolPercent, $marlaPerAcre) {
                         $plot['marla_per_plot'] = $this->normalizeDecimalInput($plot['marla_per_plot'] ?? null);
                         $plot['nominal_marla'] = $this->normalizeDecimalInput($plot['nominal_marla'] ?? null);
-                        $plot['share_percent'] = $this->normalizeDecimalInput($plot['share_percent'] ?? null);
+                        $marlaPerPlot = is_numeric($plot['marla_per_plot']) ? (float) $plot['marla_per_plot'] : 0.0;
+                        $plot['share_percent'] = $this->formatDecimalForInput(
+                            $this->computeSharePercentOfDistPerAcre($marlaPerPlot, $poolPercent, $marlaPerAcre)
+                        );
 
                         return $plot;
                     })
@@ -415,9 +425,25 @@ class ProjectSaleExemptionController extends Controller
             ->all();
 
         $request->merge([
-            'marla_per_acre' => $this->normalizeDecimalInput($request->input('marla_per_acre')),
+            'marla_per_acre' => $marlaPerAcreRaw,
             'components' => $components,
         ]);
+    }
+
+    /** Share % of dist./acre = (marla per plot ÷ (pool% × marla/acre)) × 100. */
+    private function computeSharePercentOfDistPerAcre(float $marlaPerPlot, float $poolPercent, float $marlaPerAcre): float
+    {
+        $distPerAcre = ($poolPercent / 100.0) * $marlaPerAcre;
+        if ($distPerAcre <= 0 || $marlaPerPlot <= 0) {
+            return 0.0;
+        }
+
+        return round(min(100.0, max(0.0, ($marlaPerPlot / $distPerAcre) * 100.0)), 4);
+    }
+
+    private function formatDecimalForInput(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.') ?: '0';
     }
 
     private function normalizeDecimalInput(mixed $value): mixed

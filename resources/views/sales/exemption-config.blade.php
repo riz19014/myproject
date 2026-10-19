@@ -179,9 +179,9 @@
                                                 <input type="text" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][slug]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.slug', $plotSlug) }}" required>
                                             </td>
                                             <td><input type="text" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][label]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.label', $plotLabel) }}" required></td>
-                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][marla_per_plot]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.marla_per_plot', $plotMarlaDisplay) }}" min="0" step="0.0001" required></td>
+                                            <td><input type="number" class="form-control form-control-theme form-control-sm plot-marla-per-plot" name="components[{{ $ci }}][plot_types][{{ $pi }}][marla_per_plot]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.marla_per_plot', $plotMarlaDisplay) }}" min="0" step="0.0001" required></td>
                                             <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][nominal_marla]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.nominal_marla', $plotNominalDisplay) }}" min="0.0001" step="0.0001" required title="Divisor for file count (2K=40, 1K=20, 10M=10, 8M=8)"></td>
-                                            <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[{{ $ci }}][plot_types][{{ $pi }}][share_percent]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.share_percent', $plotShareDisplay) }}" min="0" max="100" step="0.0001" required></td>
+                                            <td><input type="number" class="form-control form-control-theme form-control-sm plot-share-percent" name="components[{{ $ci }}][plot_types][{{ $pi }}][share_percent]" value="{{ old('components.'.$ci.'.plot_types.'.$pi.'.share_percent', $plotShareDisplay) }}" min="0" max="100" step="0.0001" required readonly tabindex="-1" title="Auto: (Marla per plot ÷ dist/acre) × 100"></td>
                                             <td><button type="button" class="btn btn-sm btn-outline-danger remove-plot-btn">&times;</button></td>
                                         </tr>
                                     @endforeach
@@ -248,9 +248,9 @@
             <input type="text" class="form-control form-control-theme form-control-sm" name="components[__CI__][plot_types][__PI__][slug]" required>
         </td>
         <td><input type="text" class="form-control form-control-theme form-control-sm" name="components[__CI__][plot_types][__PI__][label]" required></td>
-        <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[__CI__][plot_types][__PI__][marla_per_plot]" min="0" step="0.0001" required></td>
+        <td><input type="number" class="form-control form-control-theme form-control-sm plot-marla-per-plot" name="components[__CI__][plot_types][__PI__][marla_per_plot]" min="0" step="0.0001" required></td>
         <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[__CI__][plot_types][__PI__][nominal_marla]" min="0.0001" step="0.0001" required></td>
-        <td><input type="number" class="form-control form-control-theme form-control-sm" name="components[__CI__][plot_types][__PI__][share_percent]" min="0" max="100" step="0.0001" required></td>
+        <td><input type="number" class="form-control form-control-theme form-control-sm plot-share-percent" name="components[__CI__][plot_types][__PI__][share_percent]" min="0" max="100" step="0.0001" required readonly tabindex="-1" title="Auto: (Marla per plot ÷ dist/acre) × 100"></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-plot-btn">&times;</button></td>
     </tr>
 </template>
@@ -270,14 +270,44 @@
         return parseFloat(marlaPerAcreEl && marlaPerAcreEl.value) || 160;
     }
 
+    function formatShareValue(n) {
+        if (!isFinite(n) || n <= 0) return '0';
+        var rounded = Math.round(n * 10000) / 10000;
+        if (Math.abs(rounded - Math.round(rounded)) < 1e-9) {
+            return String(Math.round(rounded));
+        }
+        return String(rounded);
+    }
+
+    function distPerAcre(block) {
+        var pct = parseFloat(block.querySelector('.component-pool-pct')?.value) || 0;
+        return (pct / 100) * readMarlaPerAcre();
+    }
+
+    function updateSharePercents(block) {
+        var dist = distPerAcre(block);
+        block.querySelectorAll('.plot-type-row').forEach(function (row) {
+            var mppEl = row.querySelector('.plot-marla-per-plot');
+            var shareEl = row.querySelector('.plot-share-percent');
+            if (!mppEl || !shareEl) return;
+            var mpp = parseFloat(mppEl.value) || 0;
+            var share = dist > 0 ? (mpp / dist) * 100 : 0;
+            if (share < 0) share = 0;
+            if (share > 100) share = 100;
+            shareEl.value = formatShareValue(share);
+        });
+    }
+
     function updateDistHint(block) {
         var pct = parseFloat(block.querySelector('.component-pool-pct')?.value) || 0;
         var mpa = readMarlaPerAcre();
-        var dist = (pct / 100 * mpa).toFixed(4).replace(/\.?0+$/, '');
+        var dist = distPerAcre(block);
+        var distLabel = formatShareValue(dist);
         var hint = block.querySelector('.component-dist-hint');
         if (hint) {
-            hint.textContent = 'Distribution base: ' + dist + ' marla per acre (' + pct + '% of ' + mpa + ' marla/acre).';
+            hint.textContent = 'Distribution base: ' + distLabel + ' marla per acre (' + pct + '% of ' + mpa + ' marla/acre). Share % is auto: (Marla per plot ÷ dist/acre) × 100.';
         }
+        updateSharePercents(block);
     }
 
     function reindexComponents() {
@@ -301,6 +331,7 @@
         var pi = tbody.querySelectorAll('.plot-type-row').length;
         var html = plotTpl.innerHTML.replace(/__CI__/g, ci).replace(/__PI__/g, pi);
         tbody.insertAdjacentHTML('beforeend', html);
+        updateSharePercents(block);
     }
 
     document.getElementById('add-component-btn')?.addEventListener('click', function () {
@@ -332,8 +363,14 @@
     });
 
     container.addEventListener('input', function (e) {
+        var block = e.target.closest('.exemption-component-block');
+        if (!block) return;
         if (e.target.classList.contains('component-pool-pct')) {
-            updateDistHint(e.target.closest('.exemption-component-block'));
+            updateDistHint(block);
+            return;
+        }
+        if (e.target.classList.contains('plot-marla-per-plot')) {
+            updateSharePercents(block);
         }
     });
 
