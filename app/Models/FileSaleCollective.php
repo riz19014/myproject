@@ -14,6 +14,7 @@ class FileSaleCollective extends Model
 
     protected $fillable = [
         'project_id',
+        'batch_id',
         'name',
         'status',
         'exemption_payload',
@@ -33,6 +34,11 @@ class FileSaleCollective extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(FileSaleBatch::class, 'batch_id');
     }
 
     public function fileSaleLands(): HasMany

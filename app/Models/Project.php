@@ -106,6 +106,11 @@ class Project extends Model
         return $this->hasMany(FileSaleCollective::class)->orderBy('id');
     }
 
+    public function fileSaleBatches(): HasMany
+    {
+        return $this->hasMany(FileSaleBatch::class)->orderBy('id');
+    }
+
     public function saleExemptionComponents(): HasMany
     {
         return $this->hasMany(ProjectSaleExemptionComponent::class)->orderBy('sort_order');

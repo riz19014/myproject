@@ -51,6 +51,24 @@ class SaleProjectFileController extends Controller
             ->values()
             ->all();
 
+        // Rebuild after enrichment so batch nests include exemption UI data.
+        $fileSaleSummary['batches'] = $fileSaleLandService->buildBatchesSummary(
+            $project,
+            $fileSaleSummary['collectives']
+        );
+        $fileSaleSummary['unbatched_collectives'] = collect($fileSaleSummary['collectives'])
+            ->filter(fn (array $c) => empty($c['batch_id']))
+            ->values()
+            ->all();
+        $fileSaleSummary['unbatched_summary'] = $fileSaleSummary['unbatched_collectives'] === []
+            ? null
+            : $fileSaleLandService->summarizeBatchGroup(
+                $project,
+                null,
+                'Unassigned',
+                $fileSaleSummary['unbatched_collectives']
+            );
+
         // Keep a simple label list for any legacy selects.
         $exemptionOptions = collect($exemptionPickOptions)->map(fn (array $option) => [
             'id' => $option['id'] ?? null,

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\DayBookEntry;
+use App\Models\FileSaleBatch;
 use App\Models\FileSaleCollective;
 use App\Models\FileSaleLand;
 use App\Models\Project;
@@ -55,9 +56,264 @@ final class FileSaleLandService
         return FileSaleCollective::query()
             ->where('project_id', $project->id)
             ->withCount('fileSaleLands')
-            ->with(['fileSaleLands.saleLand.purchaseItems'])
+            ->with(['batch', 'fileSaleLands.saleLand.purchaseItems'])
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * @return Collection<int, FileSaleBatch>
+     */
+    public function batchesForProject(Project $project): Collection
+    {
+        return FileSaleBatch::query()
+            ->where('project_id', $project->id)
+            ->withCount('collectives')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function nextBatchName(Project $project): string
+    {
+        $existing = FileSaleBatch::query()
+            ->where('project_id', $project->id)
+            ->pluck('name');
+
+        $max = 0;
+        foreach ($existing as $name) {
+            if (preg_match('/^Batch-(\d+)$/i', (string) $name, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+
+        return 'Batch-'.($max + 1);
+    }
+
+    /**
+     * @return array{batch: array{id: int, name: string}}
+     */
+    public function createBatch(Project $project, string $name): array
+    {
+        $name = trim($name);
+        if ($name === '') {
+            $name = $this->nextBatchName($project);
+        }
+
+        if (FileSaleBatch::query()
+            ->where('project_id', $project->id)
+            ->where('name', $name)
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'name' => ['A batch with this name already exists for this project.'],
+            ]);
+        }
+
+        $batch = FileSaleBatch::create([
+            'project_id' => $project->id,
+            'name' => $name,
+        ]);
+
+        return [
+            'batch' => [
+                'id' => (int) $batch->id,
+                'name' => $batch->name,
+            ],
+        ];
+    }
+
+    /**
+     * Assign (or unassign) a clump to a batch.
+     *
+     * @return array{collective: array{id: int, name: string}, batch: array{id: int, name: string}|null}
+     */
+    public function assignCollectiveToBatch(
+        Project $project,
+        FileSaleCollective $collective,
+        ?int $batchId,
+    ): array {
+        if ((int) $collective->project_id !== (int) $project->id) {
+            throw ValidationException::withMessages([
+                'collective' => ['Clump does not belong to this project.'],
+            ]);
+        }
+
+        $batch = null;
+        if ($batchId !== null && $batchId > 0) {
+            $batch = FileSaleBatch::query()
+                ->where('project_id', $project->id)
+                ->whereKey($batchId)
+                ->first();
+
+            if (! $batch) {
+                throw ValidationException::withMessages([
+                    'batch_id' => ['Selected batch was not found for this project.'],
+                ]);
+            }
+        }
+
+        $collective->update([
+            'batch_id' => $batch?->id,
+        ]);
+
+        return [
+            'collective' => [
+                'id' => (int) $collective->id,
+                'name' => $collective->name,
+            ],
+            'batch' => $batch ? [
+                'id' => (int) $batch->id,
+                'name' => $batch->name,
+            ] : null,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $collectives
+     * @return list<array<string, mixed>>
+     */
+    public function buildBatchesSummary(Project $project, array $collectives): array
+    {
+        $byBatch = collect($collectives)
+            ->filter(fn (array $c) => ! empty($c['batch_id']))
+            ->groupBy(fn (array $c) => (int) $c['batch_id']);
+
+        return $this->batchesForProject($project)->map(function (FileSaleBatch $batch) use ($project, $byBatch) {
+            $clumps = ($byBatch->get($batch->id) ?? collect())->values()->all();
+
+            return $this->summarizeBatchGroup(
+                $project,
+                (int) $batch->id,
+                $batch->name,
+                $clumps,
+            );
+        })->values()->all();
+    }
+
+    /**
+     * Overview totals for a batch (or unassigned clumps group).
+     *
+     * @param  list<array<string, mixed>>  $clumps
+     * @return array<string, mixed>
+     */
+    public function summarizeBatchGroup(
+        Project $project,
+        ?int $batchId,
+        string $name,
+        array $clumps,
+    ): array {
+        $fileIds = collect($clumps)
+            ->flatMap(fn (array $c) => collect($c['files'] ?? [])->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $fileCount = (int) collect($clumps)->sum(fn (array $c) => (int) ($c['file_count'] ?? 0));
+        if ($fileCount <= 0) {
+            $fileCount = count($fileIds);
+        }
+
+        $totalMarla = round((float) collect($clumps)->sum(fn (array $c) => (float) ($c['total_land_marla'] ?? 0)), 6);
+        $remainingMarla = round((float) collect($clumps)->sum(fn (array $c) => (float) ($c['remaining_land_marla'] ?? 0)), 6);
+        if ($remainingMarla <= 0 && $totalMarla > 0) {
+            // Fallback when remaining was not present on clump rows.
+            $remainingMarla = $totalMarla;
+        }
+        $soldMarla = max(0.0, round($totalMarla - $remainingMarla, 6));
+
+        $grandTotalAmount = 0.0;
+        $saleFilesAmount = 0.0;
+        $fileNames = [];
+
+        if ($fileIds !== []) {
+            $files = PurchaseFile::query()
+                ->whereIn('id', $fileIds)
+                ->with('purchaseItems')
+                ->get();
+
+            $grandTotalAmount = round((float) $files->sum(
+                fn (PurchaseFile $file) => (float) $file->purchaseItems->sum('line_total_rs')
+            ), 2);
+
+            $saleFilesAmount = round((float) Sale::query()
+                ->where('project_id', $project->id)
+                ->whereIn('purchase_file_id', $fileIds)
+                ->sum('total_amount'), 2);
+
+            $fileNames = $files
+                ->sortBy('id')
+                ->map(fn (PurchaseFile $file) => $file->file_name)
+                ->values()
+                ->all();
+        }
+
+        $plotColumns = [];
+        foreach ($clumps as $clump) {
+            foreach ($clump['formula_columns'] ?? [] as $column) {
+                $code = (string) ($column['column_code'] ?? '');
+                if ($code === '') {
+                    continue;
+                }
+                if (! isset($plotColumns[$code])) {
+                    $plotColumns[$code] = [
+                        'column_code' => $code,
+                        'short_label' => (string) ($column['short_label'] ?? $code),
+                        'available' => 0.0,
+                        'sold' => 0.0,
+                        'file_bal' => 0.0,
+                    ];
+                }
+                $plotColumns[$code]['available'] += (float) ($column['available'] ?? 0);
+                $plotColumns[$code]['sold'] += (float) ($column['sold'] ?? 0);
+                $plotColumns[$code]['file_bal'] += (float) ($column['file_bal'] ?? 0);
+            }
+        }
+
+        $filesLandColumns = collect($plotColumns)
+            ->map(function (array $column) {
+                $available = round((float) $column['available'], 4);
+
+                return [
+                    'column_code' => $column['column_code'],
+                    'short_label' => $column['short_label'],
+                    'file_count' => SaleExemptionFileCalculator::formatFileCount($available),
+                    'available' => $available,
+                    'sold' => round((float) $column['sold'], 4),
+                    'file_bal' => round((float) $column['file_bal'], 4),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'id' => $batchId,
+            'name' => $name,
+            'clump_count' => count($clumps),
+            'file_count' => $fileCount,
+            'file_ids' => $fileIds,
+            'file_names' => $fileNames,
+            'total_land_marla' => round($totalMarla, 4),
+            'sold_land_marla' => round($soldMarla, 4),
+            'remaining_land_marla' => round($remainingMarla, 4),
+            'total_land_area' => $totalMarla > 0
+                ? LandMeasure::formatAkmsLabelFromMarla($totalMarla)
+                : '—',
+            'sold_land_area' => $soldMarla > 0
+                ? LandMeasure::formatAkmsLabelFromMarla($soldMarla)
+                : '—',
+            'remaining_land_area' => $totalMarla > 0
+                ? LandMeasure::formatAkmsLabelFromMarla($remainingMarla)
+                : '—',
+            'grand_total_amount' => $grandTotalAmount,
+            'grand_total_amount_formatted' => 'Rs '.number_format($grandTotalAmount, 0),
+            'grand_total_amount_short' => SaleExemptionFileCalculator::formatRsShort($grandTotalAmount),
+            'sale_files_amount' => $saleFilesAmount,
+            'sale_files_amount_formatted' => 'Rs '.number_format($saleFilesAmount, 0),
+            'sale_files_amount_short' => SaleExemptionFileCalculator::formatRsShort($saleFilesAmount),
+            'files_land_columns' => $filesLandColumns,
+            'collectives' => $clumps,
+        ];
     }
 
     public function nextCollectiveName(Project $project): string
@@ -616,6 +872,8 @@ final class FileSaleLandService
                 'name' => $collective->name,
                 'status' => $collective->status,
                 'is_open' => $collective->isOpen(),
+                'batch_id' => $collective->batch_id ? (int) $collective->batch_id : null,
+                'batch_name' => $collective->batch?->name,
                 'file_count' => $members->count(),
                 'files' => $members->map(fn (PurchaseFile $file) => [
                     'id' => (int) $file->id,
@@ -1636,7 +1894,8 @@ final class FileSaleLandService
                 $file->daybookSaleFilePayload(),
                 ['name' => $file->file_name]
             ))->values()->all(),
-            'collectives' => $this->buildCollectivesSummary($project, $files),
+            'collectives' => ($collectives = $this->buildCollectivesSummary($project, $files)),
+            'batches' => $this->buildBatchesSummary($project, $collectives),
             'separate_files' => $this->separateMovedFiles($project, $files),
             'open_collectives' => $this->openCollectives($project)->map(fn (FileSaleCollective $c) => [
                 'id' => (int) $c->id,

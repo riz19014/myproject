@@ -11,9 +11,16 @@
     $scopedPurchaseFileIds = $scopedPurchaseFiles->pluck('id')->all();
     $movedToFileSaleIds = $movedToFileSaleIds ?? [];
     $fileSaleCollectives = $fileSaleCollectives ?? [];
+    $fileSaleBatches = $fileSaleBatches ?? [];
+    $unbatchedCollectives = $unbatchedCollectives ?? [];
     $separateMovedFiles = $separateMovedFiles ?? [];
     $openCollectives = $openCollectives ?? [];
     $suggestedCollectiveName = $suggestedCollectiveName ?? 'Collective-1';
+    $suggestedBatchName = $suggestedBatchName ?? 'Batch-1';
+    $allBatchesForSelect = collect($fileSaleBatches)
+        ->map(fn (array $b) => ['id' => (int) $b['id'], 'name' => $b['name']])
+        ->values()
+        ->all();
     $allFileCount = collect($sheetRows)->where('show_file_name', true)->count();
     $availableSheetRows = collect($sheetRows)
         ->reject(fn (array $row) => in_array((int) ($row['purchase_file_id'] ?? 0), $movedToFileSaleIds, true))
@@ -78,68 +85,103 @@
         </div>
     </div>
 @else
-    @if($fileSaleCollectives !== [] || $separateMovedFiles !== [])
+    @if($fileSaleCollectives !== [] || $separateMovedFiles !== [] || $fileSaleBatches !== [])
         <div class="card card-theme mb-4 sale-land-clumps">
             <div class="card-body border-bottom py-3">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                     <div>
                         <h2 class="h6 mb-1">Sent to sale files</h2>
                         <p class="text-muted small mb-0">
-                            Files already moved are grouped as clumps — easier to find than a long list.
+                            Hierarchy: <strong>Batch → Clump → Files</strong>. Create a batch, then assign clumps to it.
                         </p>
                     </div>
                     <a href="{{ route('sale.files.index', $project) }}" class="btn btn-sm btn-outline-theme">Open sale files</a>
                 </div>
             </div>
+
+            <div class="card-body border-bottom py-3 sale-land-batch-create">
+                <form method="post" action="{{ route('projects.sale-land.batches.store', $project) }}" class="sale-land-batch-create__form">
+                    @csrf
+                    <label class="sale-land-batch-create__label" for="sale-land-batch-name">New batch</label>
+                    <div class="sale-land-batch-create__row">
+                        <input
+                            type="text"
+                            id="sale-land-batch-name"
+                            name="name"
+                            class="form-control form-control-sm"
+                            value="{{ old('name', $suggestedBatchName) }}"
+                            maxlength="150"
+                            required
+                            placeholder="Batch name"
+                        >
+                        <button type="submit" class="btn btn-sm btn-pink">Create batch</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="card-body">
-                <div class="sale-land-clump-grid">
-                    @foreach($fileSaleCollectives as $collective)
-                        <div class="sale-land-clump {{ !empty($collective['is_open']) ? 'is-open' : 'is-done' }}">
-                            <div class="sale-land-clump__top">
-                                <div>
-                                    <div class="sale-land-clump__label">Sale file clump</div>
-                                    <h3 class="sale-land-clump__title">{{ $collective['name'] }}</h3>
+                @if($fileSaleBatches !== [])
+                    <div class="sale-land-batch-list mb-4">
+                        @foreach($fileSaleBatches as $batch)
+                            <div class="sale-land-batch" id="batch-{{ $batch['id'] }}">
+                                <div class="sale-land-batch__head">
+                                    <div>
+                                        <div class="sale-land-batch__label">Batch</div>
+                                        <h3 class="sale-land-batch__title">{{ $batch['name'] }}</h3>
+                                    </div>
+                                    <div class="sale-land-batch__meta">
+                                        {{ (int) ($batch['clump_count'] ?? 0) }} {{ (int) ($batch['clump_count'] ?? 0) === 1 ? 'clump' : 'clumps' }}
+                                        · {{ (int) ($batch['file_count'] ?? 0) }} {{ (int) ($batch['file_count'] ?? 0) === 1 ? 'file' : 'files' }}
+                                        · {{ $batch['total_land_area'] ?? '—' }}
+                                    </div>
                                 </div>
-                                <span class="sale-land-clump__badge {{ !empty($collective['is_open']) ? 'is-open' : 'is-done' }}">
-                                    {{ !empty($collective['is_open']) ? 'Open' : 'Completed' }}
-                                </span>
+
+                                @if(($batch['collectives'] ?? []) === [])
+                                    <p class="sale-land-batch__empty mb-0">No clumps assigned yet. Use “Assign to batch” on a clump below.</p>
+                                @else
+                                    <div class="sale-land-clump-grid">
+                                        @foreach($batch['collectives'] as $collective)
+                                            @include('projects.partials.sale-land-clump-card', [
+                                                'project' => $project,
+                                                'collective' => $collective,
+                                                'allBatchesForSelect' => $allBatchesForSelect,
+                                            ])
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
-                            <div class="sale-land-clump__meta">
-                                {{ $collective['file_count'] }} {{ ($collective['file_count'] ?? 0) === 1 ? 'file' : 'files' }}
-                                · {{ $collective['total_land_sheet'] ?? ($collective['total_land_area'] ?? '—') }}
-                            </div>
-                            @if(!empty($collective['exemption_summary']) && $collective['exemption_summary'] !== '—')
-                                <div class="sale-land-clump__exemption">{{ $collective['exemption_summary'] }}</div>
-                            @endif
-                            <div class="sale-land-clump__files">
-                                @foreach(($collective['files'] ?? []) as $file)
-                                    <a href="{{ route('purchase.files.show', $file['id']) }}" class="sale-land-clump__chip" title="Open purchase file">
-                                        {{ $file['name'] }}
-                                    </a>
-                                @endforeach
-                            </div>
-                            <div class="sale-land-clump__actions">
-                                <a href="{{ route('sale.files.index', $project) }}#collective-{{ $collective['id'] }}" class="btn btn-sm btn-pink">
-                                    View clump
-                                </a>
-                                <form method="post"
-                                      action="{{ route('projects.sale-land.collectives.destroy', [$project, $collective['id']]) }}"
-                                      class="d-inline">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-danger btn-delete-confirm"
-                                        data-title="Delete clump?"
-                                        data-text="Delete &quot;{{ $collective['name'] }}&quot; and move its {{ (int) ($collective['file_count'] ?? 0) }} file{{ (int) ($collective['file_count'] ?? 0) === 1 ? '' : 's' }} back to Sale land (Ready to move)?"
-                                        data-confirm="Yes, delete clump"
-                                    >Delete</button>
-                                </form>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if($unbatchedCollectives !== [] || ($fileSaleBatches === [] && $fileSaleCollectives !== []))
+                    <div class="sale-land-unbatched">
+                        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+                            <div>
+                                <h3 class="h6 mb-1">{{ $fileSaleBatches !== [] ? 'Unassigned clumps' : 'Sale file clumps' }}</h3>
+                                <p class="text-muted small mb-0">
+                                    @if($allBatchesForSelect === [])
+                                        Create a batch above, then assign clumps to it.
+                                    @else
+                                        Select a batch for each clump to group them.
+                                    @endif
+                                </p>
                             </div>
                         </div>
-                    @endforeach
+                        <div class="sale-land-clump-grid">
+                            @foreach(($fileSaleBatches !== [] ? $unbatchedCollectives : $fileSaleCollectives) as $collective)
+                                @include('projects.partials.sale-land-clump-card', [
+                                    'project' => $project,
+                                    'collective' => $collective,
+                                    'allBatchesForSelect' => $allBatchesForSelect,
+                                ])
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
-                    @if($separateMovedFiles !== [])
+                @if($separateMovedFiles !== [])
+                    <div class="sale-land-clump-grid {{ ($fileSaleCollectives !== [] || $fileSaleBatches !== []) ? 'mt-4' : '' }}">
                         <div class="sale-land-clump is-separate">
                             <div class="sale-land-clump__top">
                                 <div>
@@ -165,8 +207,8 @@
                                 </a>
                             </div>
                         </div>
-                    @endif
-                </div>
+                    </div>
+                @endif
             </div>
         </div>
     @endif
@@ -646,6 +688,77 @@
 
 @push('head')
 <style>
+    .sale-land-batch-create__form {
+        max-width: 420px;
+    }
+    .sale-land-batch-create__label {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.35rem;
+    }
+    .sale-land-batch-create__row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .sale-land-batch-create__row .form-control {
+        flex: 1 1 180px;
+        min-width: 0;
+    }
+    .sale-land-batch-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+    }
+    .sale-land-batch {
+        padding: 1rem 1.05rem 1.1rem;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        border-radius: 16px;
+        background: linear-gradient(180deg, #eff6ff 0%, #fff 55%);
+    }
+    .sale-land-batch__head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.65rem;
+        margin-bottom: 0.85rem;
+    }
+    .sale-land-batch__label {
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+        margin-bottom: 0.15rem;
+    }
+    .sale-land-batch__title {
+        margin: 0;
+        font-size: 1.12rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+        line-height: 1.25;
+    }
+    .sale-land-batch__meta {
+        font-size: 0.82rem;
+        color: #475569;
+        font-weight: 650;
+        padding-top: 0.15rem;
+    }
+    .sale-land-batch__empty {
+        font-size: 0.84rem;
+        color: #64748b;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px dashed rgba(37, 99, 235, 0.25);
+        border-radius: 10px;
+        padding: 0.75rem 0.9rem;
+    }
     .sale-land-clump-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -660,6 +773,27 @@
         border-radius: 14px;
         background: linear-gradient(180deg, #f8fafc 0%, #fff 70%);
         min-height: 100%;
+    }
+    .sale-land-clump__batch-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+    .sale-land-clump__batch-label {
+        font-size: 0.68rem;
+        font-weight: 750;
+        color: #64748b;
+        margin: 0;
+    }
+    .sale-land-clump__batch-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: center;
+    }
+    .sale-land-clump__batch-row .form-select {
+        flex: 1 1 140px;
+        min-width: 0;
     }
     .sale-land-clump.is-open {
         border-color: rgba(34, 197, 94, 0.28);
@@ -759,6 +893,10 @@
     .sale-land-clump__actions {
         margin-top: auto;
         padding-top: 0.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: center;
     }
     .sale-land-ready-empty {
         padding: 2rem 1.25rem;

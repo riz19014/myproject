@@ -351,6 +351,11 @@ class ProjectController extends Controller
         $movedToFileSaleIds = $fileSaleLandService->movedSaleLandIds($project);
         $movedSaleLandFiles = $fileSaleLandService->movedSaleLandFiles($project);
         $fileSaleCollectives = $fileSaleLandService->buildCollectivesSummary($project, $movedSaleLandFiles);
+        $fileSaleBatches = $fileSaleLandService->buildBatchesSummary($project, $fileSaleCollectives);
+        $unbatchedCollectives = collect($fileSaleCollectives)
+            ->filter(fn (array $c) => empty($c['batch_id']))
+            ->values()
+            ->all();
         $separateMovedFiles = $fileSaleLandService->separateMovedFiles($project, $movedSaleLandFiles);
         $openCollectives = $fileSaleLandService->openCollectives($project)->map(fn ($c) => [
             'id' => (int) $c->id,
@@ -358,6 +363,7 @@ class ProjectController extends Controller
             'file_count' => (int) ($c->file_sale_lands_count ?? 0),
         ])->values()->all();
         $suggestedCollectiveName = $fileSaleLandService->nextCollectiveName($project);
+        $suggestedBatchName = $fileSaleLandService->nextBatchName($project);
 
         return view('projects.sale-land', compact(
             'project',
@@ -369,9 +375,12 @@ class ProjectController extends Controller
             'saleLandModalData',
             'movedToFileSaleIds',
             'fileSaleCollectives',
+            'fileSaleBatches',
+            'unbatchedCollectives',
             'separateMovedFiles',
             'openCollectives',
             'suggestedCollectiveName',
+            'suggestedBatchName',
         ));
     }
 
@@ -584,6 +593,63 @@ class ProjectController extends Controller
                 .$count.' file'.($count === 1 ? '' : 's')
                 .' moved back to Sale land (Ready to move).'
             );
+    }
+
+    public function storeSaleLandBatch(Request $request, Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+        ]);
+
+        try {
+            $result = $fileSaleLandService->createBatch($project, $validated['name']);
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('projects.sale-land', $project)
+                ->withErrors($e->errors())
+                ->withInput();
+        }
+
+        return redirect()
+            ->route('projects.sale-land', $project)
+            ->with('success', 'Batch "'.$result['batch']['name'].'" created. Assign clumps to it below.');
+    }
+
+    public function assignSaleLandCollectiveBatch(
+        Request $request,
+        Project $project,
+        FileSaleCollective $collective,
+        FileSaleLandService $fileSaleLandService
+    ) {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+
+        $request->merge([
+            'batch_id' => $request->filled('batch_id') ? $request->input('batch_id') : null,
+        ]);
+
+        $validated = $request->validate([
+            'batch_id' => ['nullable', 'integer'],
+        ]);
+
+        try {
+            $result = $fileSaleLandService->assignCollectiveToBatch(
+                $project,
+                $collective,
+                isset($validated['batch_id']) ? (int) $validated['batch_id'] : null,
+            );
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('projects.sale-land', $project)
+                ->withErrors($e->errors());
+        }
+
+        $message = $result['batch']
+            ? 'Clump "'.$result['collective']['name'].'" assigned to batch "'.$result['batch']['name'].'".'
+            : 'Clump "'.$result['collective']['name'].'" removed from batch.';
+
+        return redirect()
+            ->route('projects.sale-land', $project)
+            ->with('success', $message);
     }
 
     public function storeSaleLandSale(Request $request, Project $project, PurchaseFile $purchase_file)

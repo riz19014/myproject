@@ -110,6 +110,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
     Route::post('projects/{project}/sale-land/move-to-file-sale', [ProjectController::class, 'moveToFileSale'])->name('projects.sale-land.move-to-file-sale');
     Route::delete('projects/{project}/sale-land/collectives/{collective}', [ProjectController::class, 'destroySaleLandCollective'])->name('projects.sale-land.collectives.destroy');
+    Route::post('projects/{project}/sale-land/batches', [ProjectController::class, 'storeSaleLandBatch'])->name('projects.sale-land.batches.store');
+    Route::post('projects/{project}/sale-land/collectives/{collective}/batch', [ProjectController::class, 'assignSaleLandCollectiveBatch'])->name('projects.sale-land.collectives.batch');
     Route::delete('projects/{project}/sale-land/{purchase_file}', [ProjectController::class, 'destroySaleLand'])->name('projects.sale-land.destroy');
     Route::post('projects/{project}/sale-land/{purchase_file}/sale', [ProjectController::class, 'storeSaleLandSale'])->name('projects.sale-land.sale.store');
     Route::resource('projects', ProjectController::class);

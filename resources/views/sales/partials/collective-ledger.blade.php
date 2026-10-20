@@ -4,6 +4,8 @@
     $collectiveId = (int) ($collective['id'] ?? 0);
     $panelId = 'collective-'.$collectiveId;
     $landLabel = $collective['total_land_sheet'] ?? ($collective['total_land_area'] ?? '—');
+    $showClumpLabel = ! empty($showClumpLabel);
+    $clumpName = $collective['name'] ?? 'Sale file';
     $activeExemption = $collective['active_exemption'] ?? [
         'summary' => $collective['exemption_summary'] ?? '—',
         'marla_label' => '1 acre = '.rtrim(rtrim(number_format((float) ($collective['marla_per_acre'] ?? 160), 4, '.', ''), '0'), '.').'M',
@@ -21,12 +23,15 @@
 @endphp
 
 <div class="saved-sale-panel {{ $isOpen ? 'is-open' : 'is-done' }}" id="{{ $panelId }}">
+    @if($showClumpLabel)
+        <div class="saved-sale-panel__clump-tag">Clump</div>
+    @endif
     @include('sales.partials.leftover-land-balance', [
         'leftoverColumns' => $leftover['formula_columns'] ?? [],
         'leftoverFiles' => $leftover['files'] ?? [],
         'leftoverTotals' => $leftover['totals'] ?? [],
         'idPrefix' => 'collective-'.$collectiveId,
-        'summaryTitle' => $collective['name'] ?? 'Sale file',
+        'summaryTitle' => $clumpName,
         'summarySubtitle' => $landLabel,
         'summaryBadge' => $isOpen ? 'Open' : 'Completed',
         'summaryBadgeClass' => $isOpen ? 'is-open' : 'is-done',
@@ -35,7 +40,7 @@
         'canExcludeToSaleLand' => $isOpen,
         'excludeProject' => $project,
         'excludeCollectiveId' => $collectiveId,
-        'excludeCollectiveName' => $collective['name'] ?? 'this sale file',
+        'excludeCollectiveName' => $clumpName,
         'beforeStatsView' => 'sales.partials.collective-summary-toolbar',
         'beforeStatsData' => [
             'project' => $project,

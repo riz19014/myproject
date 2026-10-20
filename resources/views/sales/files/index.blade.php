@@ -775,6 +775,82 @@
     .saved-sale-files-list {
         gap: 0.45rem !important;
     }
+    .saved-sale-files-card__batch-count {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 750;
+        color: #1d4ed8;
+        background: #dbeafe;
+        border: 1px solid rgba(29, 78, 216, 0.15);
+    }
+    .saved-sale-batches {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .saved-sale-batch {
+        padding: 0.85rem 0.9rem 0.95rem;
+        border: 1px solid rgba(37, 99, 235, 0.16);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #eff6ff 0%, #fff 52%);
+    }
+    .saved-sale-batch.is-unbatched {
+        border-color: rgba(100, 116, 139, 0.22);
+        background: linear-gradient(180deg, #f8fafc 0%, #fff 55%);
+    }
+    .saved-sale-batch__head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.55rem 1rem;
+        margin-bottom: 0.75rem;
+    }
+    .saved-sale-batch__label {
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+        margin-bottom: 0.12rem;
+    }
+    .saved-sale-batch.is-unbatched .saved-sale-batch__label {
+        color: #64748b;
+    }
+    .saved-sale-batch__title {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+        line-height: 1.25;
+    }
+    .saved-sale-batch__meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.15rem;
+        font-size: 0.8rem;
+        font-weight: 650;
+        color: #475569;
+        padding-top: 0.1rem;
+        text-align: right;
+    }
+    .saved-sale-batch__meta strong {
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .saved-sale-batch__empty {
+        font-size: 0.84rem;
+        color: #64748b;
+        background: rgba(255, 255, 255, 0.75);
+        border: 1px dashed rgba(37, 99, 235, 0.25);
+        border-radius: 10px;
+        padding: 0.7rem 0.85rem;
+    }
     .saved-sale-panel {
         border-radius: 10px !important;
         box-shadow: none !important;
@@ -957,6 +1033,183 @@
     .fs-overview .card-body {
         padding: 0.55rem 0.7rem;
     }
+    .fs-how-it-works {
+        margin: 0 0 1rem;
+        padding: 0.85rem 1rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 14px;
+        background: linear-gradient(135deg, #fff7ed 0%, #fff 48%, #eff6ff 100%);
+    }
+    .fs-how-it-works__steps {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.55rem;
+        margin-bottom: 0.45rem;
+    }
+    .fs-how-it-works__step {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        color: #334155;
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .fs-how-it-works__step strong {
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .fs-how-it-works__step.is-batch {
+        border-color: rgba(37, 99, 235, 0.28);
+        background: #eff6ff;
+    }
+    .fs-how-it-works__step.is-clump {
+        border-color: rgba(5, 150, 105, 0.28);
+        background: #ecfdf5;
+    }
+    .fs-how-it-works__step.is-file {
+        border-color: rgba(194, 65, 12, 0.25);
+        background: #fff7ed;
+    }
+    .fs-how-it-works__arrow {
+        color: #94a3b8;
+        font-weight: 700;
+    }
+    .fs-how-it-works__hint {
+        font-size: 0.82rem;
+        color: #64748b;
+        line-height: 1.45;
+    }
+    .fs-batch-overview {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .fs-batch-overview__project,
+    .fs-batch-overview__row {
+        padding: 0.85rem 0.9rem;
+        border-radius: 14px;
+    }
+    .fs-batch-overview__project {
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        background: #fff;
+    }
+    .fs-batch-overview__row {
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        background: linear-gradient(180deg, #eff6ff 0%, #fff 72%);
+    }
+    .fs-batch-overview__row.is-unassigned {
+        border-color: rgba(100, 116, 139, 0.22);
+        background: linear-gradient(180deg, #f8fafc 0%, #fff 72%);
+    }
+    .fs-simple-card__head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.55rem 1rem;
+        margin-bottom: 0.7rem;
+    }
+    .fs-simple-card__kicker {
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+        margin-bottom: 0.12rem;
+    }
+    .fs-batch-overview__project .fs-simple-card__kicker {
+        color: #475569;
+    }
+    .fs-batch-overview__row.is-unassigned .fs-simple-card__kicker {
+        color: #64748b;
+    }
+    .fs-simple-card__title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+        line-height: 1.25;
+    }
+    .fs-simple-card__meta {
+        margin-top: 0.2rem;
+        font-size: 0.78rem;
+        font-weight: 650;
+        color: #64748b;
+    }
+    .fs-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+        gap: 0.45rem;
+    }
+    .fs-stat-tile {
+        display: flex;
+        flex-direction: column;
+        gap: 0.18rem;
+        padding: 0.55rem 0.65rem;
+        border-radius: 10px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        min-width: 0;
+        text-align: left;
+    }
+    button.fs-stat-tile {
+        cursor: pointer;
+    }
+    button.fs-stat-tile:hover,
+    button.fs-stat-tile:focus-visible {
+        border-color: rgba(194, 65, 12, 0.4);
+        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.12);
+        outline: none;
+    }
+    .fs-stat-tile__label {
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .fs-stat-tile__value {
+        font-size: 0.86rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.25;
+        word-break: break-word;
+    }
+    .fs-stat-tile.is-sold .fs-stat-tile__value { color: #c2410c; }
+    .fs-stat-tile.is-left .fs-stat-tile__value { color: #047857; }
+    .fs-stat-tile.is-amount .fs-stat-tile__value { color: #0f172a; }
+    .fs-stat-tile.is-sale .fs-stat-tile__value { color: #9a3412; }
+    .fs-stat-tile--files,
+    button.fs-stat-tile.fs-files-btn {
+        border-color: rgba(194, 65, 12, 0.2);
+        background: #fff7ed;
+        border-radius: 10px;
+        padding: 0.55rem 0.65rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.18rem;
+        line-height: 1.25;
+        box-shadow: none;
+    }
+    .fs-stat-tile--files .fs-stat-tile__value { color: #c2410c; }
+    .fs-batch-plots {
+        margin-top: 0.65rem;
+        padding-top: 0.55rem;
+        border-top: 1px dashed rgba(15, 23, 42, 0.1);
+    }
+    .fs-batch-plots__label {
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.35rem;
+    }
     .fs-overview-strip {
         display: flex;
         flex-wrap: wrap;
@@ -1127,13 +1380,41 @@
         justify-content: center;
         min-width: 1.55rem;
         height: 1.55rem;
-        padding: 0 0.4rem;
+        padding: 0 0.55rem;
         border-radius: 999px;
-        background: #fff7ed;
-        border: 1px solid rgba(194, 65, 12, 0.2);
-        color: #c2410c;
-        font-size: 0.75rem;
+        background: #d1fae5;
+        border: 1px solid rgba(4, 120, 87, 0.15);
+        color: #047857;
+        font-size: 0.72rem;
         font-weight: 800;
+    }
+    .saved-sale-panel__clump-tag {
+        display: inline-flex;
+        align-items: center;
+        margin: 0.55rem 0.75rem 0;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.62rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #047857;
+        background: #d1fae5;
+        border: 1px solid rgba(4, 120, 87, 0.18);
+    }
+    .saved-sale-batch__explain {
+        margin-top: 0.25rem;
+        font-size: 0.78rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .saved-sale-batch__clumps-label {
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #047857;
+        margin: 0 0 0.45rem;
     }
     .saved-sale-files-empty {
         text-align: center;
@@ -1652,11 +1933,15 @@
 
 @section('content')
 @php
-    $summary = $fileSaleSummary ?? ['totals' => [], 'moved_files' => [], 'files_land_columns' => [], 'leftover_balance' => [], 'collectives' => [], 'separate_files' => [], 'open_collectives' => []];
+    $summary = $fileSaleSummary ?? ['totals' => [], 'moved_files' => [], 'files_land_columns' => [], 'leftover_balance' => [], 'collectives' => [], 'batches' => [], 'unbatched_collectives' => [], 'separate_files' => [], 'open_collectives' => []];
     $totals = $summary['totals'] ?? [];
     $movedFiles = $summary['moved_files'] ?? [];
     $filesLandColumns = $summary['files_land_columns'] ?? [];
     $collectives = $summary['collectives'] ?? [];
+    $batches = $summary['batches'] ?? [];
+    $unbatchedCollectives = $summary['unbatched_collectives']
+        ?? collect($collectives)->filter(fn ($c) => empty($c['batch_id']))->values()->all();
+    $unbatchedSummary = $summary['unbatched_summary'] ?? null;
     $separateFiles = $summary['separate_files'] ?? [];
     $openCollectives = $summary['open_collectives'] ?? [];
     $suggestedSaleFileName = $summary['suggested_sale_file_name'] ?? ('Collective-'.(count($collectives) + 1));
@@ -1667,6 +1952,11 @@
     $innerMergeableFileCount = collect($openMergeCollectives)
         ->sum(fn ($c) => collect($c['leftover_balance']['files'] ?? [])->count());
     $canMergeInnerFiles = $innerMergeableFileCount >= 2;
+    $showBatchGrouping = $batches !== [];
+    $batchOverviewRows = $batches;
+    if ($unbatchedSummary) {
+        $batchOverviewRows[] = $unbatchedSummary;
+    }
 @endphp
 
 @if(session('success'))
@@ -1710,6 +2000,22 @@
     </div>
 </div>
 
+@if($movedFiles !== [] && $showBatchGrouping)
+    <div class="fs-how-it-works" aria-label="How this page is organized">
+        <div class="fs-how-it-works__steps">
+            <span class="fs-how-it-works__step is-batch"><strong>1. Batch</strong> group of clumps</span>
+            <span class="fs-how-it-works__arrow" aria-hidden="true">→</span>
+            <span class="fs-how-it-works__step is-clump"><strong>2. Clump</strong> named sale file</span>
+            <span class="fs-how-it-works__arrow" aria-hidden="true">→</span>
+            <span class="fs-how-it-works__step is-file"><strong>3. Files</strong> land inside it</span>
+        </div>
+        <p class="fs-how-it-works__hint mb-0">
+            Totals at the top are per batch. Open a clump below to sell, merge, or change exemption.
+            Assign clumps to batches from <a href="{{ route('projects.sale-land', $project) }}">Sale land</a>.
+        </p>
+    </div>
+@endif
+
 @if($movedFiles === [])
     <div class="card card-theme mb-4">
         <div class="card-body fs-empty">
@@ -1722,7 +2028,7 @@
     </div>
 @else
     <div class="card card-theme mb-3 fs-overview">
-        @if($filesLandColumns !== [])
+        @if($filesLandColumns !== [] || $batchOverviewRows !== [])
             <div class="card-body">
                 <div id="file-sale-files-popover-content" class="d-none">
                     <ul class="file-sale-popover__list">
@@ -1732,57 +2038,184 @@
                     </ul>
                 </div>
 
-                <div class="fs-overview-strip">
-                    <div class="fs-overview-strip__files">
-                        <button type="button"
-                                class="fs-files-btn"
-                                id="file-sale-files-count-btn"
-                                aria-label="{{ count($movedFiles) }} sale land files — click to view names"
-                                title="Tap to view file names">
-                            <span class="fs-files-btn__num">{{ count($movedFiles) }}</span>
-                            <span class="fs-files-btn__text">{{ count($movedFiles) === 1 ? 'file' : 'files' }}</span>
-                        </button>
-                    </div>
-
-                    <div class="fs-overview-strip__stats">
-                        <span class="fs-overview-strip__stat">Total <strong>{{ $totals['total_land_area'] ?? '—' }}</strong></span>
-                        <span class="fs-overview-strip__sep">·</span>
-                        <span class="fs-overview-strip__stat is-sold">Sold <strong>{{ $totals['sold_land_area'] ?? '—' }}</strong></span>
-                        <span class="fs-overview-strip__sep">·</span>
-                        <span class="fs-overview-strip__stat is-left">Left <strong>{{ $totals['remaining_land_area'] ?? '—' }}</strong></span>
-                        <span class="fs-overview-strip__sep">·</span>
-                        <span class="fs-overview-strip__stat is-amount" title="Total amount land">
-                            Amt <strong>{{ $totals['grand_total_amount_short'] ?? ($totals['grand_total_amount_formatted'] ?? '—') }}</strong>
-                        </span>
-                        <span class="fs-overview-strip__sep">·</span>
-                        <span class="fs-overview-strip__stat is-sale" title="Sale files amount">
-                            Sale <strong>{{ $totals['sale_files_amount_short'] ?? ($totals['sale_files_amount_formatted'] ?? '—') }}</strong>
-                        </span>
-                    </div>
-
-                    <div class="fs-overview-strip__actions">
-                        @if($separateFiles !== [])
-                            <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
-                                Save all
-                            </button>
-                        @endif
-                        <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">PDF</a>
-                    </div>
-
-                    @if($filesLandColumns !== [])
-                        <div class="fs-overview-strip__plots">
-                            @foreach($filesLandColumns as $column)
-                                @php
-                                    $isCommercial = str_starts_with(strtoupper((string) ($column['column_code'] ?? '')), 'C');
-                                @endphp
-                                <span class="fs-plot-chip {{ $isCommercial ? 'is-commercial' : 'is-residential' }}" title="{{ $column['short_label'] }}">
-                                    {{ $column['column_code'] }}
-                                    <span class="fs-plot-chip__meta">{{ $column['file_count'] }}</span>
-                                </span>
-                            @endforeach
+                @if($showBatchGrouping)
+                    <div class="fs-batch-overview">
+                        <div class="fs-batch-overview__project">
+                            <div class="fs-simple-card__head">
+                                <div>
+                                    <div class="fs-simple-card__kicker">Whole project</div>
+                                    <div class="fs-simple-card__title">All batches together</div>
+                                </div>
+                                <div class="fs-overview-strip__actions">
+                                    @if($separateFiles !== [])
+                                        <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
+                                            Save all
+                                        </button>
+                                    @endif
+                                    <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">PDF</a>
+                                </div>
+                            </div>
+                            <div class="fs-stat-grid">
+                                <button type="button"
+                                        class="fs-stat-tile fs-stat-tile--files fs-files-btn"
+                                        id="file-sale-files-count-btn"
+                                        aria-label="{{ count($movedFiles) }} sale land files — click to view names"
+                                        title="Tap to view file names">
+                                    <span class="fs-stat-tile__label">Files</span>
+                                    <span class="fs-stat-tile__value">{{ count($movedFiles) }}</span>
+                                </button>
+                                <div class="fs-stat-tile">
+                                    <span class="fs-stat-tile__label">Total land</span>
+                                    <span class="fs-stat-tile__value">{{ $totals['total_land_area'] ?? '—' }}</span>
+                                </div>
+                                <div class="fs-stat-tile is-sold">
+                                    <span class="fs-stat-tile__label">Sold</span>
+                                    <span class="fs-stat-tile__value">{{ $totals['sold_land_area'] ?? '—' }}</span>
+                                </div>
+                                <div class="fs-stat-tile is-left">
+                                    <span class="fs-stat-tile__label">Left</span>
+                                    <span class="fs-stat-tile__value">{{ $totals['remaining_land_area'] ?? '—' }}</span>
+                                </div>
+                                <div class="fs-stat-tile is-amount" title="Purchase / land amount">
+                                    <span class="fs-stat-tile__label">Land amount</span>
+                                    <span class="fs-stat-tile__value">{{ $totals['grand_total_amount_short'] ?? ($totals['grand_total_amount_formatted'] ?? '—') }}</span>
+                                </div>
+                                <div class="fs-stat-tile is-sale" title="Sale files amount">
+                                    <span class="fs-stat-tile__label">Sale amount</span>
+                                    <span class="fs-stat-tile__value">{{ $totals['sale_files_amount_short'] ?? ($totals['sale_files_amount_formatted'] ?? '—') }}</span>
+                                </div>
+                            </div>
                         </div>
-                    @endif
-                </div>
+
+                        @foreach($batchOverviewRows as $batchRow)
+                            @php
+                                $batchPopoverId = 'file-sale-batch-files-'.($batchRow['id'] ?? 'unassigned');
+                                $batchPlotColumns = $batchRow['files_land_columns'] ?? [];
+                                $batchAnchor = empty($batchRow['id']) ? 'sale-batch-unassigned' : 'sale-batch-'.$batchRow['id'];
+                            @endphp
+                            <div class="fs-batch-overview__row {{ empty($batchRow['id']) ? 'is-unassigned' : '' }}">
+                                <div id="{{ $batchPopoverId }}" class="d-none">
+                                    <ul class="file-sale-popover__list">
+                                        @forelse(($batchRow['file_names'] ?? []) as $fileName)
+                                            <li>{{ $fileName }}</li>
+                                        @empty
+                                            <li>No files in this batch</li>
+                                        @endforelse
+                                    </ul>
+                                </div>
+                                <div class="fs-simple-card__head">
+                                    <div>
+                                        <div class="fs-simple-card__kicker">{{ empty($batchRow['id']) ? 'Not in a batch' : 'Batch' }}</div>
+                                        <div class="fs-simple-card__title">{{ $batchRow['name'] }}</div>
+                                        <div class="fs-simple-card__meta">
+                                            {{ (int) ($batchRow['clump_count'] ?? 0) }} {{ (int) ($batchRow['clump_count'] ?? 0) === 1 ? 'clump' : 'clumps' }}
+                                            · {{ (int) ($batchRow['file_count'] ?? 0) }} {{ (int) ($batchRow['file_count'] ?? 0) === 1 ? 'file' : 'files' }}
+                                        </div>
+                                    </div>
+                                    <a href="#{{ $batchAnchor }}" class="btn btn-sm btn-outline-theme">Open clumps</a>
+                                </div>
+                                <div class="fs-stat-grid">
+                                    <button type="button"
+                                            class="fs-stat-tile fs-stat-tile--files fs-files-btn fs-batch-files-btn"
+                                            data-popover-source="{{ $batchPopoverId }}"
+                                            aria-label="{{ (int) ($batchRow['file_count'] ?? 0) }} files in {{ $batchRow['name'] }}"
+                                            title="Tap to view file names">
+                                        <span class="fs-stat-tile__label">Files</span>
+                                        <span class="fs-stat-tile__value">{{ (int) ($batchRow['file_count'] ?? 0) }}</span>
+                                    </button>
+                                    <div class="fs-stat-tile">
+                                        <span class="fs-stat-tile__label">Total land</span>
+                                        <span class="fs-stat-tile__value">{{ $batchRow['total_land_area'] ?? '—' }}</span>
+                                    </div>
+                                    <div class="fs-stat-tile is-sold">
+                                        <span class="fs-stat-tile__label">Sold</span>
+                                        <span class="fs-stat-tile__value">{{ $batchRow['sold_land_area'] ?? '—' }}</span>
+                                    </div>
+                                    <div class="fs-stat-tile is-left">
+                                        <span class="fs-stat-tile__label">Left</span>
+                                        <span class="fs-stat-tile__value">{{ $batchRow['remaining_land_area'] ?? '—' }}</span>
+                                    </div>
+                                    <div class="fs-stat-tile is-amount" title="Purchase / land amount">
+                                        <span class="fs-stat-tile__label">Land amount</span>
+                                        <span class="fs-stat-tile__value">{{ $batchRow['grand_total_amount_short'] ?? ($batchRow['grand_total_amount_formatted'] ?? '—') }}</span>
+                                    </div>
+                                    <div class="fs-stat-tile is-sale" title="Sale files amount">
+                                        <span class="fs-stat-tile__label">Sale amount</span>
+                                        <span class="fs-stat-tile__value">{{ $batchRow['sale_files_amount_short'] ?? ($batchRow['sale_files_amount_formatted'] ?? '—') }}</span>
+                                    </div>
+                                </div>
+                                @if($batchPlotColumns !== [])
+                                    <div class="fs-batch-plots">
+                                        <div class="fs-batch-plots__label">Plot files in this batch</div>
+                                        <div class="fs-overview-strip__plots">
+                                            @foreach($batchPlotColumns as $column)
+                                                @php
+                                                    $isCommercial = str_starts_with(strtoupper((string) ($column['column_code'] ?? '')), 'C');
+                                                @endphp
+                                                <span class="fs-plot-chip {{ $isCommercial ? 'is-commercial' : 'is-residential' }}" title="{{ $column['short_label'] }}">
+                                                    {{ $column['column_code'] }}
+                                                    <span class="fs-plot-chip__meta">{{ $column['file_count'] }}</span>
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="fs-overview-strip">
+                        <div class="fs-overview-strip__files">
+                            <button type="button"
+                                    class="fs-files-btn"
+                                    id="file-sale-files-count-btn"
+                                    aria-label="{{ count($movedFiles) }} sale land files — click to view names"
+                                    title="Tap to view file names">
+                                <span class="fs-files-btn__num">{{ count($movedFiles) }}</span>
+                                <span class="fs-files-btn__text">{{ count($movedFiles) === 1 ? 'file' : 'files' }}</span>
+                            </button>
+                        </div>
+
+                        <div class="fs-overview-strip__stats">
+                            <span class="fs-overview-strip__stat">Total <strong>{{ $totals['total_land_area'] ?? '—' }}</strong></span>
+                            <span class="fs-overview-strip__sep">·</span>
+                            <span class="fs-overview-strip__stat is-sold">Sold <strong>{{ $totals['sold_land_area'] ?? '—' }}</strong></span>
+                            <span class="fs-overview-strip__sep">·</span>
+                            <span class="fs-overview-strip__stat is-left">Left <strong>{{ $totals['remaining_land_area'] ?? '—' }}</strong></span>
+                            <span class="fs-overview-strip__sep">·</span>
+                            <span class="fs-overview-strip__stat is-amount" title="Total amount land">
+                                Amt <strong>{{ $totals['grand_total_amount_short'] ?? ($totals['grand_total_amount_formatted'] ?? '—') }}</strong>
+                            </span>
+                            <span class="fs-overview-strip__sep">·</span>
+                            <span class="fs-overview-strip__stat is-sale" title="Sale files amount">
+                                Sale <strong>{{ $totals['sale_files_amount_short'] ?? ($totals['sale_files_amount_formatted'] ?? '—') }}</strong>
+                            </span>
+                        </div>
+
+                        <div class="fs-overview-strip__actions">
+                            @if($separateFiles !== [])
+                                <button type="button" class="btn btn-sm btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
+                                    Save all
+                                </button>
+                            @endif
+                            <a href="{{ route('sale.files.original-formula.pdf', $project) }}" class="btn btn-sm btn-outline-theme">PDF</a>
+                        </div>
+
+                        @if($filesLandColumns !== [])
+                            <div class="fs-overview-strip__plots">
+                                @foreach($filesLandColumns as $column)
+                                    @php
+                                        $isCommercial = str_starts_with(strtoupper((string) ($column['column_code'] ?? '')), 'C');
+                                    @endphp
+                                    <span class="fs-plot-chip {{ $isCommercial ? 'is-commercial' : 'is-residential' }}" title="{{ $column['short_label'] }}">
+                                        {{ $column['column_code'] }}
+                                        <span class="fs-plot-chip__meta">{{ $column['file_count'] }}</span>
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endif
             </div>
         @else
             <div class="card-body">
@@ -1875,15 +2308,22 @@
         <div class="card-header py-3 saved-sale-files-card__header">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <span class="fs-step-badge">{{ $separateFiles !== [] ? '2' : '1' }}</span>
-                <h2 class="h6 mb-0">Saved sale files</h2>
+                <h2 class="h6 mb-0">{{ $showBatchGrouping ? 'Batches & clumps' : 'Saved sale files' }}</h2>
                 @if($collectives !== [])
-                    <span class="saved-sale-files-card__count">{{ count($collectives) }}</span>
+                    <span class="saved-sale-files-card__count" title="Clumps">{{ count($collectives) }} {{ count($collectives) === 1 ? 'clump' : 'clumps' }}</span>
+                @endif
+                @if($showBatchGrouping)
+                    <span class="saved-sale-files-card__batch-count">{{ count($batches) }} {{ count($batches) === 1 ? 'batch' : 'batches' }}</span>
                 @endif
             </div>
             <p class="text-muted small mb-0">
-                Tap to open.
+                @if($showBatchGrouping)
+                    Each blue box is a <strong>batch</strong>. Inside it, tap a <strong>clump</strong> to see its files.
+                @else
+                    Tap a clump to open its files.
+                @endif
                 @if($canMergeInnerFiles)
-                    Inside a sale file, tick files of the same mouza to merge them.
+                    Inside a clump, tick same-mouza files to merge them.
                 @endif
             </p>
         </div>
@@ -1900,6 +2340,72 @@
                         @endif
                     </p>
                 </div>
+            @elseif($showBatchGrouping)
+                <div class="saved-sale-batches">
+                    @foreach($batches as $batch)
+                        <section class="saved-sale-batch" id="sale-batch-{{ $batch['id'] }}">
+                            <div class="saved-sale-batch__head">
+                                <div>
+                                    <div class="saved-sale-batch__label">Batch</div>
+                                    <h3 class="saved-sale-batch__title">{{ $batch['name'] }}</h3>
+                                    <p class="saved-sale-batch__explain mb-0">
+                                        Contains the clumps listed below.
+                                    </p>
+                                </div>
+                                <div class="saved-sale-batch__meta">
+                                    <div><strong>{{ (int) ($batch['clump_count'] ?? 0) }}</strong> {{ (int) ($batch['clump_count'] ?? 0) === 1 ? 'clump' : 'clumps' }}</div>
+                                    <div><strong>{{ (int) ($batch['file_count'] ?? 0) }}</strong> {{ (int) ($batch['file_count'] ?? 0) === 1 ? 'file' : 'files' }}</div>
+                                    <div>Land <strong>{{ $batch['total_land_area'] ?? '—' }}</strong></div>
+                                </div>
+                            </div>
+                            @if(($batch['collectives'] ?? []) === [])
+                                <p class="saved-sale-batch__empty mb-0">No clumps in this batch yet. Assign them from Sale land.</p>
+                            @else
+                                <div class="saved-sale-batch__clumps-label">Clumps in this batch</div>
+                                <div class="saved-sale-files-list">
+                                    @foreach($batch['collectives'] as $collective)
+                                        @include('sales.partials.collective-ledger', [
+                                            'project' => $project,
+                                            'collective' => $collective,
+                                            'exemptionPickOptions' => $exemptionPickOptions ?? [],
+                                            'exemptionOptions' => $exemptionOptions ?? [],
+                                            'showClumpLabel' => true,
+                                        ])
+                                    @endforeach
+                                </div>
+                            @endif
+                        </section>
+                    @endforeach
+
+                    @if($unbatchedCollectives !== [])
+                        <section class="saved-sale-batch is-unbatched" id="sale-batch-unassigned">
+                            <div class="saved-sale-batch__head">
+                                <div>
+                                    <div class="saved-sale-batch__label">Not in a batch</div>
+                                    <h3 class="saved-sale-batch__title">Unassigned clumps</h3>
+                                    <p class="saved-sale-batch__explain mb-0">
+                                        These clumps are saved, but not assigned to any batch yet.
+                                    </p>
+                                </div>
+                                <div class="saved-sale-batch__meta">
+                                    <div><strong>{{ count($unbatchedCollectives) }}</strong> {{ count($unbatchedCollectives) === 1 ? 'clump' : 'clumps' }}</div>
+                                </div>
+                            </div>
+                            <div class="saved-sale-batch__clumps-label">Clumps</div>
+                            <div class="saved-sale-files-list">
+                                @foreach($unbatchedCollectives as $collective)
+                                    @include('sales.partials.collective-ledger', [
+                                        'project' => $project,
+                                        'collective' => $collective,
+                                        'exemptionPickOptions' => $exemptionPickOptions ?? [],
+                                        'exemptionOptions' => $exemptionOptions ?? [],
+                                        'showClumpLabel' => true,
+                                    ])
+                                @endforeach
+                            </div>
+                        </section>
+                    @endif
+                </div>
             @else
                 <div class="saved-sale-files-list">
                     @foreach($collectives as $collective)
@@ -1911,7 +2417,9 @@
                         ])
                     @endforeach
                 </div>
-                @if($canMergeInnerFiles)
+            @endif
+
+            @if($collectives !== [] && $canMergeInnerFiles)
                     <div class="ssf-inner-merge-bar" id="ssf-inner-merge-bar" hidden>
                         <div class="ssf-inner-merge-bar__text" id="ssf-inner-merge-bar-text">
                             Select files
@@ -1937,7 +2445,6 @@
                             >Merge selected</button>
                         </div>
                     </div>
-                @endif
             @endif
         </div>
     </div>
@@ -2053,24 +2560,47 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var btn = document.getElementById('file-sale-files-count-btn');
-    var content = document.getElementById('file-sale-files-popover-content');
-    if (btn && content && typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+    var filePopovers = [];
+    function bindFilesPopover(btn, contentEl, title) {
+        if (!btn || !contentEl || typeof bootstrap === 'undefined' || !bootstrap.Popover) return;
         var popover = new bootstrap.Popover(btn, {
-            title: 'Sale land files',
-            content: content.innerHTML,
+            title: title || 'Sale land files',
+            content: contentEl.innerHTML,
             html: true,
             trigger: 'click',
             placement: 'bottom',
             customClass: 'file-sale-popover',
             sanitize: false
         });
+        filePopovers.push({ btn: btn, popover: popover });
+    }
 
+    bindFilesPopover(
+        document.getElementById('file-sale-files-count-btn'),
+        document.getElementById('file-sale-files-popover-content'),
+        'Sale land files'
+    );
+
+    document.querySelectorAll('.fs-batch-files-btn[data-popover-source]').forEach(function (batchBtn) {
+        var sourceId = batchBtn.getAttribute('data-popover-source');
+        var source = sourceId ? document.getElementById(sourceId) : null;
+        var titleEl = batchBtn.closest('.fs-batch-overview__row');
+        var title = titleEl && titleEl.querySelector('.fs-batch-overview__title')
+            ? titleEl.querySelector('.fs-batch-overview__title').textContent.trim() + ' files'
+            : 'Batch files';
+        bindFilesPopover(batchBtn, source, title);
+    });
+
+    if (filePopovers.length) {
         document.addEventListener('click', function (e) {
-            var pop = document.querySelector('.file-sale-popover');
-            if (!btn.contains(e.target) && !(pop && pop.contains(e.target))) {
-                popover.hide();
-            }
+            filePopovers.forEach(function (item) {
+                var pop = item.btn.getAttribute('aria-describedby')
+                    ? document.getElementById(item.btn.getAttribute('aria-describedby'))
+                    : null;
+                if (!item.btn.contains(e.target) && !(pop && pop.contains(e.target))) {
+                    item.popover.hide();
+                }
+            });
         });
     }
 
