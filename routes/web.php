@@ -47,6 +47,8 @@ Route::middleware('auth')->group(function () {
     Route::get('sale/projects/{project}/files/collectives/{collective}', [SaleProjectFileController::class, 'showCollective'])->name('sale.files.collectives.show');
     Route::post('sale/projects/{project}/files/collectives', [SaleProjectFileController::class, 'storeCollective'])->name('sale.files.collectives.store');
     Route::post('sale/projects/{project}/files/collectives/group', [SaleProjectFileController::class, 'groupCollective'])->name('sale.files.collectives.group');
+    Route::post('sale/projects/{project}/files/collectives/merge-files', [SaleProjectFileController::class, 'mergeInnerFiles'])->name('sale.files.collectives.merge-files');
+    Route::post('sale/projects/{project}/files/collectives/unmerge-files', [SaleProjectFileController::class, 'unmergeInnerFiles'])->name('sale.files.collectives.unmerge-files');
     Route::post('sale/projects/{project}/files/collectives/{collective}/complete', [SaleProjectFileController::class, 'completeCollective'])->name('sale.files.collectives.complete');
     Route::post('sale/projects/{project}/files/collectives/{collective}/reopen', [SaleProjectFileController::class, 'reopenCollective'])->name('sale.files.collectives.reopen');
     Route::post('sale/projects/{project}/files/collectives/{collective}/exclude/{purchase_file}', [SaleProjectFileController::class, 'excludeFromCollective'])->name('sale.files.collectives.exclude');
@@ -107,6 +109,7 @@ Route::middleware('auth')->group(function () {
     Route::get('projects/{project}/sale-land-pdf', [ProjectController::class, 'saleLandPdf'])->name('projects.sale-land.pdf');
     Route::patch('projects/{project}/sale-land/moza-row', [ProjectController::class, 'updateSaleLandMozaRow'])->name('projects.sale-land.moza-row.update');
     Route::post('projects/{project}/sale-land/move-to-file-sale', [ProjectController::class, 'moveToFileSale'])->name('projects.sale-land.move-to-file-sale');
+    Route::delete('projects/{project}/sale-land/collectives/{collective}', [ProjectController::class, 'destroySaleLandCollective'])->name('projects.sale-land.collectives.destroy');
     Route::delete('projects/{project}/sale-land/{purchase_file}', [ProjectController::class, 'destroySaleLand'])->name('projects.sale-land.destroy');
     Route::post('projects/{project}/sale-land/{purchase_file}/sale', [ProjectController::class, 'storeSaleLandSale'])->name('projects.sale-land.sale.store');
     Route::resource('projects', ProjectController::class);

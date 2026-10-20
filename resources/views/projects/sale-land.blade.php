@@ -58,6 +58,15 @@
 @if(session('success'))
     <div class="alert alert-success small">{{ session('success') }}</div>
 @endif
+@if($errors->any())
+    <div class="alert alert-danger small">
+        <ul class="mb-0 ps-3">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 
 @if($sheetRows === [])
     <div class="card card-theme mb-4">
@@ -113,6 +122,19 @@
                                 <a href="{{ route('sale.files.index', $project) }}#collective-{{ $collective['id'] }}" class="btn btn-sm btn-pink">
                                     View clump
                                 </a>
+                                <form method="post"
+                                      action="{{ route('projects.sale-land.collectives.destroy', [$project, $collective['id']]) }}"
+                                      class="d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger btn-delete-confirm"
+                                        data-title="Delete clump?"
+                                        data-text="Delete &quot;{{ $collective['name'] }}&quot; and move its {{ (int) ($collective['file_count'] ?? 0) }} file{{ (int) ($collective['file_count'] ?? 0) === 1 ? '' : 's' }} back to Sale land (Ready to move)?"
+                                        data-confirm="Yes, delete clump"
+                                    >Delete</button>
+                                </form>
                             </div>
                         </div>
                     @endforeach

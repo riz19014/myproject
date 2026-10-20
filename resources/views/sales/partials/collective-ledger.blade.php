@@ -30,6 +30,7 @@
         'summarySubtitle' => $landLabel,
         'summaryBadge' => $isOpen ? 'Open' : 'Completed',
         'summaryBadgeClass' => $isOpen ? 'is-open' : 'is-done',
+        'summaryMouza' => $collective['mouzas_names'] ?? null,
         'variant' => 'sale-file',
         'canExcludeToSaleLand' => $isOpen,
         'excludeProject' => $project,
@@ -44,6 +45,7 @@
             'chooseModalId' => $chooseModalId,
             'viewModalId' => $viewModalId,
         ],
+        'canSelectFilesForMerge' => $isOpen,
     ])
 </div>
 

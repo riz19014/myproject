@@ -11,6 +11,7 @@ use App\Models\PurchaseFile;
 use App\Models\Sale;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 final class FileSaleLandService
@@ -608,6 +609,8 @@ final class FileSaleLandService
                 $members,
             );
 
+            $mouzaKey = $this->mouzaKeyFromFiles($members);
+
             return [
                 'id' => (int) $collective->id,
                 'name' => $collective->name,
@@ -618,6 +621,9 @@ final class FileSaleLandService
                     'id' => (int) $file->id,
                     'name' => $file->file_name,
                 ])->all(),
+                'mouza_key' => $mouzaKey,
+                'mouzas_names' => $leftoverBalance['totals']['mouzas_names'] ?? '—',
+                'mouzas_count' => (int) ($leftoverBalance['totals']['mouzas_count'] ?? 0),
                 'total_land_area' => $totalMarla > 0
                     ? LandMeasure::formatAkmsLabelFromMarla($totalMarla)
                     : '—',
@@ -643,6 +649,823 @@ final class FileSaleLandService
                 'marla_per_acre' => (float) ($exemptionPayload['marla_per_acre'] ?? $config->marlaPerAcreLand()),
             ];
         })->values()->all();
+    }
+
+    /**
+     * Truly merge selected same-mouza purchase files into ONE purchase file
+     * (items + related rows combined). Editable name defaults to combined land
+     * (e.g. 12 kanal + 7 kanal → "19 kanal"). Other files in the clump stay.
+     *
+     * @param  list<int>  $purchaseFileIds
+     * @return array{collective: array{id: int, name: string, status: string}, file: array{id: int, name: string}, file_count: int, mouza: string, suggested_name: string}
+     */
+    public function mergeInnerFiles(
+        Project $project,
+        array $purchaseFileIds,
+        ?string $name = null,
+        ?int $preferCollectiveId = null,
+    ): array {
+        $purchaseFileIds = collect($purchaseFileIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (count($purchaseFileIds) < 2) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Select at least two files of the same mouza to merge.'],
+            ]);
+        }
+
+        $links = FileSaleLand::query()
+            ->where('project_id', $project->id)
+            ->whereIn('sale_land_id', $purchaseFileIds)
+            ->whereNotNull('collective_id')
+            ->with(['saleLand.purchaseItems', 'saleLand.dealers', 'collective'])
+            ->get()
+            ->keyBy(fn (FileSaleLand $row) => (int) $row->sale_land_id);
+
+        if ($links->count() !== count($purchaseFileIds)) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Select files from inside open saved sale files only.'],
+            ]);
+        }
+
+        $closed = $links->filter(fn (FileSaleLand $row) => ! ($row->collective?->isOpen() ?? false));
+        if ($closed->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Only files inside open sale files can be merged. Reopen completed ones first.'],
+            ]);
+        }
+
+        $memberFiles = $links->map(fn (FileSaleLand $row) => $row->saleLand)->filter()->values();
+        if ($memberFiles->count() !== count($purchaseFileIds)) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['One or more selected files could not be loaded.'],
+            ]);
+        }
+
+        $mouzaKey = $this->mouzaKeyFromFiles($memberFiles);
+        if ($mouzaKey === '') {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Selected files have no mouza.'],
+            ]);
+        }
+
+        $perFileKeys = $memberFiles->map(fn (PurchaseFile $file) => $this->mouzaKeyFromFiles(collect([$file])));
+        if ($perFileKeys->unique()->count() !== 1) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Selected files must share the same mouza.'],
+            ]);
+        }
+
+        $mouzaLabel = $memberFiles
+            ->flatMap(fn (PurchaseFile $file) => $file->purchaseItems->pluck('moza'))
+            ->filter(fn ($v) => filled($v))
+            ->map(fn ($v) => trim((string) $v))
+            ->unique()
+            ->sort()
+            ->values()
+            ->implode(', ');
+
+        $suggestedName = $this->suggestedMergeNameFromFiles($memberFiles);
+        $finalName = ($name !== null && trim($name) !== '') ? trim($name) : $suggestedName;
+
+        $keeperLink = $this->resolveMergeKeeperLink($links, $preferCollectiveId);
+        $keeper = $keeperLink->saleLand;
+        $keeperCollective = $keeperLink->collective;
+        if (! $keeper || ! $keeperCollective) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Could not resolve a file to keep for this merge.'],
+            ]);
+        }
+
+        $donorIds = collect($purchaseFileIds)
+            ->reject(fn (int $id) => $id === (int) $keeper->id)
+            ->values()
+            ->all();
+
+        $result = DB::transaction(function () use (
+            $project,
+            $links,
+            $keeper,
+            $keeperLink,
+            $keeperCollective,
+            $donorIds,
+            $finalName,
+        ) {
+            $meta = is_array($keeper->merge_meta) ? $keeper->merge_meta : [];
+            if (! isset($meta['original_name']) || trim((string) $meta['original_name']) === '') {
+                $meta['original_name'] = (string) $keeper->file_name;
+            }
+            $meta['parts'] = is_array($meta['parts'] ?? null) ? array_values($meta['parts']) : [];
+            $keeper->merge_meta = $meta;
+            $keeper->save();
+
+            foreach ($donorIds as $donorId) {
+                /** @var FileSaleLand|null $donorLink */
+                $donorLink = $links->get($donorId);
+                $donor = $donorLink?->saleLand;
+                if (! $donor) {
+                    continue;
+                }
+                $this->absorbPurchaseFileInto($project, $keeper, $donor, $donorLink);
+            }
+
+            $keeper->update(['file_name' => $finalName]);
+            $keeper->load('purchaseItems');
+
+            // Keep keeper on its clump (re-fetch in case the in-memory link was stale).
+            $freshKeeperLink = FileSaleLand::query()
+                ->where('project_id', $project->id)
+                ->where('sale_land_id', $keeper->id)
+                ->first();
+            if ($freshKeeperLink) {
+                $freshKeeperLink->update(['collective_id' => $keeperCollective->id]);
+            } else {
+                FileSaleLand::create([
+                    'project_id' => $project->id,
+                    'sale_land_id' => $keeper->id,
+                    'collective_id' => $keeperCollective->id,
+                ]);
+            }
+
+            $touchedCollectiveIds = $links
+                ->pluck('collective_id')
+                ->map(fn ($id) => (int) $id)
+                ->push((int) $keeperCollective->id)
+                ->unique()
+                ->values()
+                ->all();
+
+            foreach ($touchedCollectiveIds as $collectiveId) {
+                $remaining = FileSaleLand::query()->where('collective_id', $collectiveId)->count();
+                if ($remaining === 0) {
+                    FileSaleCollective::query()->whereKey($collectiveId)->delete();
+
+                    continue;
+                }
+                $collective = FileSaleCollective::query()->find($collectiveId);
+                if ($collective) {
+                    $this->refreshCollectiveTotals($collective);
+                }
+            }
+
+            // If the kept clump now only has this one file, rename the clump to match.
+            $keeperCollective = $keeperCollective->fresh();
+            if ($keeperCollective
+                && FileSaleLand::query()->where('collective_id', $keeperCollective->id)->count() === 1
+            ) {
+                $this->renameCollectiveUnique($project, $keeperCollective, $finalName);
+                $keeperCollective = $keeperCollective->fresh();
+            }
+
+            return [
+                'collective' => $keeperCollective,
+                'file' => $keeper->fresh(),
+            ];
+        });
+
+        /** @var FileSaleCollective $collective */
+        $collective = $result['collective'];
+        /** @var PurchaseFile $file */
+        $file = $result['file'];
+
+        return [
+            'collective' => [
+                'id' => (int) $collective->id,
+                'name' => $collective->name,
+                'status' => $collective->status,
+            ],
+            'file' => [
+                'id' => (int) $file->id,
+                'name' => $file->file_name,
+            ],
+            'file_count' => 1,
+            'mouza' => $mouzaLabel !== '' ? $mouzaLabel : '—',
+            'suggested_name' => $suggestedName,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, FileSaleLand>  $links  keyed by sale_land_id
+     */
+    private function resolveMergeKeeperLink(Collection $links, ?int $preferCollectiveId): FileSaleLand
+    {
+        $ordered = $links->sortBy(fn (FileSaleLand $row) => (int) $row->sale_land_id)->values();
+
+        if ($preferCollectiveId !== null && $preferCollectiveId > 0) {
+            $fromPreferred = $ordered->first(
+                fn (FileSaleLand $row) => (int) $row->collective_id === $preferCollectiveId
+            );
+            if ($fromPreferred) {
+                return $fromPreferred;
+            }
+        }
+
+        $bestCollectiveId = $links
+            ->groupBy(fn (FileSaleLand $row) => (int) $row->collective_id)
+            ->map(fn (Collection $group) => $group->count())
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        $fromBest = $ordered->first(
+            fn (FileSaleLand $row) => (int) $row->collective_id === (int) $bestCollectiveId
+        );
+
+        return $fromBest ?? $ordered->first();
+    }
+
+    private function absorbPurchaseFileInto(
+        Project $project,
+        PurchaseFile $keeper,
+        PurchaseFile $donor,
+        FileSaleLand $donorLink,
+    ): void {
+        if ((int) $keeper->id === (int) $donor->id) {
+            return;
+        }
+        if ((int) $keeper->project_id !== (int) $project->id
+            || (int) $donor->project_id !== (int) $project->id) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Selected files must belong to this project.'],
+            ]);
+        }
+
+        $donor->loadMissing(['purchaseItems', 'dealers']);
+        $keeper->loadMissing('dealers');
+
+        $part = $this->snapshotPurchaseFileForMerge($donor, (int) $donorLink->collective_id);
+
+        // Move khasra / purchase lines onto the kept file.
+        DB::table('purchase_items')
+            ->where('purchase_file_id', $donor->id)
+            ->update(['purchase_file_id' => $keeper->id]);
+
+        DB::table('sales')
+            ->where('purchase_file_id', $donor->id)
+            ->update(['purchase_file_id' => $keeper->id]);
+
+        DB::table('day_book_entries')
+            ->where('purchase_file_id', $donor->id)
+            ->update(['purchase_file_id' => $keeper->id]);
+
+        DB::table('purchase_file_documents')
+            ->where('purchase_file_id', $donor->id)
+            ->update(['purchase_file_id' => $keeper->id]);
+
+        // Partners: unique on party_id + project_id + purchase_file_id — drop collisions.
+        $keeperPartnerPartyIds = DB::table('project_partners')
+            ->where('purchase_file_id', $keeper->id)
+            ->pluck('party_id')
+            ->all();
+        DB::table('project_partners')
+            ->where('purchase_file_id', $donor->id)
+            ->when($keeperPartnerPartyIds !== [], fn ($q) => $q->whereNotIn('party_id', $keeperPartnerPartyIds))
+            ->update(['purchase_file_id' => $keeper->id]);
+        DB::table('project_partners')
+            ->where('purchase_file_id', $donor->id)
+            ->delete();
+
+        // Moza overrides: drop donor rows that would collide on unique key.
+        $keeperMozaKeys = DB::table('purchase_file_sale_land_moza_overrides')
+            ->where('purchase_file_id', $keeper->id)
+            ->pluck('moza_key')
+            ->all();
+        DB::table('purchase_file_sale_land_moza_overrides')
+            ->where('purchase_file_id', $donor->id)
+            ->when($keeperMozaKeys !== [], fn ($q) => $q->whereNotIn('moza_key', $keeperMozaKeys))
+            ->update(['purchase_file_id' => $keeper->id]);
+        DB::table('purchase_file_sale_land_moza_overrides')
+            ->where('purchase_file_id', $donor->id)
+            ->delete();
+
+        if (Schema::hasTable('file_sale_records')) {
+            DB::table('file_sale_records')
+                ->where('purchase_file_id', $donor->id)
+                ->update(['purchase_file_id' => $keeper->id]);
+        }
+
+        // Merge dealers (unique purchase_file_id + party_id).
+        $dealerDeltas = [];
+        foreach ($donor->dealers as $dealer) {
+            $partyId = (int) $dealer->id;
+            $commission = (float) ($dealer->pivot->commission_rs ?? 0);
+            $existing = $keeper->dealers->firstWhere('id', $partyId);
+            $dealerDeltas[] = [
+                'party_id' => $partyId,
+                'added' => $existing === null,
+                'commission_added' => $commission,
+            ];
+            if ($existing) {
+                $keeper->dealers()->updateExistingPivot($partyId, [
+                    'commission_rs' => round((float) ($existing->pivot->commission_rs ?? 0) + $commission, 2),
+                ]);
+            } else {
+                $keeper->dealers()->attach($partyId, ['commission_rs' => $commission]);
+            }
+        }
+        $part['dealer_deltas'] = $dealerDeltas;
+        $donor->dealers()->detach();
+
+        $meta = is_array($keeper->merge_meta) ? $keeper->merge_meta : [];
+        $meta['parts'] = array_values(array_merge(
+            is_array($meta['parts'] ?? null) ? $meta['parts'] : [],
+            [$part]
+        ));
+        $keeper->merge_meta = $meta;
+        $keeper->save();
+
+        // Remove donor from file-sale clump, then delete the purchase file.
+        $donorLink->delete();
+        $donor->delete();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function snapshotPurchaseFileForMerge(PurchaseFile $file, int $collectiveId): array
+    {
+        $file->loadMissing(['purchaseItems', 'dealers']);
+
+        $partnerRows = DB::table('project_partners')
+            ->where('purchase_file_id', $file->id)
+            ->get()
+            ->map(fn ($row) => (array) $row)
+            ->all();
+
+        return [
+            'file_name' => (string) $file->file_name,
+            'file_date' => $file->file_date?->toDateString(),
+            'sale_land_at' => $file->sale_land_at?->toDateTimeString(),
+            'collective_id' => $collectiveId,
+            'purchase_item_ids' => $file->purchaseItems->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+            'day_book_entry_ids' => DB::table('day_book_entries')
+                ->where('purchase_file_id', $file->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all(),
+            'sale_ids' => DB::table('sales')
+                ->where('purchase_file_id', $file->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all(),
+            'document_ids' => DB::table('purchase_file_documents')
+                ->where('purchase_file_id', $file->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all(),
+            'moza_override_ids' => DB::table('purchase_file_sale_land_moza_overrides')
+                ->where('purchase_file_id', $file->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all(),
+            'file_sale_record_ids' => Schema::hasTable('file_sale_records')
+                ? DB::table('file_sale_records')
+                    ->where('purchase_file_id', $file->id)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all()
+                : [],
+            'partner_rows' => $partnerRows,
+            'dealers' => $file->dealers->map(fn ($dealer) => [
+                'party_id' => (int) $dealer->id,
+                'commission_rs' => (float) ($dealer->pivot->commission_rs ?? 0),
+            ])->values()->all(),
+            'dealer_deltas' => [],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, PurchaseFile>  $files
+     */
+    private function suggestedMergeNameFromFiles(Collection $files): string
+    {
+        $totalMarla = round((float) $files->sum(
+            fn (PurchaseFile $file) => (float) $file->totalLandMarla()
+        ), 6);
+
+        return mb_substr(LandMeasure::formatSpokenKanalMarlaFromMarla($totalMarla), 0, 150);
+    }
+
+    private function renameCollectiveUnique(Project $project, FileSaleCollective $collective, string $name): void
+    {
+        $name = trim($name);
+        if ($name === '' || $name === $collective->name) {
+            return;
+        }
+
+        if (FileSaleCollective::query()
+            ->where('project_id', $project->id)
+            ->where('name', $name)
+            ->where('id', '!=', $collective->id)
+            ->exists()) {
+            // Fall back to a unique variant instead of failing the whole merge.
+            $name = $this->uniqueCollectiveNameForFile($project, $name);
+        }
+
+        if ($name === $collective->name) {
+            return;
+        }
+
+        $collective->update(['name' => $name]);
+    }
+
+    /**
+     * Reverse a purchase-file merge (restore original files from merge_meta),
+     * or split a non-merged file out of a multi-file clump into its own sale file.
+     *
+     * @param  list<int>  $purchaseFileIds
+     * @return array{file_count: int, collective_count: int, collective_ids: list<int>, mode: string}
+     */
+    public function unmergeInnerFiles(Project $project, array $purchaseFileIds): array
+    {
+        $purchaseFileIds = collect($purchaseFileIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($purchaseFileIds === []) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Select at least one file to unmerge.'],
+            ]);
+        }
+
+        $links = FileSaleLand::query()
+            ->where('project_id', $project->id)
+            ->whereIn('sale_land_id', $purchaseFileIds)
+            ->whereNotNull('collective_id')
+            ->with(['saleLand.purchaseItems', 'saleLand.dealers', 'collective'])
+            ->orderBy('id')
+            ->get();
+
+        if ($links->count() !== count($purchaseFileIds)) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Select files from inside open saved sale files only.'],
+            ]);
+        }
+
+        $closed = $links->filter(fn (FileSaleLand $row) => ! ($row->collective?->isOpen() ?? false));
+        if ($closed->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Only files inside open sale files can be unmerged. Reopen completed ones first.'],
+            ]);
+        }
+
+        $mergedLinks = $links->filter(fn (FileSaleLand $row) => $row->saleLand?->hasMergeParts());
+        if ($mergedLinks->isNotEmpty()) {
+            return $this->reverseMergedPurchaseFiles($project, $mergedLinks);
+        }
+
+        return $this->splitFilesIntoOwnCollectives($project, $links);
+    }
+
+    /**
+     * @param  Collection<int, FileSaleLand>  $links
+     * @return array{file_count: int, collective_count: int, collective_ids: list<int>, mode: string}
+     */
+    private function reverseMergedPurchaseFiles(Project $project, Collection $links): array
+    {
+        $createdIds = DB::transaction(function () use ($project, $links) {
+            $restoredFileIds = [];
+            $touchedCollectiveIds = [];
+
+            foreach ($links as $link) {
+                $keeper = $link->saleLand;
+                if (! $keeper || ! $keeper->hasMergeParts()) {
+                    continue;
+                }
+
+                $collectiveId = (int) $link->collective_id;
+                $touchedCollectiveIds[$collectiveId] = true;
+                $meta = is_array($keeper->merge_meta) ? $keeper->merge_meta : [];
+                $parts = array_values($meta['parts'] ?? []);
+                $originalName = trim((string) ($meta['original_name'] ?? ''));
+
+                foreach ($parts as $part) {
+                    if (! is_array($part)) {
+                        continue;
+                    }
+                    $restored = $this->restorePurchaseFileFromMergePart(
+                        $project,
+                        $keeper,
+                        $part,
+                        $collectiveId
+                    );
+                    $restoredFileIds[] = (int) $restored->id;
+                }
+
+                if ($originalName !== '' && $originalName !== $keeper->file_name) {
+                    $keeper->update([
+                        'file_name' => $this->uniquePurchaseFileName($project, $originalName, (int) $keeper->id),
+                    ]);
+                }
+                $keeper->update(['merge_meta' => null]);
+                $keeper->load('purchaseItems');
+            }
+
+            foreach (array_keys($touchedCollectiveIds) as $collectiveId) {
+                $collective = FileSaleCollective::query()->find($collectiveId);
+                if ($collective) {
+                    $this->refreshCollectiveTotals($collective);
+                }
+            }
+
+            return $restoredFileIds;
+        });
+
+        $anchorCollectiveIds = $links
+            ->pluck('collective_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'file_count' => count($createdIds) + $links->count(),
+            'collective_count' => count($anchorCollectiveIds),
+            'collective_ids' => $anchorCollectiveIds,
+            'mode' => 'file',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $part
+     */
+    private function restorePurchaseFileFromMergePart(
+        Project $project,
+        PurchaseFile $keeper,
+        array $part,
+        int $collectiveId,
+    ): PurchaseFile {
+        $name = $this->uniquePurchaseFileName(
+            $project,
+            trim((string) ($part['file_name'] ?? 'Restored file'))
+        );
+
+        $restored = PurchaseFile::create([
+            'project_id' => $project->id,
+            'file_name' => $name,
+            'file_date' => $part['file_date'] ?? null,
+            'sale_land_at' => $part['sale_land_at'] ?? $keeper->sale_land_at,
+            'merge_meta' => null,
+        ]);
+
+        $itemIds = collect($part['purchase_item_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+        if ($itemIds !== []) {
+            DB::table('purchase_items')
+                ->where('purchase_file_id', $keeper->id)
+                ->whereIn('id', $itemIds)
+                ->update(['purchase_file_id' => $restored->id]);
+        }
+
+        $saleIds = collect($part['sale_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+        if ($saleIds !== []) {
+            DB::table('sales')
+                ->where('purchase_file_id', $keeper->id)
+                ->whereIn('id', $saleIds)
+                ->update(['purchase_file_id' => $restored->id]);
+        }
+
+        $daybookIds = collect($part['day_book_entry_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+        if ($daybookIds !== []) {
+            DB::table('day_book_entries')
+                ->where('purchase_file_id', $keeper->id)
+                ->whereIn('id', $daybookIds)
+                ->update(['purchase_file_id' => $restored->id]);
+        }
+
+        $documentIds = collect($part['document_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+        if ($documentIds !== []) {
+            DB::table('purchase_file_documents')
+                ->where('purchase_file_id', $keeper->id)
+                ->whereIn('id', $documentIds)
+                ->update(['purchase_file_id' => $restored->id]);
+        }
+
+        $mozaIds = collect($part['moza_override_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+        if ($mozaIds !== []) {
+            DB::table('purchase_file_sale_land_moza_overrides')
+                ->where('purchase_file_id', $keeper->id)
+                ->whereIn('id', $mozaIds)
+                ->update(['purchase_file_id' => $restored->id]);
+        }
+
+        $recordIds = collect($part['file_sale_record_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+        if ($recordIds !== [] && Schema::hasTable('file_sale_records')) {
+            DB::table('file_sale_records')
+                ->where('purchase_file_id', $keeper->id)
+                ->whereIn('id', $recordIds)
+                ->update(['purchase_file_id' => $restored->id]);
+        }
+
+        foreach (($part['partner_rows'] ?? []) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $partyId = (int) ($row['party_id'] ?? 0);
+            if ($partyId < 1) {
+                continue;
+            }
+            $exists = DB::table('project_partners')
+                ->where('purchase_file_id', $restored->id)
+                ->where('party_id', $partyId)
+                ->where('project_id', $project->id)
+                ->exists();
+            if ($exists) {
+                continue;
+            }
+            DB::table('project_partners')->insert([
+                'project_id' => $project->id,
+                'purchase_file_id' => $restored->id,
+                'party_id' => $partyId,
+                'investment_amount' => $row['investment_amount'] ?? 0,
+                'share_percentage' => $row['share_percentage'] ?? 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $keeper->load('dealers');
+        foreach (($part['dealer_deltas'] ?? []) as $delta) {
+            if (! is_array($delta)) {
+                continue;
+            }
+            $partyId = (int) ($delta['party_id'] ?? 0);
+            $commissionAdded = (float) ($delta['commission_added'] ?? 0);
+            if ($partyId < 1) {
+                continue;
+            }
+            $existing = $keeper->dealers->firstWhere('id', $partyId);
+            if (! $existing) {
+                continue;
+            }
+            if (! empty($delta['added'])) {
+                $keeper->dealers()->detach($partyId);
+            } else {
+                $next = round((float) ($existing->pivot->commission_rs ?? 0) - $commissionAdded, 2);
+                if ($next <= 0) {
+                    $keeper->dealers()->detach($partyId);
+                } else {
+                    $keeper->dealers()->updateExistingPivot($partyId, ['commission_rs' => $next]);
+                }
+            }
+        }
+        $keeper->unsetRelation('dealers');
+
+        foreach (($part['dealers'] ?? []) as $dealer) {
+            if (! is_array($dealer)) {
+                continue;
+            }
+            $partyId = (int) ($dealer['party_id'] ?? 0);
+            if ($partyId < 1) {
+                continue;
+            }
+            $restored->dealers()->syncWithoutDetaching([
+                $partyId => ['commission_rs' => (float) ($dealer['commission_rs'] ?? 0)],
+            ]);
+        }
+
+        FileSaleLand::create([
+            'project_id' => $project->id,
+            'sale_land_id' => $restored->id,
+            'collective_id' => $collectiveId,
+        ]);
+
+        return $restored->fresh();
+    }
+
+    /**
+     * @param  Collection<int, FileSaleLand>  $links
+     * @return array{file_count: int, collective_count: int, collective_ids: list<int>, mode: string}
+     */
+    private function splitFilesIntoOwnCollectives(Project $project, Collection $links): array
+    {
+        $sourceCounts = FileSaleLand::query()
+            ->whereIn('collective_id', $links->pluck('collective_id')->unique()->all())
+            ->selectRaw('collective_id, COUNT(*) as file_count')
+            ->groupBy('collective_id')
+            ->pluck('file_count', 'collective_id');
+
+        $splittable = $links->filter(function (FileSaleLand $row) use ($sourceCounts) {
+            return (int) ($sourceCounts[$row->collective_id] ?? 0) > 1;
+        });
+
+        if ($splittable->isEmpty()) {
+            throw ValidationException::withMessages([
+                'purchase_file_ids' => ['Selected file(s) are not merged and are already separate.'],
+            ]);
+        }
+
+        $createdIds = DB::transaction(function () use ($project, $splittable) {
+            $ids = [];
+            $touchedSourceIds = [];
+
+            foreach ($splittable as $link) {
+                $file = $link->saleLand;
+                if (! $file) {
+                    continue;
+                }
+
+                $sourceId = (int) $link->collective_id;
+                $touchedSourceIds[$sourceId] = true;
+
+                $name = $this->uniqueCollectiveNameForFile($project, (string) $file->file_name);
+                $collective = $this->createCollectiveHeader($project, $name, collect([$file]));
+
+                $link->update(['collective_id' => $collective->id]);
+                $this->refreshCollectiveTotals($collective->fresh());
+                $ids[] = (int) $collective->id;
+            }
+
+            foreach (array_keys($touchedSourceIds) as $sourceId) {
+                $remaining = FileSaleLand::query()->where('collective_id', $sourceId)->count();
+                if ($remaining === 0) {
+                    FileSaleCollective::query()->whereKey($sourceId)->delete();
+                } else {
+                    $source = FileSaleCollective::query()->find($sourceId);
+                    if ($source) {
+                        $this->refreshCollectiveTotals($source);
+                    }
+                }
+            }
+
+            return $ids;
+        });
+
+        return [
+            'file_count' => count($createdIds),
+            'collective_count' => count($createdIds),
+            'collective_ids' => $createdIds,
+            'mode' => 'clump',
+        ];
+    }
+
+    private function uniquePurchaseFileName(Project $project, string $base, ?int $ignoreId = null): string
+    {
+        $base = trim($base);
+        if ($base === '') {
+            $base = 'Restored file';
+        }
+        $base = mb_substr($base, 0, 140);
+        $name = $base;
+        $i = 2;
+        while (PurchaseFile::query()
+            ->where('project_id', $project->id)
+            ->where('file_name', $name)
+            ->when($ignoreId !== null, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $suffix = ' ('.$i.')';
+            $name = mb_substr($base, 0, 150 - mb_strlen($suffix)).$suffix;
+            $i++;
+        }
+
+        return $name;
+    }
+
+    private function uniqueCollectiveNameForFile(Project $project, string $fileName): string
+    {
+        $base = trim($fileName);
+        if ($base === '') {
+            return $this->nextCollectiveName($project);
+        }
+
+        $base = mb_substr($base, 0, 140);
+        $name = $base;
+        $i = 2;
+        while (FileSaleCollective::query()
+            ->where('project_id', $project->id)
+            ->where('name', $name)
+            ->exists()) {
+            $suffix = ' ('.$i.')';
+            $name = mb_substr($base, 0, 150 - mb_strlen($suffix)).$suffix;
+            $i++;
+        }
+
+        return $name;
+    }
+
+    /**
+     * @param  Collection<int, PurchaseFile|null>  $files
+     */
+    private function mouzaKeyFromFiles(Collection $files): string
+    {
+        return $files
+            ->filter()
+            ->flatMap(fn (PurchaseFile $file) => $file->purchaseItems->pluck('moza'))
+            ->filter(fn ($v) => filled($v))
+            ->map(fn ($v) => mb_strtolower(trim((string) $v)))
+            ->unique()
+            ->sort()
+            ->values()
+            ->implode('|');
     }
 
     /**
@@ -820,6 +1643,7 @@ final class FileSaleLandService
                 'name' => $c->name,
                 'file_count' => (int) ($c->file_sale_lands_count ?? 0),
             ])->values()->all(),
+            'suggested_sale_file_name' => $this->nextCollectiveName($project),
             'area_balance' => $this->buildAreaBalanceByMoza($project, $purchaseFileIds, $config),
             'leftover_balance' => $leftoverBalance,
         ];
@@ -964,6 +1788,9 @@ final class FileSaleLandService
                 'purchase_file_id' => $fileId,
                 'file_name' => $file->file_name,
                 'moza' => $moza->isEmpty() ? '—' : $moza->implode(', '),
+                'mouza_key' => $moza->isEmpty()
+                    ? ''
+                    : $moza->map(fn ($v) => mb_strtolower(trim((string) $v)))->sort()->values()->implode('|'),
                 'items_count' => $file->purchaseItems->count(),
                 'total_land_marla' => $total,
                 'total_land' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
@@ -973,6 +1800,8 @@ final class FileSaleLandService
                 'remaining_land' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : '—',
                 'remaining_land_compact' => $remaining > 0 ? LandMeasure::formatAkmsCompactFromMarla($remaining) : '—',
                 'status' => $file->saleStatusLabel(),
+                'is_merged' => $file->hasMergeParts(),
+                'can_file_unmerge' => $file->hasMergeParts(),
                 'plots' => $plots,
             ];
         }
@@ -1261,6 +2090,74 @@ final class FileSaleLandService
         FileSaleLand::query()
             ->where('sale_land_id', $purchaseFile->id)
             ->delete();
+    }
+
+    /**
+     * Delete a sale-file clump and return all its purchase files to Sale Land
+     * (keeps sale_land_at; removes File Sale links so they reappear in Ready to move).
+     *
+     * @return array{collective_name: string, file_count: int, file_names: list<string>}
+     */
+    public function dissolveCollectiveToSaleLand(Project $project, FileSaleCollective $collective): array
+    {
+        if ((int) $collective->project_id !== (int) $project->id) {
+            throw ValidationException::withMessages([
+                'collective' => ['Sale file does not belong to this project.'],
+            ]);
+        }
+
+        $links = FileSaleLand::query()
+            ->where('project_id', $project->id)
+            ->where('collective_id', $collective->id)
+            ->with('saleLand')
+            ->get();
+
+        $blocked = [];
+        foreach ($links as $link) {
+            $file = $link->saleLand;
+            if (! $file) {
+                continue;
+            }
+            $hasSales = Sale::query()
+                ->where('project_id', $project->id)
+                ->where('purchase_file_id', $file->id)
+                ->where('sale_type', Sale::TYPE_SALE_LAND)
+                ->exists();
+            if ($hasSales) {
+                $blocked[] = $file->file_name;
+            }
+        }
+
+        if ($blocked !== []) {
+            throw ValidationException::withMessages([
+                'collective' => [
+                    'Cannot delete this clump because these file(s) already have sale land sales: '
+                    .implode(', ', $blocked)
+                    .'.',
+                ],
+            ]);
+        }
+
+        $fileNames = $links
+            ->map(fn (FileSaleLand $link) => $link->saleLand?->file_name)
+            ->filter()
+            ->values()
+            ->all();
+
+        $collectiveName = $collective->name;
+
+        DB::transaction(function () use ($links, $collective) {
+            FileSaleLand::query()
+                ->whereIn('id', $links->pluck('id')->all())
+                ->delete();
+            $collective->delete();
+        });
+
+        return [
+            'collective_name' => $collectiveName,
+            'file_count' => count($fileNames),
+            'file_names' => $fileNames,
+        ];
     }
 
     /**

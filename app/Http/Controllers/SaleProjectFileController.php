@@ -664,6 +664,79 @@ class SaleProjectFileController extends Controller
             ->with('success', $result['file_count'].' file(s) saved under '.$result['collective']['name'].'.');
     }
 
+    public function mergeInnerFiles(Request $request, Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $validated = $request->validate([
+            'purchase_file_ids' => ['required', 'array', 'min:2'],
+            'purchase_file_ids.*' => ['required', 'integer', 'distinct'],
+            'name' => ['required', 'string', 'max:150'],
+            'prefer_collective_id' => ['nullable', 'integer'],
+        ]);
+
+        try {
+            $result = $fileSaleLandService->mergeInnerFiles(
+                $project,
+                $validated['purchase_file_ids'],
+                trim((string) $validated['name']),
+                isset($validated['prefer_collective_id']) ? (int) $validated['prefer_collective_id'] : null,
+            );
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('sale.files.index', $project)
+                ->withErrors($e->errors())
+                ->withInput();
+        }
+
+        return redirect()
+            ->to(route('sale.files.index', $project).'#collective-'.$result['collective']['id'])
+            ->with(
+                'success',
+                'Merged into one file "'.$result['file']['name'].'" (mouza '.$result['mouza'].').'
+            );
+    }
+
+    public function unmergeInnerFiles(Request $request, Project $project, FileSaleLandService $fileSaleLandService)
+    {
+        $validated = $request->validate([
+            'purchase_file_ids' => ['required', 'array', 'min:1'],
+            'purchase_file_ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        try {
+            $result = $fileSaleLandService->unmergeInnerFiles(
+                $project,
+                $validated['purchase_file_ids'],
+            );
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('sale.files.index', $project)
+                ->withErrors($e->errors())
+                ->withInput();
+        }
+
+        $anchorId = $result['collective_ids'][0] ?? null;
+
+        return redirect()
+            ->to(
+                $anchorId
+                    ? route('sale.files.index', $project).'#collective-'.$anchorId
+                    : route('sale.files.index', $project)
+            )
+            ->with(
+                'success',
+                ($result['mode'] ?? '') === 'file'
+                    ? 'Unmerged back into '.$result['file_count'].' original purchase file'
+                        .($result['file_count'] === 1 ? '' : 's').'.'
+                    : $result['file_count'].' file'
+                        .($result['file_count'] === 1 ? '' : 's')
+                        .' split into '
+                        .$result['collective_count']
+                        .' separate sale file'
+                        .($result['collective_count'] === 1 ? '' : 's')
+                        .'.'
+            );
+    }
+
     public function completeCollective(Project $project, FileSaleCollective $collective, FileSaleLandService $fileSaleLandService)
     {
         abort_unless((int) $collective->project_id === (int) $project->id, 404);

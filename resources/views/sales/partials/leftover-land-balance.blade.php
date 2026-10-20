@@ -15,6 +15,8 @@
     $excludeCollectiveName = $excludeCollectiveName ?? 'this sale file';
     $isSaleFile = $variant === 'sale-file';
     $filesCount = (int) ($leftoverTotals['files_count'] ?? count($leftoverFiles));
+    $mouzaLabel = $summaryMouza ?? ($leftoverTotals['mouzas_names'] ?? null);
+    $canSelectFilesForMerge = ! empty($canSelectFilesForMerge);
 @endphp
 
 <div class="leftover-land-balance leftover-land-balance--{{ $variant }}">
@@ -38,6 +40,9 @@
                                 <span class="leftover-land-balance__status {{ $summaryBadgeClass }}">{{ $summaryBadge }}</span>
                             @endif
                             <span class="ssf-simple-row__meta">{{ $filesCount }} {{ $filesCount === 1 ? 'file' : 'files' }}</span>
+                            @if(filled($mouzaLabel) && $mouzaLabel !== '—')
+                                <span class="ssf-simple-row__mouza" title="Mouza">{{ $mouzaLabel }}</span>
+                            @endif
                         </span>
                         <span class="ssf-simple-row__left">
                             <span class="ssf-simple-row__left-value">{{ $leftoverTotals['remaining_land'] ?? '—' }}</span>
@@ -160,6 +165,22 @@
                                 @endphp
                                 <div class="leftover-land-balance__item leftover-land-balance__item--nested">
                                     <div class="leftover-land-balance__file-row">
+                                        @if($canSelectFilesForMerge && $isSaleFile)
+                                            <label class="leftover-land-balance__merge-pick" title="Select to merge or unmerge">
+                                                <input
+                                                    type="checkbox"
+                                                    class="form-check-input ssf-inner-merge-check"
+                                                    value="{{ (int) $file['purchase_file_id'] }}"
+                                                    data-mouza-key="{{ $file['mouza_key'] ?? '' }}"
+                                                    data-mouza="{{ $file['moza'] ?? '' }}"
+                                                    data-name="{{ $file['file_name'] ?? '' }}"
+                                                    data-total-marla="{{ (float) ($file['total_land_marla'] ?? 0) }}"
+                                                    data-collective-id="{{ $excludeCollectiveId }}"
+                                                    data-collective-file-count="{{ $filesCount }}"
+                                                    data-can-file-unmerge="{{ ! empty($file['can_file_unmerge']) ? '1' : '0' }}"
+                                                >
+                                            </label>
+                                        @endif
                                         <button
                                             type="button"
                                             class="leftover-land-balance__summary leftover-land-balance__summary--nested"
@@ -170,13 +191,15 @@
                                         >
                                             <span class="leftover-land-balance__chevron" aria-hidden="true"></span>
                                             <span class="leftover-land-balance__meta">
+                                                @if(filled($file['moza'] ?? null) && ($file['moza'] ?? '') !== '—')
+                                                    <span class="leftover-land-balance__meta-mouza" title="Mouza">{{ $file['moza'] }}</span>
+                                                    <span class="leftover-land-balance__meta-sep">·</span>
+                                                @endif
                                                 <strong>{{ $file['file_name'] }}</strong>
                                                 @if($isSaleFile)
                                                     <span class="leftover-land-balance__meta-sep">·</span>
                                                     <span class="leftover-land-balance__meta-left">Left {{ $file['remaining_land'] }}</span>
                                                 @else
-                                                    <span class="leftover-land-balance__meta-sep">·</span>
-                                                    <span>Mouza {{ $file['moza'] }}</span>
                                                     <span class="leftover-land-balance__meta-sep">·</span>
                                                     <span>{{ (int) ($file['items_count'] ?? 0) }} {{ (int) ($file['items_count'] ?? 0) === 1 ? 'khasra' : 'khasras' }}</span>
                                                     <span class="leftover-land-balance__meta-sep">·</span>

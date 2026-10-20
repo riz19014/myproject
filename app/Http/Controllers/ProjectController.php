@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\DayBookEntry;
+use App\Models\FileSaleCollective;
 use App\Models\LandType;
 use App\Models\Party;
 use App\Models\Project;
@@ -556,6 +557,33 @@ class ProjectController extends Controller
         return redirect()
             ->route('projects.sale-land', $project)
             ->with('success', 'Sale land record for "'.$name.'" removed. The purchase file is unchanged.');
+    }
+
+    public function destroySaleLandCollective(
+        Project $project,
+        FileSaleCollective $collective,
+        FileSaleLandService $fileSaleLandService
+    ) {
+        abort_unless((int) $collective->project_id === (int) $project->id, 404);
+
+        try {
+            $result = $fileSaleLandService->dissolveCollectiveToSaleLand($project, $collective);
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('projects.sale-land', $project)
+                ->withErrors($e->errors());
+        }
+
+        $count = (int) $result['file_count'];
+
+        return redirect()
+            ->route('projects.sale-land', $project)
+            ->with(
+                'success',
+                'Deleted clump "'.$result['collective_name'].'". '
+                .$count.' file'.($count === 1 ? '' : 's')
+                .' moved back to Sale land (Ready to move).'
+            );
     }
 
     public function storeSaleLandSale(Request $request, Project $project, PurchaseFile $purchase_file)

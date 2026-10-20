@@ -267,6 +267,20 @@
     .leftover-land-balance__meta-sep {
         color: #cbd5e1;
     }
+    .leftover-land-balance__meta-mouza {
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: #9a3412;
+        background: #fff7ed;
+        border: 1px solid rgba(234, 88, 12, 0.18);
+        border-radius: 999px;
+        padding: 0.08rem 0.45rem;
+        max-width: 10rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 0 1 auto;
+    }
     .leftover-land-balance__meta-left {
         color: #047857;
         font-weight: 700;
@@ -566,6 +580,65 @@
         color: #94a3b8;
         font-weight: 700;
         flex: 0 0 auto;
+    }
+    .ssf-simple-row__mouza {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #9a3412;
+        background: #fff7ed;
+        border: 1px solid rgba(234, 88, 12, 0.18);
+        border-radius: 999px;
+        padding: 0.08rem 0.45rem;
+        max-width: 9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 0 1 auto;
+    }
+    .leftover-land-balance__merge-pick {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        padding: 0.45rem 0.15rem 0.45rem 0.35rem;
+        margin: 0;
+        cursor: pointer;
+    }
+    .leftover-land-balance__merge-pick .form-check-input {
+        margin: 0;
+        cursor: pointer;
+    }
+    .ssf-inner-merge-bar {
+        position: sticky;
+        bottom: 0.75rem;
+        z-index: 20;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 0.85rem;
+        padding: 0.7rem 0.85rem;
+        border: 1px solid rgba(234, 88, 12, 0.22);
+        border-radius: 12px;
+        background: #fff7ed;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+    .ssf-inner-merge-bar.is-visible {
+        display: flex;
+    }
+    .ssf-inner-merge-bar__text {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #9a3412;
+        min-width: 0;
+    }
+    .ssf-inner-merge-bar__text span {
+        display: block;
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: #78716c;
+        margin-top: 0.1rem;
     }
     .ssf-simple-row__left {
         display: inline-flex;
@@ -1586,7 +1659,14 @@
     $collectives = $summary['collectives'] ?? [];
     $separateFiles = $summary['separate_files'] ?? [];
     $openCollectives = $summary['open_collectives'] ?? [];
-    $suggestedSaleFileName = 'Collective-'.(count($collectives) + 1);
+    $suggestedSaleFileName = $summary['suggested_sale_file_name'] ?? ('Collective-'.(count($collectives) + 1));
+    $openMergeCollectives = collect($collectives)
+        ->filter(fn ($c) => ! empty($c['is_open']))
+        ->values()
+        ->all();
+    $innerMergeableFileCount = collect($openMergeCollectives)
+        ->sum(fn ($c) => collect($c['leftover_balance']['files'] ?? [])->count());
+    $canMergeInnerFiles = $innerMergeableFileCount >= 2;
 @endphp
 
 @if(session('success'))
@@ -1608,20 +1688,18 @@
         <p class="text-muted small mb-0">Project: <strong><x-project-name :project="$project" /></strong></p>
     </div>
     <div class="fs-page-header__actions">
+        <a href="{{ route('projects.sale-land', $project) }}" class="btn btn-pink">Sale land</a>
         <a href="{{ route('projects.show', $project) }}" class="btn btn-outline-theme">Back to project</a>
         @if($separateFiles !== [])
-            <button type="button" class="btn btn-pink" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
+            <button type="button" class="btn btn-outline-theme" data-bs-toggle="modal" data-bs-target="#save-sale-file-modal">
                 Save as sale file
             </button>
-        @elseif($movedFiles === [])
-            <a href="{{ route('projects.sale-land', $project) }}" class="btn btn-pink">Go to Sale land</a>
         @endif
         <div class="dropdown">
             <button class="btn btn-outline-theme dropdown-toggle" type="button" id="file-sale-more-menu" data-bs-toggle="dropdown" aria-expanded="false">
                 More
             </button>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="file-sale-more-menu">
-                <li><a class="dropdown-item" href="{{ route('projects.sale-land', $project) }}">Sale land</a></li>
                 <li><a class="dropdown-item" href="{{ route('sale.projects.exemption.edit', $project) }}">Exemption setup</a></li>
                 <li><a class="dropdown-item" href="{{ route('sale.files.create', $project) }}">Add project file</a></li>
                 <li><a class="dropdown-item" href="{{ route('purchase.files.index', ['project' => $project->id]) }}">Purchase files</a></li>
@@ -1802,7 +1880,12 @@
                     <span class="saved-sale-files-card__count">{{ count($collectives) }}</span>
                 @endif
             </div>
-            <p class="text-muted small mb-0">Tap to open.</p>
+            <p class="text-muted small mb-0">
+                Tap to open.
+                @if($canMergeInnerFiles)
+                    Inside a sale file, tick files of the same mouza to merge them.
+                @endif
+            </p>
         </div>
         <div class="card-body saved-sale-files-card__body">
             @if($collectives === [])
@@ -1828,9 +1911,101 @@
                         ])
                     @endforeach
                 </div>
+                @if($canMergeInnerFiles)
+                    <div class="ssf-inner-merge-bar" id="ssf-inner-merge-bar" hidden>
+                        <div class="ssf-inner-merge-bar__text" id="ssf-inner-merge-bar-text">
+                            Select files
+                            <span>Merge same mouza · Unmerge to split apart</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="ssf-inner-merge-clear">Clear</button>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-theme"
+                                id="ssf-inner-unmerge-open"
+                                data-bs-toggle="modal"
+                                data-bs-target="#unmerge-inner-files-modal"
+                                disabled
+                            >Unmerge</button>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-pink"
+                                id="ssf-inner-merge-open"
+                                data-bs-toggle="modal"
+                                data-bs-target="#merge-inner-files-modal"
+                                disabled
+                            >Merge selected</button>
+                        </div>
+                    </div>
+                @endif
             @endif
         </div>
     </div>
+@endif
+
+@if($canMergeInnerFiles)
+@push('modals')
+<div class="modal fade" id="merge-inner-files-modal" tabindex="-1" aria-labelledby="merge-inner-files-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="{{ route('sale.files.collectives.merge-files', $project) }}" class="modal-content card-theme" id="merge-inner-files-form">
+            @csrf
+            <input type="hidden" name="prefer_collective_id" id="merge-inner-files-prefer-id" value="">
+            <div class="modal-header">
+                <h2 class="modal-title h5 mb-0" id="merge-inner-files-modal-title">Merge selected files</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Combines selected same-mouza files into <strong>one purchase file</strong>
+                    (e.g. 12 kanal + 7 kanal → one 19 kanal file). Other files in the clump stay as they are.
+                </p>
+                <div class="mb-3">
+                    <div class="small fw-semibold text-body mb-1">Will become one file</div>
+                    <ul class="mb-0 ps-3 small" id="merge-inner-files-list"></ul>
+                    <div id="merge-inner-files-ids"></div>
+                </div>
+                <div class="mb-0">
+                    <label for="merge-inner-files-name" class="form-label">Merged file name</label>
+                    <input type="text" name="name" id="merge-inner-files-name" class="form-control form-control-theme"
+                           value="" required maxlength="150">
+                    <div class="form-text">Suggested from combined land (12 + 7 → 19 kanal). You can edit it.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-pink">Merge files</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="unmerge-inner-files-modal" tabindex="-1" aria-labelledby="unmerge-inner-files-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="{{ route('sale.files.collectives.unmerge-files', $project) }}" class="modal-content card-theme" id="unmerge-inner-files-form">
+            @csrf
+            <div class="modal-header">
+                <h2 class="modal-title h5 mb-0" id="unmerge-inner-files-modal-title">Unmerge selected files</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    If the file was merged (e.g. 19 kanal from 12 + 7), this restores the <strong>original purchase files</strong>.
+                    Otherwise it only splits a file out of a multi-file clump.
+                </p>
+                <div class="mb-0">
+                    <div class="small fw-semibold text-body mb-1">Selected</div>
+                    <ul class="mb-0 ps-3 small" id="unmerge-inner-files-list"></ul>
+                    <div id="unmerge-inner-files-ids"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-pink">Unmerge files</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endpush
 @endif
 
 @if($separateFiles !== [])
@@ -1955,6 +2130,207 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    var innerBar = document.getElementById('ssf-inner-merge-bar');
+    var innerBarText = document.getElementById('ssf-inner-merge-bar-text');
+    var innerOpenBtn = document.getElementById('ssf-inner-merge-open');
+    var innerUnmergeBtn = document.getElementById('ssf-inner-unmerge-open');
+    var innerClearBtn = document.getElementById('ssf-inner-merge-clear');
+    var innerForm = document.getElementById('merge-inner-files-form');
+    var unmergeForm = document.getElementById('unmerge-inner-files-form');
+    var innerList = document.getElementById('merge-inner-files-list');
+    var innerIdsWrap = document.getElementById('merge-inner-files-ids');
+    var unmergeList = document.getElementById('unmerge-inner-files-list');
+    var unmergeIdsWrap = document.getElementById('unmerge-inner-files-ids');
+    var innerNameInput = document.getElementById('merge-inner-files-name');
+    var innerPreferId = document.getElementById('merge-inner-files-prefer-id');
+
+    function selectedInnerChecks() {
+        return Array.prototype.slice.call(document.querySelectorAll('.ssf-inner-merge-check:checked'));
+    }
+
+    function canUnmergeSelection(selected) {
+        return selected.some(function (cb) {
+            return cb.getAttribute('data-can-file-unmerge') === '1'
+                || parseInt(cb.getAttribute('data-collective-file-count') || '0', 10) > 1;
+        });
+    }
+
+    function marlaToMergeName(totalMarla) {
+        var eps = 1e-6;
+        if (totalMarla <= eps) return '0 marla';
+        var whole = Math.floor(totalMarla + eps);
+        var k = Math.floor(whole / 20);
+        var m = whole - k * 20;
+        var parts = [];
+        if (k > 0) parts.push(k + ' kanal');
+        if (m > 0) parts.push(m + ' marla');
+        return parts.length ? parts.join(' ') : '0 marla';
+    }
+
+    function preferredCollectiveId(selected) {
+        var counts = {};
+        selected.forEach(function (cb) {
+            var id = String(cb.getAttribute('data-collective-id') || '');
+            if (!id) return;
+            counts[id] = (counts[id] || 0) + 1;
+        });
+        var best = '';
+        var bestCount = 0;
+        Object.keys(counts).forEach(function (id) {
+            if (counts[id] > bestCount) {
+                bestCount = counts[id];
+                best = id;
+            }
+        });
+        return best;
+    }
+
+    function syncInnerMergeBar() {
+        var selected = selectedInnerChecks();
+        if (!innerBar) return;
+
+        if (selected.length === 0) {
+            innerBar.classList.remove('is-visible');
+            innerBar.hidden = true;
+            if (innerOpenBtn) innerOpenBtn.disabled = true;
+            if (innerUnmergeBtn) innerUnmergeBtn.disabled = true;
+            return;
+        }
+
+        innerBar.hidden = false;
+        innerBar.classList.add('is-visible');
+
+        var keys = selected.map(function (cb) { return String(cb.getAttribute('data-mouza-key') || ''); });
+        var unique = keys.filter(function (k, i) { return keys.indexOf(k) === i; });
+        var sameMouza = unique.length === 1 && !!unique[0];
+        var mouzaLabel = sameMouza ? (selected[0].getAttribute('data-mouza') || unique[0]) : '';
+        var canUnmerge = canUnmergeSelection(selected);
+        var totalMarla = selected.reduce(function (sum, cb) {
+            return sum + (parseFloat(cb.getAttribute('data-total-marla') || '0') || 0);
+        }, 0);
+        var suggested = marlaToMergeName(totalMarla);
+
+        var hints = [];
+        if (sameMouza && selected.length >= 2) {
+            hints.push('Mouza ' + mouzaLabel + ' · become one file "' + suggested + '"');
+        } else if (sameMouza) {
+            hints.push('Mouza ' + mouzaLabel + ' · select one more to merge');
+        } else if (selected.length >= 2) {
+            hints.push('Different mouza — merge disabled');
+        }
+        if (canUnmerge) {
+            var hasFileUnmerge = selected.some(function (cb) {
+                return cb.getAttribute('data-can-file-unmerge') === '1';
+            });
+            hints.push(hasFileUnmerge ? 'Can unmerge back to original files' : 'Can unmerge');
+        }
+
+        if (innerBarText) {
+            innerBarText.innerHTML = selected.length + ' file' + (selected.length === 1 ? '' : 's') + ' selected'
+                + '<span>' + hints.join(' · ') + '</span>';
+        }
+        if (innerOpenBtn) {
+            innerOpenBtn.disabled = !(sameMouza && selected.length >= 2);
+        }
+        if (innerUnmergeBtn) {
+            innerUnmergeBtn.disabled = !canUnmerge;
+        }
+    }
+
+    function fillIdList(selected, listEl, idsWrap) {
+        if (!listEl || !idsWrap) return;
+        listEl.innerHTML = '';
+        idsWrap.innerHTML = '';
+        selected.forEach(function (cb) {
+            var li = document.createElement('li');
+            var mouza = cb.getAttribute('data-mouza') || '';
+            li.textContent = (mouza ? mouza + ' · ' : '') + (cb.getAttribute('data-name') || cb.value);
+            listEl.appendChild(li);
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'purchase_file_ids[]';
+            hidden.value = cb.value;
+            idsWrap.appendChild(hidden);
+        });
+    }
+
+    function fillInnerMergeModal() {
+        var selected = selectedInnerChecks();
+        fillIdList(selected, innerList, innerIdsWrap);
+        var totalMarla = selected.reduce(function (sum, cb) {
+            return sum + (parseFloat(cb.getAttribute('data-total-marla') || '0') || 0);
+        }, 0);
+        if (innerNameInput) {
+            innerNameInput.value = marlaToMergeName(totalMarla);
+        }
+        if (innerPreferId) {
+            innerPreferId.value = preferredCollectiveId(selected);
+        }
+    }
+
+    function fillInnerUnmergeModal() {
+        var selected = selectedInnerChecks().filter(function (cb) {
+            return cb.getAttribute('data-can-file-unmerge') === '1'
+                || parseInt(cb.getAttribute('data-collective-file-count') || '0', 10) > 1;
+        });
+        fillIdList(selected, unmergeList, unmergeIdsWrap);
+    }
+
+    document.querySelectorAll('.ssf-inner-merge-check').forEach(function (cb) {
+        cb.addEventListener('change', syncInnerMergeBar);
+        cb.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    if (innerClearBtn) {
+        innerClearBtn.addEventListener('click', function () {
+            document.querySelectorAll('.ssf-inner-merge-check').forEach(function (cb) { cb.checked = false; });
+            syncInnerMergeBar();
+        });
+    }
+
+    if (innerOpenBtn) {
+        innerOpenBtn.addEventListener('click', fillInnerMergeModal);
+    }
+    if (innerUnmergeBtn) {
+        innerUnmergeBtn.addEventListener('click', fillInnerUnmergeModal);
+    }
+
+    if (innerForm) {
+        innerForm.addEventListener('submit', function (e) {
+            var selected = selectedInnerChecks();
+            if (selected.length < 2) {
+                e.preventDefault();
+                alert('Select at least two files of the same mouza.');
+                return;
+            }
+            var keys = selected.map(function (cb) { return String(cb.getAttribute('data-mouza-key') || ''); });
+            var unique = keys.filter(function (k, i) { return keys.indexOf(k) === i; });
+            if (unique.length !== 1 || !unique[0]) {
+                e.preventDefault();
+                alert('Selected files must share the same mouza.');
+                return;
+            }
+            fillInnerMergeModal();
+            if (!innerNameInput || !String(innerNameInput.value || '').trim()) {
+                e.preventDefault();
+                alert('Enter a merged sale file name.');
+            }
+        });
+    }
+
+    if (unmergeForm) {
+        unmergeForm.addEventListener('submit', function (e) {
+            fillInnerUnmergeModal();
+            var ids = unmergeIdsWrap ? unmergeIdsWrap.querySelectorAll('input[name="purchase_file_ids[]"]') : [];
+            if (!ids.length) {
+                e.preventDefault();
+                alert('Select a merged file to restore, or a file inside a multi-file sale file.');
+            }
+        });
+    }
+
+    syncInnerMergeBar();
 });
 </script>
 @endpush

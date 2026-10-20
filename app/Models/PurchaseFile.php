@@ -17,6 +17,7 @@ class PurchaseFile extends Model
         'file_name',
         'file_date',
         'sale_land_at',
+        'merge_meta',
     ];
 
     protected function casts(): array
@@ -24,7 +25,15 @@ class PurchaseFile extends Model
         return [
             'file_date' => 'date',
             'sale_land_at' => 'datetime',
+            'merge_meta' => 'array',
         ];
+    }
+
+    public function hasMergeParts(): bool
+    {
+        $parts = $this->merge_meta['parts'] ?? null;
+
+        return is_array($parts) && $parts !== [];
     }
 
     public function isSaleLand(): bool
