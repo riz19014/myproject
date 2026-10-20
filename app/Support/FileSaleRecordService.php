@@ -354,14 +354,17 @@ final class FileSaleRecordService
                 $landProvider = '';
             }
 
+            $eStampId = trim((string) ($data['e_stamp_id'] ?? ''));
+            $purchaserName = trim((string) ($data['purchaser_name'] ?? ''));
+
             $record = FileSaleRecord::create([
                 'project_id' => $project->id,
                 'purchase_file_id' => $purchaseFile->id,
                 'sale_id' => $sale?->id,
-                'e_stamp_id' => trim((string) $data['e_stamp_id']),
+                'e_stamp_id' => $eStampId !== '' ? $eStampId : null,
                 'land_owner' => $landOwner !== '' ? $landOwner : null,
                 'land_provider' => $landProvider !== '' ? $landProvider : null,
-                'purchaser_name' => trim((string) $data['purchaser_name']),
+                'purchaser_name' => $purchaserName !== '' ? $purchaserName : null,
                 'moza' => $details['moza'] !== '—' ? $details['moza'] : null,
                 'khasra' => $details['khasra'] !== '—' ? $details['khasra'] : null,
                 'khewat_no' => $details['khewat_no'] !== '—' ? $details['khewat_no'] : null,

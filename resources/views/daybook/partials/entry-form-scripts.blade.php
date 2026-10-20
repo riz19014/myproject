@@ -3422,16 +3422,6 @@
         var landOwner = landOwnerEl ? landOwnerEl.value.trim() : '';
         var landProvider = landProviderEl ? landProviderEl.value.trim() : '';
 
-        if (!eStamp) {
-            showError('Enter the intimation letter No.');
-            if (eStampEl) eStampEl.focus();
-            return;
-        }
-        if (!purchaser) {
-            showError('Enter the file purchaser name.');
-            if (purchaserEl) purchaserEl.focus();
-            return;
-        }
         if (!selectedPlotOption) {
             showError('Select a plot size from the available formula options.');
             return;
@@ -3529,10 +3519,10 @@
             var areaLabel = record && record.land_area_label ? record.land_area_label : '';
             var desc = note || (
                 'File sale — ' + (selectedItem.label || selectedItem.file_name || '') +
-                ' · ' + purchaser +
+                (purchaser ? ' · ' + purchaser : '') +
                 (plotLabel ? ' · ' + plotLabel + (qty > 1 ? ' ×' + qty : '') : '') +
                 (areaLabel ? ' · ' + areaLabel : '') +
-                ' · Letter ' + eStamp
+                (eStamp ? ' · Letter ' + eStamp : '')
             );
 
             var applied = typeof window.__daybookApplySaleToForm === 'function' && window.__daybookApplySaleToForm({

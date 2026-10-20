@@ -357,11 +357,11 @@
                                     <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_land_provider" placeholder="Land provider name" autocomplete="off" maxlength="255">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="daybook-modal-label" for="daybook_sale_e_stamp_id">Intimation letter No. <span class="text-danger">*</span></label>
+                                    <label class="daybook-modal-label" for="daybook_sale_e_stamp_id">Intimation letter No. <span class="text-muted fw-normal">(optional)</span></label>
                                     <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_e_stamp_id" placeholder="Enter intimation letter No." autocomplete="off" maxlength="120">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="daybook-modal-label" for="daybook_sale_purchaser_name">File purchaser name <span class="text-danger">*</span></label>
+                                    <label class="daybook-modal-label" for="daybook_sale_purchaser_name">File purchaser name <span class="text-muted fw-normal">(optional)</span></label>
                                     <input type="text" class="form-control form-control-theme form-control-lg" id="daybook_sale_purchaser_name" placeholder="Purchaser full name" autocomplete="off" maxlength="255">
                                 </div>
                             </div>

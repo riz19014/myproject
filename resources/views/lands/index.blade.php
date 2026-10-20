@@ -178,7 +178,7 @@
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
                                 <td class="small">{{ $record['created_at'] }}</td>
-                                <td class="fw-semibold small">{{ $record['e_stamp_id'] }}</td>
+                                <td class="fw-semibold small">{{ $record['e_stamp_id'] !== '' && $record['e_stamp_id'] !== null ? $record['e_stamp_id'] : '—' }}</td>
                                 <td>
                                     <div class="sold-land-detail">
                                         <a href="{{ route('purchase.files.show', $record['purchase_file_id']) }}" class="text-decoration-none fw-semibold">
@@ -197,7 +197,7 @@
                                         <span class="sold-land-detail__meta">Provider: {{ $record['land_provider'] }}</span>
                                     </div>
                                 </td>
-                                <td class="small fw-semibold">{{ $record['purchaser_name'] }}</td>
+                                <td class="small fw-semibold">{{ $record['purchaser_name'] !== '' && $record['purchaser_name'] !== null ? $record['purchaser_name'] : '—' }}</td>
                                 <td class="small">
                                     <div class="fw-semibold">{{ $record['plot_label'] }}</div>
                                     <div class="sold-land-detail__meta">Area: {{ $record['land_area_label'] }}</div>

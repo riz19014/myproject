@@ -1422,8 +1422,8 @@ class DayBookController extends Controller
         $validated = $request->validate([
             'project_id' => ['required', 'integer', 'exists:projects,id'],
             'purchase_file_id' => ['required', 'integer', 'exists:purchase_files,id'],
-            'e_stamp_id' => ['required', 'string', 'max:120'],
-            'purchaser_name' => ['required', 'string', 'max:255'],
+            'e_stamp_id' => ['nullable', 'string', 'max:120'],
+            'purchaser_name' => ['nullable', 'string', 'max:255'],
             'land_owner' => ['nullable', 'string', 'max:255'],
             'land_provider' => ['nullable', 'string', 'max:255'],
             'component' => ['required', 'string', 'max:40'],
