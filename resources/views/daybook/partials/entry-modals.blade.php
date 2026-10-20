@@ -427,7 +427,10 @@
 
                             <div class="row g-3 mt-1">
                                 <div class="col-md-5">
-                                    <label class="daybook-modal-label" for="daybook_sale_file_amount">Amount (Rs) <span class="text-danger">*</span></label>
+                                    <label class="daybook-modal-label daybook-sale-amount-label" for="daybook_sale_file_amount">
+                                        <span>Amount (Rs) <span class="text-danger">*</span></span>
+                                        <span class="daybook-sale-amount-words" id="daybook_sale_file_amount_words" aria-live="polite"></span>
+                                    </label>
                                     <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_file_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
                                 </div>
                                 <div class="col-md-4">
@@ -478,7 +481,10 @@
                                 @endif
                             </div>
                             <div class="col-12 col-lg-6">
-                                <label class="daybook-modal-label" for="daybook_sale_plot_amount">Amount (Rs) <span class="text-danger">*</span></label>
+                                <label class="daybook-modal-label daybook-sale-amount-label" for="daybook_sale_plot_amount">
+                                    <span>Amount (Rs) <span class="text-danger">*</span></span>
+                                    <span class="daybook-sale-amount-words" id="daybook_sale_plot_amount_words" aria-live="polite"></span>
+                                </label>
                                 <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
                             </div>
                             <div class="col-6 col-md-3">

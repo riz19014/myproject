@@ -2723,12 +2723,45 @@
         if (marla) marla.value = '0';
         if (sqft) sqft.value = '0';
         if (plotAmount) plotAmount.value = '';
+        updateSaleAmountWords(fileAmount);
+        updateSaleAmountWords(plotAmount);
         clearFileDetailsUi();
         hideList(projectList, projectSearch, projectWrap);
         hideList(itemList, itemSearch, itemWrap);
         showError('');
         renderStep();
     }
+
+    function saleAmountShortLabel(raw) {
+        var amount = parseFloat(String(raw || '').replace(/,/g, ''));
+        if (!isFinite(amount) || amount <= 0) return '';
+        var intPart = Math.round(amount);
+        function scale2(x) {
+            return (Math.round(x * 100) / 100).toFixed(2);
+        }
+        if (intPart >= 10000000) return scale2(intPart / 10000000) + ' cr';
+        if (intPart >= 100000) return scale2(intPart / 100000) + ' lac';
+        if (intPart >= 1000) return scale2(intPart / 1000) + ' th';
+        return '';
+    }
+
+    function updateSaleAmountWords(inputEl) {
+        if (!inputEl) return;
+        var wordsId = inputEl.id === 'daybook_sale_plot_amount'
+            ? 'daybook_sale_plot_amount_words'
+            : 'daybook_sale_file_amount_words';
+        var wordsEl = document.getElementById(wordsId);
+        if (!wordsEl) return;
+        wordsEl.textContent = saleAmountShortLabel(inputEl.value);
+    }
+
+    ['daybook_sale_file_amount', 'daybook_sale_plot_amount'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function () { updateSaleAmountWords(el); });
+        el.addEventListener('change', function () { updateSaleAmountWords(el); });
+        updateSaleAmountWords(el);
+    });
 
     function syncModeLabels() {
         var dha = isDha(selectedProject);

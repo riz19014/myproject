@@ -1154,6 +1154,21 @@
     .daybook-sale-wizard__primary {
         min-width: 10rem;
     }
+    #daybookSaleWizardModal .daybook-sale-amount-label {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.35rem 0.65rem;
+    }
+    #daybookSaleWizardModal .daybook-sale-amount-words {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: 0.01em;
+        line-height: 1.35;
+        margin-left: auto;
+    }
     .daybook-sale-wizard__error {
         margin: 1rem 0 0;
         padding: 0.75rem 1rem;
