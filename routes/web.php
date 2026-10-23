@@ -122,6 +122,8 @@ Route::middleware('auth')->group(function () {
     Route::get('sold-land-files', [LandController::class, 'index'])->name('sale-land.index');
     Route::get('sold-land-files/{record}/documents/{document}', [LandController::class, 'showFileSaleDocument'])
         ->name('sale-land.documents.show');
+    Route::delete('sold-land-files/{record}', [LandController::class, 'destroyFileSaleRecord'])
+        ->name('sale-land.records.destroy');
     Route::get('lands', fn () => redirect()->route('sale-land.index'))->name('lands.index');
     Route::resource('lands', LandController::class)->except(['index']);
     Route::post('lands/{land}/plots', [LandController::class, 'addPlot'])->name('lands.plots.store');

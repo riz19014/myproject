@@ -34,6 +34,62 @@
         gap: 0.15rem;
     }
     .sold-land-detail__meta { color: #64748b; font-size: 0.78rem; }
+    .sold-land-record-row { cursor: pointer; }
+    .sold-land-record-row:hover { background: rgba(249, 115, 22, 0.06) !important; }
+    #soldFileModal {
+        z-index: 1060;
+    }
+    #soldFileModal .modal-dialog {
+        pointer-events: auto;
+    }
+    .sold-file-modal-content {
+        background: #ffffff !important;
+        border-radius: 16px;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+        overflow: hidden;
+        opacity: 1 !important;
+        pointer-events: auto;
+    }
+    .sold-file-modal-content .modal-header {
+        background: #f8fafc !important;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .sold-file-modal-content .modal-body,
+    .sold-file-modal-content .modal-footer {
+        background: #ffffff !important;
+    }
+    .sold-file-modal-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 1.75rem;
+    }
+    .sold-file-modal-item {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        min-width: 0;
+    }
+    .sold-file-modal-item--wide { grid-column: 1 / -1; }
+    .sold-file-modal-key {
+        flex: 0 0 42%;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.78rem;
+    }
+    .sold-file-modal-val {
+        flex: 1 1 auto;
+        font-size: 0.88rem;
+        color: #0f172a;
+        word-break: break-word;
+        text-align: right;
+    }
+    .sold-file-modal-docs a { display: block; }
+    @media (max-width: 575.98px) {
+        .sold-file-modal-grid { grid-template-columns: 1fr; }
+    }
 </style>
 @endpush
 
@@ -175,18 +231,49 @@
                     </thead>
                     <tbody>
                         @foreach($fileSaleRecords as $record)
-                            <tr>
+                            @php
+                                $soldFileModalData = [
+                                    'id' => $record['id'],
+                                    'created_at' => $record['created_at'],
+                                    'e_stamp_id' => ($record['e_stamp_id'] !== '' && $record['e_stamp_id'] !== null) ? $record['e_stamp_id'] : '—',
+                                    'file_name' => $record['file_name'],
+                                    'project_name' => $record['project_name'],
+                                    'land_owner' => $record['land_owner'],
+                                    'land_provider' => $record['land_provider'],
+                                    'purchaser_name' => ($record['purchaser_name'] !== '' && $record['purchaser_name'] !== null) ? $record['purchaser_name'] : '—',
+                                    'plot_label' => $record['plot_label'],
+                                    'land_area_label' => $record['land_area_label'],
+                                    'moza' => $record['moza'],
+                                    'khewat_no' => $record['khewat_no'],
+                                    'khatooni_no' => $record['khatooni_no'],
+                                    'khasra' => $record['khasra'],
+                                    'file_total_label' => $record['file_total_label'],
+                                    'file_sold_label' => $record['file_sold_label'],
+                                    'file_remaining_label' => $record['file_remaining_label'],
+                                    'file_status' => $record['file_status'],
+                                    'amount_formatted' => $record['amount_formatted'],
+                                    'status_label' => $record['status_label'],
+                                    'notes' => $record['notes'] ?? '—',
+                                    'documents' => $record['documents'],
+                                    'file_url' => route('purchase.files.show', $record['purchase_file_id']),
+                                    'delete_url' => route('sale-land.records.destroy', $record['id']),
+                                ];
+                            @endphp
+                            <tr class="sold-land-record-row"
+                                tabindex="0"
+                                role="button"
+                                data-sold-file="{{ json_encode($soldFileModalData, JSON_HEX_APOS | JSON_HEX_QUOT) }}">
                                 <td>{{ $loop->iteration }}</td>
                                 <td class="small">{{ $record['created_at'] }}</td>
                                 <td class="fw-semibold small">{{ $record['e_stamp_id'] !== '' && $record['e_stamp_id'] !== null ? $record['e_stamp_id'] : '—' }}</td>
                                 <td>
                                     <div class="sold-land-detail">
-                                        <a href="{{ route('purchase.files.show', $record['purchase_file_id']) }}" class="text-decoration-none fw-semibold">
+                                        <a href="{{ route('purchase.files.show', $record['purchase_file_id']) }}" class="text-decoration-none fw-semibold" data-stop-sold-modal>
                                             {{ $record['file_name'] }}
                                         </a>
                                         <span class="sold-land-detail__meta">
                                             @if($record['project_id'])
-                                                <a href="{{ route('sale.files.index', $record['project_id']) }}" class="text-decoration-none">
+                                                <a href="{{ route('sale.files.index', $record['project_id']) }}" class="text-decoration-none" data-stop-sold-modal>
                                                     <x-project-name :name="$record['project_name']" :is-dha="$record['project_is_dha'] ?? false" />
                                                 </a>
                                             @else
@@ -238,7 +325,7 @@
                                 <td class="small">
                                     @forelse($record['documents'] as $doc)
                                         @if($doc['url'])
-                                            <a href="{{ $doc['url'] }}" target="_blank" rel="noopener" class="d-block text-decoration-none">{{ $doc['name'] }}</a>
+                                            <a href="{{ $doc['url'] }}" target="_blank" rel="noopener" class="d-block text-decoration-none" data-stop-sold-modal>{{ $doc['name'] }}</a>
                                         @else
                                             <span class="d-block">{{ $doc['name'] }}</span>
                                         @endif
@@ -433,3 +520,161 @@
     </div>
 </div>
 @endsection
+
+@push('modals')
+{{-- Must sit outside .app-main so Bootstrap backdrop/stacking works --}}
+<div class="modal fade" id="soldFileModal" tabindex="-1" aria-labelledby="soldFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content sold-file-modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0" id="soldFileModalLabel">Sold file</h5>
+                    <p class="small text-muted mb-0" id="sold-file-modal-subtitle"></p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="sold-file-modal-grid">
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Date</span><span id="sold-file-modal-date" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">eStamp</span><span id="sold-file-modal-estamp" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">File</span><span id="sold-file-modal-file" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Project</span><span id="sold-file-modal-project" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Purchaser</span><span id="sold-file-modal-purchaser" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Plot sold</span><span id="sold-file-modal-plot" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Land area</span><span id="sold-file-modal-area" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Amount</span><span id="sold-file-modal-amount" class="sold-file-modal-val fw-semibold"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Land owner</span><span id="sold-file-modal-owner" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Land provider</span><span id="sold-file-modal-provider" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Mouza</span><span id="sold-file-modal-moza" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Khasra</span><span id="sold-file-modal-khasra" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Khewat</span><span id="sold-file-modal-khewat" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Khatoni</span><span id="sold-file-modal-khatoni" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">File leftover</span><span id="sold-file-modal-leftover" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item"><span class="sold-file-modal-key">Status</span><span id="sold-file-modal-status" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item sold-file-modal-item--wide"><span class="sold-file-modal-key">Notes</span><span id="sold-file-modal-notes" class="sold-file-modal-val"></span></div>
+                    <div class="sold-file-modal-item sold-file-modal-item--wide">
+                        <span class="sold-file-modal-key">Documents</span>
+                        <span id="sold-file-modal-docs" class="sold-file-modal-val sold-file-modal-docs"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+                <form id="sold-file-delete-form" method="POST" action="#">
+                    @csrf
+                    @method('DELETE')
+                    <button type="button"
+                            class="btn btn-sm btn-danger-theme btn-delete-confirm"
+                            data-title="Delete sold file?"
+                            data-text="This will remove the sale record and restore leftover land on the purchase file."
+                            data-confirm="Yes, delete it">
+                        Delete
+                    </button>
+                </form>
+                <div class="d-flex gap-2">
+                    <a href="#" id="sold-file-modal-open-file" class="btn btn-sm btn-outline-theme" target="_blank" rel="noopener">Open file</a>
+                    <button type="button" class="btn btn-sm btn-pink" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endpush
+
+@push('scripts')
+<script>
+(function () {
+    var modalEl = document.getElementById('soldFileModal');
+    if (!modalEl || !window.bootstrap) return;
+
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var deleteForm = document.getElementById('sold-file-delete-form');
+
+    function setText(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = value || '—';
+    }
+
+    function escapeHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function fillModal(data) {
+        setText('sold-file-modal-subtitle', data.file_name || '');
+        setText('sold-file-modal-date', data.created_at);
+        setText('sold-file-modal-estamp', data.e_stamp_id);
+        setText('sold-file-modal-file', data.file_name);
+        setText('sold-file-modal-project', data.project_name);
+        setText('sold-file-modal-purchaser', data.purchaser_name);
+        setText('sold-file-modal-plot', data.plot_label);
+        setText('sold-file-modal-area', data.land_area_label);
+        setText('sold-file-modal-amount', data.amount_formatted);
+        setText('sold-file-modal-owner', data.land_owner);
+        setText('sold-file-modal-provider', data.land_provider);
+        setText('sold-file-modal-moza', data.moza);
+        setText('sold-file-modal-khasra', data.khasra);
+        setText('sold-file-modal-khewat', data.khewat_no);
+        setText('sold-file-modal-khatoni', data.khatooni_no);
+        setText('sold-file-modal-leftover',
+            'Total ' + (data.file_total_label || '—') +
+            ' · Sold ' + (data.file_sold_label || '—') +
+            ' · Left ' + (data.file_remaining_label || '—') +
+            ' (' + (data.file_status || '—') + ')'
+        );
+        setText('sold-file-modal-status', data.status_label);
+        setText('sold-file-modal-notes', data.notes);
+
+        var docsEl = document.getElementById('sold-file-modal-docs');
+        if (docsEl) {
+            var docs = Array.isArray(data.documents) ? data.documents : [];
+            if (!docs.length) {
+                docsEl.textContent = '—';
+            } else {
+                docsEl.innerHTML = docs.map(function (doc) {
+                    if (doc.url) {
+                        return '<a href="' + escapeHtml(doc.url) + '" target="_blank" rel="noopener">' + escapeHtml(doc.name || 'Document') + '</a>';
+                    }
+                    return '<span>' + escapeHtml(doc.name || 'Document') + '</span>';
+                }).join('');
+            }
+        }
+
+        if (deleteForm && data.delete_url) {
+            deleteForm.setAttribute('action', data.delete_url);
+        }
+
+        var openFile = document.getElementById('sold-file-modal-open-file');
+        if (openFile) {
+            openFile.href = data.file_url || '#';
+            openFile.classList.toggle('d-none', !data.file_url);
+        }
+    }
+
+    function openFromRow(row) {
+        var raw = row.getAttribute('data-sold-file');
+        if (!raw) return;
+        try {
+            fillModal(JSON.parse(raw));
+            modal.show();
+        } catch (e) {}
+    }
+
+    document.querySelectorAll('.sold-land-record-row').forEach(function (row) {
+        row.addEventListener('click', function (e) {
+            if (e.target.closest('[data-stop-sold-modal], a, button, form')) return;
+            openFromRow(row);
+        });
+        row.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openFromRow(row);
+            }
+        });
+    });
+})();
+</script>
+@endpush

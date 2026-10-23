@@ -394,6 +394,27 @@ final class FileSaleRecordService
         });
     }
 
+    /**
+     * Remove a file sale record and restore sold inventory on the purchase file.
+     */
+    public function destroy(FileSaleRecord $record): void
+    {
+        DB::transaction(function () use ($record) {
+            $record->loadMissing(['documents', 'sale']);
+
+            foreach ($record->documents as $document) {
+                $document->delete();
+            }
+
+            $sale = $record->sale;
+            $record->delete();
+
+            if ($sale) {
+                $sale->delete();
+            }
+        });
+    }
+
     private function uniqueJoined(Collection $values): string
     {
         $clean = $values->filter(fn ($v) => filled($v))->map(fn ($v) => trim((string) $v))->unique()->values();

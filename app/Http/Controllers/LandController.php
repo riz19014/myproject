@@ -8,6 +8,7 @@ use App\Models\FileSaleRecordDocument;
 use App\Models\Land;
 use App\Models\Plot;
 use App\Models\PurchaseFile;
+use App\Support\FileSaleRecordService;
 use App\Support\LandMeasure;
 use App\Support\ProjectExemptionDefaults;
 use App\Support\SaleExemptionConfig;
@@ -298,6 +299,20 @@ class LandController extends Controller
                 'Content-Disposition' => 'inline; filename="'.$filename.'"',
             ]
         );
+    }
+
+    /**
+     * Delete a sold-land file sale record and restore leftover balance.
+     */
+    public function destroyFileSaleRecord(FileSaleRecord $record, FileSaleRecordService $fileSaleRecords)
+    {
+        $record->loadMissing('purchaseFile');
+        $fileName = $record->purchaseFile?->file_name ?? ('File #'.$record->purchase_file_id);
+        $fileSaleRecords->destroy($record);
+
+        return redirect()
+            ->route('sale-land.index')
+            ->with('success', 'Sale record for '.$fileName.' deleted. File leftover balance restored.');
     }
 
     /**
