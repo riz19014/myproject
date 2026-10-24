@@ -33,14 +33,36 @@ class PartySubCategoryController extends Controller
         return $request->validate($this->subCategoryRules());
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        $name = trim((string) $request->query('name', ''));
+        $categoryId = $request->query('category_id');
+        $categoryId = $categoryId !== null && $categoryId !== ''
+            ? (int) $categoryId
+            : null;
+
         $partySubCategories = PartySubCategory::query()
             ->with('category')
+            ->when($name !== '', function ($query) use ($name) {
+                $query->where('name', 'like', '%'.$name.'%');
+            })
+            ->when($categoryId, function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId);
+            })
             ->orderBy('id', 'desc')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('party-sub-categories.index', compact('partySubCategories'));
+        $partyCategories = PartyCategory::orderBy('name')->get();
+        $hasFilters = $name !== '' || $categoryId;
+
+        return view('party-sub-categories.index', compact(
+            'partySubCategories',
+            'partyCategories',
+            'name',
+            'categoryId',
+            'hasFilters'
+        ));
     }
 
     public function create()
