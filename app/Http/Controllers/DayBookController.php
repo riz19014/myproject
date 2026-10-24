@@ -1733,12 +1733,6 @@ class DayBookController extends Controller
             ]
         );
 
-        if ($request->filled('return_date') && empty($validated['project_id']) && empty($validated['party_id'])) {
-            return back()
-                ->withErrors(['party_id' => 'Please select a project or a party.'])
-                ->withInput();
-        }
-
         $formProjectId = $validated['project_id'] ?? null;
         $formPartyId = $validated['party_id'] ?? null;
         $contextProjectId = null;
@@ -1949,12 +1943,6 @@ class DayBookController extends Controller
                 'sold_area_unit.in' => 'Choose a valid area unit.',
             ]
         );
-
-        if (empty($validated['project_id']) && empty($validated['party_id'])) {
-            return back()
-                ->withErrors(['party_id' => 'Please select a project or a party.'])
-                ->withInput();
-        }
 
         $formProjectId = $validated['project_id'] ?? null;
         $formPartyId = $validated['party_id'] ?? null;
