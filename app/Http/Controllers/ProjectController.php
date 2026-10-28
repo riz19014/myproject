@@ -32,7 +32,26 @@ class ProjectController extends Controller
     public function index(Request $request)
     {
         $search = trim((string) $request->query('q', ''));
-        $canReorder = $search === '';
+        $statusFilter = trim((string) $request->query('status', ''));
+        if ($statusFilter !== '' && ! array_key_exists($statusFilter, Project::statusOptions())) {
+            $statusFilter = '';
+        }
+
+        $canReorder = $search === '' && $statusFilter === '';
+
+        $statusCounts = [
+            Project::STATUS_IN_PROGRESS => 0,
+            Project::STATUS_UNDER_REVIEW => 0,
+            Project::STATUS_COMPLETED => 0,
+        ];
+        foreach (Project::query()->selectRaw('status, COUNT(*) as aggregate')->groupBy('status')->get() as $row) {
+            $key = $row->status ?: Project::STATUS_IN_PROGRESS;
+            if (array_key_exists($key, $statusCounts)) {
+                $statusCounts[$key] += (int) $row->aggregate;
+            } else {
+                $statusCounts[Project::STATUS_IN_PROGRESS] += (int) $row->aggregate;
+            }
+        }
 
         $query = Project::query()
             ->with('landType')
@@ -44,6 +63,17 @@ class ProjectController extends Controller
                         ->orWhereHas('landType', fn ($lt) => $lt->where('name', 'like', $like));
                 });
             })
+            ->when($statusFilter !== '', function ($query) use ($statusFilter) {
+                if ($statusFilter === Project::STATUS_IN_PROGRESS) {
+                    $query->where(function ($q) {
+                        $q->where('status', Project::STATUS_IN_PROGRESS)
+                            ->orWhereNull('status')
+                            ->orWhere('status', '');
+                    });
+                } else {
+                    $query->where('status', $statusFilter);
+                }
+            })
             ->orderBy('sort_order')
             ->orderBy('id');
 
@@ -53,7 +83,7 @@ class ProjectController extends Controller
             $projects = $query->paginate(10)->withQueryString();
         }
 
-        return view('projects.index', compact('projects', 'search', 'canReorder'));
+        return view('projects.index', compact('projects', 'search', 'canReorder', 'statusCounts', 'statusFilter'));
     }
 
     public function reorder(Request $request)
@@ -77,6 +107,21 @@ class ProjectController extends Controller
         });
 
         return response()->json(['message' => 'Project order saved.']);
+    }
+
+    public function updateStatus(Request $request, Project $project)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(array_keys(Project::statusOptions()))],
+        ]);
+
+        $project->update(['status' => $validated['status']]);
+
+        return response()->json([
+            'message' => 'Project status updated.',
+            'status' => $project->status,
+            'status_label' => $project->statusLabel(),
+        ]);
     }
 
     public function saleIndex()

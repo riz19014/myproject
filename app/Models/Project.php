@@ -9,8 +9,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Project extends Model
 {
+    public const STATUS_IN_PROGRESS = 'in_progress';
+
+    public const STATUS_UNDER_REVIEW = 'under_review';
+
+    public const STATUS_COMPLETED = 'completed';
+
     protected $fillable = [
         'name',
+        'status',
         'sort_order',
         'land_type_id',
         'is_dha',
@@ -20,6 +27,10 @@ class Project extends Model
     protected static function booted(): void
     {
         static::creating(function (Project $project): void {
+            if ($project->status === null || $project->status === '') {
+                $project->status = self::STATUS_IN_PROGRESS;
+            }
+
             if ($project->sort_order !== null) {
                 return;
             }
@@ -27,6 +38,25 @@ class Project extends Model
             $max = static::query()->max('sort_order');
             $project->sort_order = $max !== null ? (int) $max + 1 : 1;
         });
+    }
+
+    public static function statusOptions(): array
+    {
+        return [
+            self::STATUS_IN_PROGRESS => 'In progress',
+            self::STATUS_UNDER_REVIEW => 'Under Review',
+            self::STATUS_COMPLETED => 'Completed',
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        return self::statusOptions()[$this->status] ?? 'In progress';
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->status === self::STATUS_COMPLETED;
     }
 
     protected function casts(): array
