@@ -162,5 +162,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 
-Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login')->middleware('guest');
-Route::post('/login', [AuthController::class, 'login'])->middleware('guest');
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/login/otp', [AuthController::class, 'showOtpForm'])->name('login.otp');
+    Route::post('/login/otp', [AuthController::class, 'verifyOtp'])->name('login.otp.verify');
+    Route::post('/login/otp/cancel', [AuthController::class, 'cancelOtp'])->name('login.otp.cancel');
+});
