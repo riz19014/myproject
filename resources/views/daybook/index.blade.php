@@ -141,10 +141,26 @@
             </div>
         </div>
     </div>
-    <div class="daybook-metric daybook-metric--close">
-        <span class="daybook-metric__label">Closing</span>
-        <span class="daybook-metric__val">Rs {{ number_format($closingBalance, 2) }}</span>
-        <span class="daybook-metric__sub">End of day</span>
+    @php
+        $closingCash = (float) $openingAmount + (float) $pettyCashAmount + (float) $paymentBreakdown['cash']['net'];
+        $closingBank = (float) $paymentBreakdown['bank']['net'];
+    @endphp
+    <div class="daybook-metric daybook-metric--combined daybook-metric--close">
+        <div class="daybook-metric__stack">
+            <div class="daybook-metric__row daybook-metric__row--cash">
+                <span class="daybook-metric__label">Cash</span>
+                <span class="daybook-metric__val">Rs {{ number_format($closingCash, 2) }}</span>
+            </div>
+            <div class="daybook-metric__row daybook-metric__row--bank">
+                <span class="daybook-metric__label">Bank</span>
+                <span class="daybook-metric__val">Rs {{ number_format($closingBank, 2) }}</span>
+            </div>
+            <div class="daybook-metric__row daybook-metric__row--close-total">
+                <span class="daybook-metric__label">Total closing</span>
+                <span class="daybook-metric__val">Rs {{ number_format($closingBalance, 2) }}</span>
+                <span class="daybook-metric__sub">End of day</span>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -260,6 +276,19 @@
                         </tr>
                     @endforelse
                 </tbody>
+                @if($entries->isNotEmpty())
+                <tfoot>
+                    <tr class="daybook-records-total">
+                        <td colspan="3" class="text-end fw-bold">Total</td>
+                        <td class="text-end font-monospace">
+                            <div class="daybook-records-total__line daybook-records-total__line--in">+{{ number_format($cashIn, 0) }}</div>
+                            <div class="daybook-records-total__line daybook-records-total__line--out">−{{ number_format($cashOut, 0) }}</div>
+                            <div class="daybook-records-total__line daybook-records-total__line--net"><strong>Net {{ ($cashIn - $cashOut) >= 0 ? '+' : '−' }}{{ number_format(abs($cashIn - $cashOut), 0) }}</strong></div>
+                        </td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+                @endif
             </table>
         </div>
                 </div>

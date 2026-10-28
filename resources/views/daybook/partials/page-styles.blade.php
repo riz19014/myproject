@@ -292,6 +292,13 @@
     .daybook-page .daybook-metric--out .daybook-metric__val,
     .daybook-page .daybook-metric__row--out .daybook-metric__val { color: #b91c1c; }
     .daybook-page .daybook-metric--close .daybook-metric__val { color: #c2410c; }
+    .daybook-page .daybook-metric__row--close-total .daybook-metric__val {
+        color: #c2410c;
+        font-weight: 800;
+    }
+    .daybook-page .daybook-metric__row--close-total .daybook-metric__label {
+        color: #9a3412;
+    }
     .daybook-page .daybook-metric--cash .daybook-metric__val,
     .daybook-page .daybook-metric__row--cash .daybook-metric__val { color: #0f766e; }
     .daybook-page .daybook-metric--bank .daybook-metric__val,
@@ -788,6 +795,28 @@
     .daybook-page .daybook-records-panel .table-theme .font-monospace {
         font-variant-numeric: tabular-nums;
         font-weight: 600;
+    }
+    .daybook-page .daybook-records-panel .table-theme tfoot td {
+        padding: 0.85rem 1rem !important;
+        vertical-align: middle;
+        border-top: 2px solid #cbd5e1 !important;
+        background: #f8fafc !important;
+        font-size: 0.875rem;
+    }
+    .daybook-page .daybook-records-total__line + .daybook-records-total__line {
+        margin-top: 0.2rem;
+    }
+    .daybook-page .daybook-records-total__line--in {
+        color: #166534;
+    }
+    .daybook-page .daybook-records-total__line--out {
+        color: #991b1b;
+    }
+    .daybook-page .daybook-records-total__line--net {
+        margin-top: 0.35rem;
+        padding-top: 0.35rem;
+        border-top: 1px solid #e2e8f0;
+        color: #0f172a;
     }
     .daybook-page .daybook-count-badge {
         display: inline-flex;
