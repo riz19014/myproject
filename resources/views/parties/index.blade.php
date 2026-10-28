@@ -95,7 +95,12 @@
                         @foreach($parties as $party)
                             <tr>
                                 <td>{{ $parties->firstItem() + $loop->index }}</td>
-                                <td>{{ $party->name }}</td>
+                                <td>
+                                    <div class="fw-medium">{{ $party->name }}</div>
+                                    <div class="small text-muted" title="Pakistan time (Asia/Karachi)">
+                                        {{ $party->created_at?->copy()->timezone('Asia/Karachi')->format('j M Y, h:i A') ?? '—' }}
+                                    </div>
+                                </td>
                                 <td>{{ $party->category?->name ?? '—' }}</td>
                                 <td>{{ $party->subCategory?->name ?? '—' }}</td>
                                 <td>{{ $party->phone ?: '—' }}</td>

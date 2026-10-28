@@ -2,12 +2,51 @@
     /** @var \Illuminate\Support\Collection<int, array<string, mixed>> $sidebarEntryRows */
     /** @var string|null $highlightDate Y-m-d row highlight, optional */
     $highlightDate = $highlightDate ?? null;
+    $dateFrom = $dateFrom ?? null;
+    $dateTo = $dateTo ?? null;
 @endphp
 <div class="daybook-entries-global-list">
     <div class="row g-2 align-items-center mb-2">
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-sm-6 col-md-3">
             <label for="daybook-sidebar-search" class="visually-hidden">Search daybook entries</label>
             <input type="search" id="daybook-sidebar-search" class="form-control form-control-sm" placeholder="Search by any field…" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="col-6 col-sm-auto">
+            <label for="daybook-sidebar-date-from" class="visually-hidden">Date from</label>
+            <div class="input-group input-group-sm daybook-entries-date-filter">
+                <span class="input-group-text">From</span>
+                <input
+                    type="text"
+                    id="daybook-sidebar-date-from"
+                    class="form-control"
+                    placeholder="Date from"
+                    value="{{ $dateFrom ?? '' }}"
+                    inputmode="none"
+                    autocomplete="off"
+                    readonly
+                    aria-label="Filter date from"
+                >
+            </div>
+        </div>
+        <div class="col-6 col-sm-auto">
+            <label for="daybook-sidebar-date-to" class="visually-hidden">Date to</label>
+            <div class="input-group input-group-sm daybook-entries-date-filter">
+                <span class="input-group-text">To</span>
+                <input
+                    type="text"
+                    id="daybook-sidebar-date-to"
+                    class="form-control"
+                    placeholder="Date to"
+                    value="{{ $dateTo ?? '' }}"
+                    inputmode="none"
+                    autocomplete="off"
+                    readonly
+                    aria-label="Filter date to"
+                >
+            </div>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="daybook-sidebar-date-clear" title="Clear date filter" aria-label="Clear date filter">Clear</button>
         </div>
         <div class="col-12 col-md-auto">
             <p class="small text-muted mb-0" id="daybook-sidebar-filter-hint" aria-live="polite">Showing {{ $sidebarEntryRows->count() }} of {{ $sidebarEntryRows->count() }}</p>
@@ -22,6 +61,7 @@
                     <tr>
                         <th scope="col" style="width: 56px;">#</th>
                         <th scope="col" class="text-nowrap">Date</th>
+                        <th scope="col" class="text-nowrap">Created at</th>
                         <th scope="col" class="text-nowrap">Voucher</th>
                         <th scope="col" class="text-end text-nowrap">Amount (Rs)</th>
                         <th scope="col">Detail</th>
@@ -30,12 +70,18 @@
                 </thead>
                 <tbody id="daybook-sidebar-tbody">
                     @foreach($sidebarEntryRows as $row)
-                        <tr class="daybook-sidebar-row @if($highlightDate && $row['entry_date'] === $highlightDate) daybook-sidebar-row--selected-day @endif">
+                        <tr
+                            class="daybook-sidebar-row @if($highlightDate && $row['entry_date'] === $highlightDate) daybook-sidebar-row--selected-day @endif"
+                            data-entry-date="{{ $row['entry_date'] }}"
+                            data-amount="{{ number_format((float) $row['amount'], 2, '.', '') }}"
+                            data-cash-in="{{ !empty($row['is_cash_in']) ? '1' : '0' }}"
+                        >
                             <td class="text-muted small">{{ $loop->iteration }}</td>
                             <td class="text-nowrap small daybook-entries-date">
                                 <span class="visually-hidden daybook-sidebar-search-blob">{{ $row['search_blob'] }}</span>
                                 <a href="{{ route('daybook.index', ['date' => $row['entry_date']]) }}" class="text-decoration-none text-body fw-medium" title="Open this day in daybook">{{ $row['date_display'] }}</a>
                             </td>
+                            <td class="text-nowrap small text-muted" title="Pakistan time (Asia/Karachi)">{{ $row['created_at_display'] ?? '—' }}</td>
                             <td class="text-nowrap small">
                                 @if($row['voucher_display'] !== '')
                                     <span class="daybook-voucher-chip font-monospace">{{ $row['voucher_display'] }}</span>
@@ -77,6 +123,7 @@
                                     'url' => $row['url'],
                                     'voucher' => $row['voucher_display'],
                                     'date' => $row['date_display'],
+                                    'created_at' => $row['created_at_display'] ?? '—',
                                     'type_label' => $row['type_label'],
                                     'is_cash_in' => $row['is_cash_in'],
                                     'amount' => $row['amount_display'],
@@ -102,6 +149,17 @@
                         </tr>
                     @endforeach
                 </tbody>
+                <tfoot>
+                    <tr class="daybook-entries-total" id="daybook-entries-total-row">
+                        <td colspan="4" class="text-end fw-bold">Total</td>
+                        <td class="text-end font-monospace">
+                            <div class="daybook-records-total__line daybook-records-total__line--in" id="daybook-entries-total-in">+0</div>
+                            <div class="daybook-records-total__line daybook-records-total__line--out" id="daybook-entries-total-out">−0</div>
+                            <div class="daybook-records-total__line daybook-records-total__line--net" id="daybook-entries-total-net"><strong>Net +0</strong></div>
+                        </td>
+                        <td colspan="2" class="small text-muted" id="daybook-entries-total-note"></td>
+                    </tr>
+                </tfoot>
             </table>
         @endif
     </div>
@@ -121,6 +179,7 @@
                 <div class="daybook-modal-grid">
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Voucher no.</span><span id="daybook-modal-voucher" class="daybook-modal-val font-monospace fw-semibold"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Date</span><span id="daybook-modal-date" class="daybook-modal-val"></span></div>
+                    <div class="daybook-modal-item"><span class="daybook-modal-key">Created at</span><span id="daybook-modal-created-at" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Payment</span><span id="daybook-modal-type" class="daybook-modal-val"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Amount</span><span id="daybook-modal-amount" class="daybook-modal-val font-monospace fw-semibold"></span></div>
                     <div class="daybook-modal-item"><span class="daybook-modal-key">Settlement</span><span id="daybook-modal-settlement" class="daybook-modal-val"></span></div>

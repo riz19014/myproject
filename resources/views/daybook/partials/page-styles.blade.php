@@ -1054,13 +1054,101 @@
             grid-template-columns: 1fr;
         }
     }
-    .daybook-entries-page .daybook-entries-global-scroll {
-        max-height: min(70vh, 640px);
+    /*
+     * Daybook entries: one scroll only (the table).
+     * Lock the shell to the viewport so the outer page scrollbar does not appear.
+     */
+    body:has(.daybook-entries-page) {
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
     }
-    @media (min-width: 992px) {
-        .daybook-entries-page .daybook-entries-global-scroll {
-            max-height: calc(100vh - 16rem);
-        }
+    body:has(.daybook-entries-page) .app-shell {
+        min-height: 0;
+        overflow: hidden;
+    }
+    body:has(.daybook-entries-page) .app-main {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    body:has(.daybook-entries-page) .app-main > main.daybook-entries-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .daybook-entries-page {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .daybook-entries-page > .card {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .daybook-entries-page > .card > .card-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .daybook-entries-page > .card > .card-body > .d-flex:first-child {
+        flex-shrink: 0;
+    }
+    .daybook-entries-page .daybook-entries-global-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .daybook-entries-page .daybook-entries-global-list > .row:first-child {
+        flex-shrink: 0;
+    }
+    .daybook-entries-page .daybook-entries-global-scroll.daybook-sidebar-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow: auto;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: #fff;
+    }
+    .daybook-entries-page .daybook-entries-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #fff;
+    }
+    .daybook-entries-page .daybook-entries-table tfoot td {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        padding: 0.85rem 0.75rem !important;
+        vertical-align: middle;
+        border-top: 2px solid #cbd5e1 !important;
+        background: #f8fafc !important;
+        font-size: 0.875rem;
+    }
+    .daybook-entries-page .daybook-entries-table tfoot .daybook-records-total__line + .daybook-records-total__line {
+        margin-top: 0.2rem;
+    }
+    .daybook-entries-page .daybook-records-total__line--in { color: #166534; }
+    .daybook-entries-page .daybook-records-total__line--out { color: #991b1b; }
+    .daybook-entries-page .daybook-records-total__line--net {
+        margin-top: 0.35rem;
+        padding-top: 0.35rem;
+        border-top: 1px solid #e2e8f0;
+        color: #0f172a;
     }
 
     /* Sale wizard — full-size modal */

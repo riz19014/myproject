@@ -751,20 +751,40 @@ class DayBookController extends Controller
      */
     public function entries(Request $request)
     {
-        $highlightDate = null;
-        if ($request->filled('date')) {
-            try {
-                $highlightDate = Carbon::parse($request->query('date'))->toDateString();
-            } catch (\Throwable) {
-                $highlightDate = null;
+        $parseDate = static function (?string $value): ?string {
+            if ($value === null || trim($value) === '') {
+                return null;
             }
+            try {
+                return Carbon::parse($value)->toDateString();
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+
+        $dateFrom = $parseDate($request->query('date_from'));
+        $dateTo = $parseDate($request->query('date_to'));
+
+        // Legacy ?date= still works as a single-day range.
+        $legacyDate = $parseDate($request->query('date'));
+        if ($legacyDate && ! $dateFrom && ! $dateTo) {
+            $dateFrom = $legacyDate;
+            $dateTo = $legacyDate;
         }
+
+        if ($dateFrom && $dateTo && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $highlightDate = ($dateFrom && $dateTo && $dateFrom === $dateTo) ? $dateFrom : null;
 
         $sidebarEntryRows = $this->buildDaybookSidebarRows(1200);
 
         return view('daybook.entries', [
             'sidebarEntryRows' => $sidebarEntryRows,
             'highlightDate' => $highlightDate,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
         ]);
     }
 
@@ -818,6 +838,21 @@ class DayBookController extends Controller
             $dateStr = $e->entry_date->format('Y-m-d');
             $dateDisp = $e->entry_date->format('j M Y');
             $dateDispShort = $e->entry_date->format('d-M-y');
+            $createdAtPk = $e->created_at
+                ? $e->created_at->copy()->timezone('Asia/Karachi')
+                : null;
+            $createdAtDisplay = $createdAtPk
+                ? $createdAtPk->format('j M Y, h:i A')
+                : '—';
+            $createdAtSearch = $createdAtPk
+                ? implode(' ', [
+                    $createdAtPk->format('Y-m-d'),
+                    $createdAtPk->format('j M Y'),
+                    $createdAtPk->format('d-M-y'),
+                    $createdAtPk->format('h:i A'),
+                    $createdAtPk->format('H:i'),
+                ])
+                : '';
             $voucherNo = $e->voucher_no;
             $voucherDisplay = $e->getVoucherNumber();
 
@@ -826,6 +861,7 @@ class DayBookController extends Controller
                 $dateStr,
                 $dateDisp,
                 $dateDispShort,
+                $createdAtSearch,
                 $voucherNo !== null ? (string) $voucherNo : '',
                 $voucherNo !== null ? strtolower($voucherDisplay) : '',
                 $voucherNo !== null ? 'voucher '.$voucherNo : '',
@@ -861,6 +897,7 @@ class DayBookController extends Controller
                 'url' => route('daybook.show', $e),
                 'entry_date' => $dateStr,
                 'date_display' => $dateDisp,
+                'created_at_display' => $createdAtDisplay,
                 'voucher_no' => $voucherNo,
                 'voucher_display' => $voucherNo !== null ? $voucherDisplay : '',
                 'description' => $e->description,
