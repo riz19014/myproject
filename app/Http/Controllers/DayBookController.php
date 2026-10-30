@@ -806,12 +806,15 @@ class DayBookController extends Controller
             ]);
             fputcsv($out, []);
             fputcsv($out, [
-                '#',
+                'Sr # / Voucher',
                 'Date',
                 'Created at',
-                'Voucher',
-                'Description',
+                'Project',
+                'File',
                 'Linked to',
+                'Party sub category',
+                'Description',
+                'Settlement',
                 'Payment',
                 'Amount (Rs)',
                 'Balance (Rs)',
@@ -822,14 +825,24 @@ class DayBookController extends Controller
                 $createdAtPk = $e->created_at
                     ? $e->created_at->copy()->timezone('Asia/Karachi')
                     : null;
+                $settlementLabel = $e->getSettlementLabel();
+                $partySubCategoryLabel = $e->getPartySubCategoryLabel();
+                $fileLabel = $e->getPurchaseFileLabel();
+                $projectLabel = $e->project?->name ?? '';
+                if ($e->project?->landType?->name) {
+                    $projectLabel .= ' ('.$e->project->landType->name.')';
+                }
 
                 fputcsv($out, [
-                    $i + 1,
+                    ($i + 1).' / '.$e->getVoucherNumber(),
                     $e->entry_date->format('Y-m-d'),
                     $createdAtPk ? $createdAtPk->format('Y-m-d H:i:s') : '',
-                    $e->getVoucherNumber(),
-                    $e->description ?: '',
+                    $projectLabel,
+                    $fileLabel !== '—' ? $fileLabel : '',
                     $e->getLinkLabel(),
+                    $partySubCategoryLabel !== '—' ? $partySubCategoryLabel : '',
+                    $e->description ?: '',
+                    $settlementLabel !== '—' ? $settlementLabel : '',
                     $isCashIn ? 'Payment in' : 'Payment out',
                     number_format((float) $e->amount, 2, '.', ''),
                     number_format((float) $e->running_balance, 2, '.', ''),
@@ -837,9 +850,9 @@ class DayBookController extends Controller
             }
 
             fputcsv($out, []);
-            fputcsv($out, ['', '', '', '', '', '', 'Payment in', number_format($cashIn, 2, '.', ''), '']);
-            fputcsv($out, ['', '', '', '', '', '', 'Payment out', number_format($cashOut, 2, '.', ''), '']);
-            fputcsv($out, ['', '', '', '', '', '', 'Net', number_format($cashIn - $cashOut, 2, '.', ''), number_format($closingBalance, 2, '.', '')]);
+            fputcsv($out, ['', '', '', '', '', '', '', '', '', 'Payment in', number_format($cashIn, 2, '.', ''), '']);
+            fputcsv($out, ['', '', '', '', '', '', '', '', '', 'Payment out', number_format($cashOut, 2, '.', ''), '']);
+            fputcsv($out, ['', '', '', '', '', '', '', '', '', 'Net', number_format($cashIn - $cashOut, 2, '.', ''), number_format($closingBalance, 2, '.', '')]);
 
             fclose($out);
         }, $filename, [

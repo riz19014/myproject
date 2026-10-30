@@ -90,15 +90,18 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 4%;">#</th>
-                <th style="width: 9%;">Date</th>
-                <th style="width: 12%;">Created at</th>
-                <th style="width: 9%;">Voucher</th>
-                <th style="width: 20%;">Description</th>
-                <th style="width: 15%;">Linked to</th>
-                <th style="width: 9%;">Payment</th>
-                <th class="amt" style="width: 11%;">Amount</th>
-                <th class="amt" style="width: 11%;">Balance</th>
+                <th style="width: 8%;">Sr # / Voucher</th>
+                <th style="width: 7%;">Date</th>
+                <th style="width: 9%;">Created at</th>
+                <th style="width: 9%;">Project</th>
+                <th style="width: 8%;">File</th>
+                <th style="width: 9%;">Linked to</th>
+                <th style="width: 9%;">Party sub category</th>
+                <th style="width: 12%;">Description</th>
+                <th style="width: 8%;">Settlement</th>
+                <th style="width: 7%;">Payment</th>
+                <th class="amt" style="width: 7%;">Amount</th>
+                <th class="amt" style="width: 7%;">Balance</th>
             </tr>
         </thead>
         <tbody>
@@ -109,14 +112,23 @@
                         ? $e->created_at->copy()->timezone('Asia/Karachi')
                         : null;
                     $runningBalance = (float) ($e->running_balance ?? 0);
+                    $settlementLabel = $e->getSettlementLabel();
+                    $partySubCategoryLabel = $e->getPartySubCategoryLabel();
+                    $projectLabel = $e->project?->name ?? '—';
+                    if ($e->project?->landType?->name) {
+                        $projectLabel .= ' ('.$e->project->landType->name.')';
+                    }
                 @endphp
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
+                    <td>{{ $loop->iteration }} / {{ $e->getVoucherNumber() }}</td>
                     <td>{{ $e->entry_date->format('j M Y') }}</td>
                     <td class="muted">{{ $createdAtPk ? $createdAtPk->format('j M Y, h:i A') : '—' }}</td>
-                    <td>{{ $e->getVoucherNumber() }}</td>
-                    <td>{{ $e->description ?: '—' }}</td>
+                    <td>{{ $projectLabel }}</td>
+                    <td>{{ $e->getPurchaseFileLabel() }}</td>
                     <td>{{ $e->getLinkLabel() }}</td>
+                    <td>{{ $partySubCategoryLabel !== '—' ? $partySubCategoryLabel : '—' }}</td>
+                    <td>{{ $e->description ?: '—' }}</td>
+                    <td>{{ $settlementLabel !== '—' ? $settlementLabel : '—' }}</td>
                     <td>{{ $isCashIn ? 'Payment in' : 'Payment out' }}</td>
                     <td class="amt {{ $isCashIn ? 'c-green' : 'c-red' }}">
                         {{ $isCashIn ? '+' : '−' }}{{ number_format($e->amount, 0) }}
@@ -127,7 +139,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 16px;" class="muted">No records in this range.</td>
+                    <td colspan="12" style="text-align: center; padding: 16px;" class="muted">No records in this range.</td>
                 </tr>
             @endforelse
         </tbody>

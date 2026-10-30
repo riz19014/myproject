@@ -133,12 +133,15 @@
                 <table class="table table-theme table-striped mb-0 align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 56px;">#</th>
+                            <th class="text-nowrap">Sr # / Voucher</th>
                             <th class="text-nowrap">Date</th>
                             <th class="text-nowrap">Created at</th>
-                            <th class="text-nowrap">Voucher</th>
-                            <th>Description</th>
+                            <th>Project</th>
+                            <th>File</th>
                             <th>Linked to</th>
+                            <th>Party sub category</th>
+                            <th>Description</th>
+                            <th>Settlement</th>
                             <th class="text-end text-nowrap">Amount (Rs)</th>
                             <th class="text-end text-nowrap">Balance (Rs)</th>
                             <th class="text-end" style="width: 90px;">Actions</th>
@@ -154,17 +157,20 @@
                                 $createdAtDisplay = $createdAtPk ? $createdAtPk->format('j M Y, h:i A') : '—';
                                 $typeLabel = $isCashIn ? 'Payment in' : 'Payment out';
                                 $runningBalance = (float) ($e->running_balance ?? 0);
+                                $voucherNo = $e->getVoucherNumber();
+                                $settlementLabel = $e->getSettlementLabel();
+                                $partySubCategoryLabel = $e->getPartySubCategoryLabel();
                                 $categoryName = $e->partySubCategory?->category?->name ?? '';
                                 $daybookModalData = [
                                     'id' => $e->id,
                                     'url' => route('daybook.show', $e),
-                                    'voucher' => $e->getVoucherNumber(),
+                                    'voucher' => $voucherNo,
                                     'date' => $e->entry_date->format('j M Y'),
                                     'created_at' => $createdAtDisplay,
                                     'type_label' => $typeLabel,
                                     'is_cash_in' => $isCashIn,
                                     'amount' => number_format((float) $e->amount, 0),
-                                    'settlement' => $e->getSettlementLabel(),
+                                    'settlement' => $settlementLabel,
                                     'paid_by' => $e->getPaidByLabel(),
                                     'description' => $e->description ?: '—',
                                     'link_label' => $e->getLinkLabel(),
@@ -174,7 +180,7 @@
                                     'purchase_file' => $e->purchaseFile?->file_name ?? '',
                                     'sold_area' => $e->getSoldAreaLabel(),
                                     'category' => $categoryName,
-                                    'sub_category' => $e->getPartySubCategoryLabel(),
+                                    'sub_category' => $partySubCategoryLabel,
                                     'is_factory' => $e->isFactoryExpense(),
                                     'factory_sub_category' => $e->getFactorySubCategoryLabel(),
                                     'unit' => $e->unit ?? '',
@@ -183,7 +189,7 @@
                                 ];
                             @endphp
                             <tr>
-                                <td class="text-muted small">{{ $loop->iteration }}</td>
+                                <td class="text-nowrap small font-monospace">{{ $loop->iteration }} / {{ $voucherNo }}</td>
                                 <td class="text-nowrap small">
                                     <a href="{{ route('daybook.index', ['date' => $e->entry_date->toDateString()]) }}" class="text-decoration-none text-body fw-medium">
                                         {{ $e->entry_date->format('j M Y') }}
@@ -192,9 +198,21 @@
                                 <td class="text-nowrap small text-muted" title="Pakistan time (Asia/Karachi)">
                                     {{ $createdAtDisplay }}
                                 </td>
-                                <td class="text-nowrap small font-monospace">{{ $e->getVoucherNumber() }}</td>
-                                <td class="small">{{ $e->description ?: '—' }}</td>
+                                <td class="small">
+                                    @if($e->project)
+                                        <x-project-name :project="$e->project" />
+                                        @if($e->project->landType)
+                                            <span class="d-block text-muted">{{ $e->project->landType->name }}</span>
+                                        @endif
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="small">{{ $e->getPurchaseFileLabel() }}</td>
                                 <td class="small">{{ $e->getLinkLabel() }}</td>
+                                <td class="small">{{ $partySubCategoryLabel !== '—' ? $partySubCategoryLabel : '—' }}</td>
+                                <td class="small">{{ $e->description ?: '—' }}</td>
+                                <td class="small">{{ $settlementLabel !== '—' ? $settlementLabel : '—' }}</td>
                                 <td class="text-end font-monospace small text-nowrap fw-semibold {{ $isCashIn ? 'text-success' : 'text-danger' }}">
                                     {{ $isCashIn ? '+' : '−' }}{{ number_format($e->amount, 0) }}
                                     <span class="d-block small fw-normal text-muted">{{ $typeLabel }}</span>
@@ -212,14 +230,14 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-muted small py-4 text-center">No entries in this range.</td>
+                                <td colspan="12" class="text-muted small py-4 text-center">No entries in this range.</td>
                             </tr>
                         @endforelse
                     </tbody>
                     @if($entries->isNotEmpty())
                         <tfoot>
                             <tr>
-                                <td colspan="6" class="text-end fw-bold">Total</td>
+                                <td colspan="9" class="text-end fw-bold">Total</td>
                                 <td class="text-end font-monospace">
                                     <div class="text-success">+{{ number_format($cashIn, 0) }}</div>
                                     <div class="text-danger">−{{ number_format($cashOut, 0) }}</div>
