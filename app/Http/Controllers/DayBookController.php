@@ -747,6 +747,194 @@ class DayBookController extends Controller
     }
 
     /**
+     * Daily entry report: filter day_book_entries by entry_date or created_at range.
+     */
+    public function dailyEntryReport(Request $request)
+    {
+        $data = $this->buildDailyEntryReportData($request);
+
+        return view('daybook.daily-entry-report', $data);
+    }
+
+    /**
+     * Stream daily entry report PDF inline (open in browser tab).
+     */
+    public function dailyEntryReportPdf(Request $request)
+    {
+        $data = $this->buildDailyEntryReportData($request);
+        abort_unless($data['filtered'], 422, 'Choose From and To dates first.');
+
+        $generatedAt = now();
+        $pdf = Pdf::loadView('daybook.daily-entry-report-pdf', array_merge($data, [
+            'generatedAt' => $generatedAt,
+        ]));
+        $pdf->setPaper('a4', 'landscape');
+
+        $filename = 'daily-entry-report-'.$data['from'].'_to_'.$data['to'].'.pdf';
+
+        return $pdf->stream($filename);
+    }
+
+    /**
+     * Download daily entry report as Excel-compatible CSV.
+     */
+    public function dailyEntryReportExcel(Request $request)
+    {
+        $data = $this->buildDailyEntryReportData($request);
+        abort_unless($data['filtered'], 422, 'Choose From and To dates first.');
+
+        /** @var Collection<int, DayBookEntry> $entries */
+        $entries = $data['entries'];
+        $filterBy = $data['filterBy'];
+        $from = $data['from'];
+        $to = $data['to'];
+        $cashIn = $data['cashIn'];
+        $cashOut = $data['cashOut'];
+        $closingBalance = $data['closingBalance'];
+
+        $filename = 'daily-entry-report-'.$from.'_to_'.$to.'.csv';
+
+        return response()->streamDownload(function () use ($entries, $filterBy, $from, $to, $cashIn, $cashOut, $closingBalance) {
+            $out = fopen('php://output', 'w');
+            // UTF-8 BOM so Excel opens Urdu/special chars correctly
+            fwrite($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, [
+                'Daily entry report',
+                $filterBy === 'created_at' ? 'Created at' : 'Entry date',
+                $from.' to '.$to,
+            ]);
+            fputcsv($out, []);
+            fputcsv($out, [
+                '#',
+                'Date',
+                'Created at',
+                'Voucher',
+                'Description',
+                'Linked to',
+                'Payment',
+                'Amount (Rs)',
+                'Balance (Rs)',
+            ]);
+
+            foreach ($entries as $i => $e) {
+                $isCashIn = $e->type === DayBookEntry::TYPE_CASH_IN;
+                $createdAtPk = $e->created_at
+                    ? $e->created_at->copy()->timezone('Asia/Karachi')
+                    : null;
+
+                fputcsv($out, [
+                    $i + 1,
+                    $e->entry_date->format('Y-m-d'),
+                    $createdAtPk ? $createdAtPk->format('Y-m-d H:i:s') : '',
+                    $e->getVoucherNumber(),
+                    $e->description ?: '',
+                    $e->getLinkLabel(),
+                    $isCashIn ? 'Payment in' : 'Payment out',
+                    number_format((float) $e->amount, 2, '.', ''),
+                    number_format((float) $e->running_balance, 2, '.', ''),
+                ]);
+            }
+
+            fputcsv($out, []);
+            fputcsv($out, ['', '', '', '', '', '', 'Payment in', number_format($cashIn, 2, '.', ''), '']);
+            fputcsv($out, ['', '', '', '', '', '', 'Payment out', number_format($cashOut, 2, '.', ''), '']);
+            fputcsv($out, ['', '', '', '', '', '', 'Net', number_format($cashIn - $cashOut, 2, '.', ''), number_format($closingBalance, 2, '.', '')]);
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * @return array{
+     *     filterBy: string,
+     *     from: ?string,
+     *     to: ?string,
+     *     filtered: bool,
+     *     entries: Collection<int, DayBookEntry>,
+     *     cashIn: float,
+     *     cashOut: float,
+     *     closingBalance: float
+     * }
+     */
+    private function buildDailyEntryReportData(Request $request): array
+    {
+        $filterBy = $request->query('filter_by', 'date') === 'created_at' ? 'created_at' : 'date';
+
+        $parseDate = static function (?string $value): ?string {
+            if ($value === null || trim($value) === '') {
+                return null;
+            }
+            try {
+                return Carbon::parse($value)->toDateString();
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+
+        $from = $parseDate($request->query('from'));
+        $to = $parseDate($request->query('to'));
+        $filtered = $request->boolean('_filter') || ($from !== null && $to !== null);
+
+        if ($from && $to && $from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $entries = collect();
+        $cashIn = 0.0;
+        $cashOut = 0.0;
+        $closingBalance = 0.0;
+
+        if ($filtered && $from && $to) {
+            $query = DayBookEntry::query()
+                ->with(['project.landType', 'partySubCategory.category', 'subCategory.category', 'purchaseFile', 'paidByParty']);
+
+            // Oldest first so running balance reads top → bottom.
+            if ($filterBy === 'created_at') {
+                $query
+                    ->where('created_at', '>=', Carbon::parse($from)->startOfDay())
+                    ->where('created_at', '<=', Carbon::parse($to)->endOfDay())
+                    ->orderBy('created_at')
+                    ->orderBy('id');
+            } else {
+                $query
+                    ->whereBetween('entry_date', [$from, $to])
+                    ->orderBy('entry_date')
+                    ->orderBy('id');
+            }
+
+            $running = 0.0;
+            $entries = $query->get()->map(function (DayBookEntry $e) use (&$running, &$cashIn, &$cashOut) {
+                $amount = (float) $e->amount;
+                if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                    $running += $amount;
+                    $cashIn += $amount;
+                } else {
+                    $running -= $amount;
+                    $cashOut += $amount;
+                }
+                $e->setAttribute('running_balance', $running);
+
+                return $e;
+            });
+            $closingBalance = $running;
+        }
+
+        return [
+            'filterBy' => $filterBy,
+            'from' => $from,
+            'to' => $to,
+            'filtered' => (bool) ($filtered && $from && $to),
+            'entries' => $entries,
+            'cashIn' => $cashIn,
+            'cashOut' => $cashOut,
+            'closingBalance' => $closingBalance,
+        ];
+    }
+
+    /**
      * Global searchable list of recent daybook lines (separate from the daily daybook screen).
      */
     public function entries(Request $request)

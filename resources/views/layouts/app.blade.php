@@ -98,6 +98,7 @@
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('companies.*') ? 'active' : '' }}" href="{{ route('companies.index') }}"><i class="bi bi-building-gear app-sidebar-link__icon" aria-hidden="true"></i><span>Company</span></a>
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('sale.percentage.index') || (request()->routeIs('sale.files.sale.create') && request('type') === 'percentage') ? 'active' : '' }}" href="{{ route('sale.percentage.index') }}"><i class="bi bi-percent app-sidebar-link__icon" aria-hidden="true"></i><span>Sale percentage</span></a>
                     <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('sale.exemption.index', 'sale.projects.exemption.*') ? 'active' : '' }}" href="{{ route('sale.exemption.index') }}"><i class="bi bi-sliders2 app-sidebar-link__icon" aria-hidden="true"></i><span>Project exemption</span></a>
+                    <a class="app-sidebar-link app-sidebar-link--sub {{ request()->routeIs('sale.exemption.report', 'sale.exemption.report.pdf', 'sale.exemption.report.excel') ? 'active' : '' }}" href="{{ route('sale.exemption.report') }}"><i class="bi bi-file-earmark-bar-graph app-sidebar-link__icon" aria-hidden="true"></i><span>Daily entry report</span></a>
                 </nav>
                 @endauth
                 <div class="app-sidebar-footer">

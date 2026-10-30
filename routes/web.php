@@ -32,6 +32,9 @@ Route::middleware('auth')->group(function () {
     Route::get('sale', [SaleController::class, 'index'])->name('sale.index');
     Route::get('sale/percentage', [SaleProjectFileController::class, 'percentageIndex'])->name('sale.percentage.index');
     Route::get('sale/exemption', [ProjectSaleExemptionController::class, 'index'])->name('sale.exemption.index');
+    Route::get('sale/exemption/report', [DayBookController::class, 'dailyEntryReport'])->name('sale.exemption.report');
+    Route::get('sale/exemption/report/pdf', [DayBookController::class, 'dailyEntryReportPdf'])->name('sale.exemption.report.pdf');
+    Route::get('sale/exemption/report/excel', [DayBookController::class, 'dailyEntryReportExcel'])->name('sale.exemption.report.excel');
     Route::delete('sale/exemption', [ProjectSaleExemptionController::class, 'destroyAll'])->name('sale.exemption.destroy-all');
     Route::delete('sale/exemption/selected', [ProjectSaleExemptionController::class, 'destroySelected'])->name('sale.exemption.destroy-selected');
     Route::get('sale/projects/{project}/exemption', [ProjectSaleExemptionController::class, 'edit'])->name('sale.projects.exemption.edit');
