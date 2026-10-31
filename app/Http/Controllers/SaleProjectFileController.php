@@ -24,6 +24,8 @@ class SaleProjectFileController extends Controller
 {
     public function index(Project $project, FileSaleLandService $fileSaleLandService)
     {
+        abort_unless($project->isDha(), 404);
+
         $project->load(['landType', 'projectFiles' => fn ($q) => $q->with(['dealerParty', 'sales'])->orderBy('file_number')]);
 
         $fileSaleSummary = $fileSaleLandService->buildFileSaleSummary($project);

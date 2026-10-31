@@ -380,6 +380,8 @@ class ProjectController extends Controller
 
     public function saleLand(Request $request, Project $project)
     {
+        abort_unless($project->isDha(), 404);
+
         $project->load('landType');
         ProjectExemptionDefaults::ensureForProject($project);
 
@@ -431,6 +433,8 @@ class ProjectController extends Controller
 
     public function saleLandPdf(Request $request, Project $project)
     {
+        abort_unless($project->isDha(), 404);
+
         $project->load('landType');
         ProjectExemptionDefaults::ensureForProject($project);
 
@@ -1140,7 +1144,7 @@ class ProjectController extends Controller
 
         $safeName = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $project->name);
 
-        return $pdf->download('project-ledger-'.$safeName.'-'.now()->format('Y-m-d').'.pdf');
+        return $pdf->stream('project-ledger-'.$safeName.'-'.now()->format('Y-m-d').'.pdf');
     }
 
     public function partners(Project $project)

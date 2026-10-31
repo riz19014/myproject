@@ -102,7 +102,7 @@
 </header>
 
 <div class="row g-3 g-lg-4 mb-4">
-    <div class="col-md-6 col-lg-3">
+    <div class="col-md-6 @if($project->isDha()) col-lg-3 @else col-lg-4 @endif">
         <a href="{{ route('projects.partners', $project) }}" class="project-hub-link">
             <span class="project-hub-link__icon project-hub-link__icon--partners" aria-hidden="true">
                 <i class="bi bi-people"></i>
@@ -112,6 +112,7 @@
             <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
         </a>
     </div>
+    @if($project->isDha())
     <div class="col-md-6 col-lg-3">
         <a href="{{ route('purchase.files.index', ['project' => $project->id]) }}" class="project-hub-link">
             <span class="project-hub-link__icon project-hub-link__icon--purchase" aria-hidden="true">
@@ -142,10 +143,11 @@
             <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
         </a>
     </div>
+    @endif
 </div>
 
 <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-start">
     <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-theme btn-sm">Edit project</a>
-    <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-outline-theme btn-sm">Ledger PDF</a>
+    <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-outline-theme btn-sm" target="_blank" rel="noopener">Ledger PDF</a>
 </div>
 @endsection

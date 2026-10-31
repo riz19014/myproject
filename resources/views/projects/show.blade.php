@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <h1 class="mb-0"><x-project-name :project="$project" /></h1>
     <div class="d-flex flex-wrap gap-2">
-        <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-pink">Download ledger PDF</a>
+        <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-pink" target="_blank" rel="noopener">Ledger PDF</a>
         <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-theme">Edit</a>
         <a href="{{ route('projects.show', $project) }}" class="btn btn-outline-theme">Back to project</a>
         <a href="{{ route('projects.index') }}" class="btn btn-outline-theme">All projects</a>
@@ -97,7 +97,7 @@
                 <h5 class="mb-1">DayBook — <x-project-name :project="$project" /></h5>
                 <p class="text-muted small mb-0">Grouped by party. Land total is from purchase file sellers; payments from DayBook. Balance payable = land total minus total paid (amounts shown without minus signs).</p>
             </div>
-            <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-sm btn-outline-theme">Ledger PDF</a>
+            <a href="{{ route('projects.ledger.pdf', $project) }}" class="btn btn-sm btn-outline-theme" target="_blank" rel="noopener">Ledger PDF</a>
         </div>
 
         @include('projects.partials.daybook-ledger-section')
