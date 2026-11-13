@@ -336,13 +336,32 @@
                         <tr>
                             <td>{{ $r['date'] }}</td>
                             <td class="text-nowrap">
-                                @if(!empty($r['voucher']) && !empty($r['entry_modal']))
-                                    <button
-                                        type="button"
-                                        class="daybook-voucher-chip font-monospace"
-                                        data-daybook-entry="{{ json_encode($r['entry_modal'], JSON_HEX_APOS | JSON_HEX_QUOT) }}"
-                                        title="View voucher details"
-                                    >{{ $r['voucher'] }}</button>
+                                @if(!empty($r['entry_modal']))
+                                    <span class="daybook-voucher-actions">
+                                        @if(!empty($r['voucher']))
+                                            <button
+                                                type="button"
+                                                class="daybook-voucher-chip font-monospace"
+                                                data-daybook-entry="{{ json_encode($r['entry_modal'], JSON_HEX_APOS | JSON_HEX_QUOT) }}"
+                                                title="View voucher details"
+                                            >{{ $r['voucher'] }}</button>
+                                        @else
+                                            <button
+                                                type="button"
+                                                class="btn btn-link btn-sm p-0"
+                                                data-daybook-entry="{{ json_encode($r['entry_modal'], JSON_HEX_APOS | JSON_HEX_QUOT) }}"
+                                                title="View entry"
+                                            >View</button>
+                                        @endif
+                                        <button
+                                            type="button"
+                                            class="daybook-voucher-edit-btn"
+                                            data-daybook-edit
+                                            data-daybook-entry="{{ json_encode($r['entry_modal'], JSON_HEX_APOS | JSON_HEX_QUOT) }}"
+                                            title="Edit entry"
+                                            aria-label="Edit entry"
+                                        ><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
+                                    </span>
                                 @elseif(!empty($r['voucher']))
                                     <span class="daybook-voucher-chip font-monospace">{{ $r['voucher'] }}</span>
                                 @else
@@ -392,6 +411,7 @@
 @endif
 
 @include('daybook.partials.entry-detail-modal')
+@include('daybook.partials.entry-edit-modal')
 @endsection
 
 @push('scripts')

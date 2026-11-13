@@ -7,6 +7,9 @@
     @if(!empty($daybookReturnDate))
         <input type="hidden" name="return_date" value="{{ $daybookReturnDate }}">
     @endif
+    @if(!empty($daybookEmbed))
+        <input type="hidden" name="embed" value="1">
+    @endif
 
     <div class="daybook-panel">
         <div class="row g-4">

@@ -1911,6 +1911,7 @@ class DayBookController extends Controller
             'entry_modal' => [
                 'id' => $e->id,
                 'url' => route('daybook.show', $e),
+                'edit_url' => route('daybook.edit', ['entry' => $e, 'embed' => 1]),
                 'voucher_url' => route('daybook.voucher', $e),
                 'voucher' => $voucherDisplay,
                 'date' => $e->entry_date->format('j M Y'),
@@ -2464,7 +2465,7 @@ class DayBookController extends Controller
         return view('daybook.voucher', compact('entry'));
     }
 
-    public function edit(DayBookEntry $entry)
+    public function edit(Request $request, DayBookEntry $entry)
     {
         $entry->load(['partySubCategory.category', 'purchaseFile', 'paidByParty']);
 
@@ -2497,6 +2498,8 @@ class DayBookController extends Controller
             'partyCategories' => $partyCategories,
             'landTypes' => $landTypes,
             'customers' => $customers,
+            'daybookEmbed' => $request->boolean('embed'),
+            'daybookEmbedSaved' => $request->boolean('saved'),
             'daybookProjectIdDefault' => $formProjectId !== null ? (string) $formProjectId : '',
             'daybookPartyIdDefault' => $formPartyId !== null ? (string) $formPartyId : '',
             'daybookPartySubCategoryIdDefault' => $entry->party_sub_category_id !== null ? (string) $entry->party_sub_category_id : '',
@@ -2647,6 +2650,12 @@ class DayBookController extends Controller
             $validated = $this->normalizePaymentSettlement($validated);
             $entry->update($validated);
         });
+
+        if ($request->boolean('embed')) {
+            return redirect()
+                ->route('daybook.edit', ['entry' => $entry, 'embed' => 1, 'saved' => 1])
+                ->with('success', 'DayBook entry updated.');
+        }
 
         return redirect()
             ->route('daybook.show', $entry)

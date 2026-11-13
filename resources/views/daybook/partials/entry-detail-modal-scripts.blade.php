@@ -1,11 +1,22 @@
 <script>
 (function () {
     var modalEl = document.getElementById('daybookEntryModal');
-    if (!modalEl || typeof bootstrap === 'undefined') return;
-    if (modalEl.parentNode !== document.body) {
+    var editModalEl = document.getElementById('daybookEntryEditModal');
+    if (typeof bootstrap === 'undefined') return;
+
+    if (modalEl && modalEl.parentNode !== document.body) {
         document.body.appendChild(modalEl);
     }
-    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    if (editModalEl && editModalEl.parentNode !== document.body) {
+        document.body.appendChild(editModalEl);
+    }
+
+    var modal = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+    var editModal = editModalEl ? bootstrap.Modal.getOrCreateInstance(editModalEl) : null;
+    var editIframe = document.getElementById('daybook-edit-modal-iframe');
+    var editLoading = document.getElementById('daybook-edit-modal-loading');
+    var editSubtitle = document.getElementById('daybook-edit-modal-subtitle');
+    var reloadAfterSave = false;
 
     function setRow(id, value) {
         var el = document.getElementById(id);
@@ -16,6 +27,7 @@
     }
 
     function openFromPayload(data) {
+        if (!modal) return;
         data = data || {};
         var subtitle = document.getElementById('daybook-modal-subtitle');
         if (subtitle) subtitle.textContent = data.voucher ? ('Voucher ' + data.voucher) : ('Entry #' + (data.id || ''));
@@ -81,6 +93,54 @@
         modal.show();
     }
 
+    function showEditLoading(show) {
+        if (editLoading) editLoading.classList.toggle('d-none', !show);
+        if (editIframe) editIframe.classList.toggle('d-none', !!show);
+    }
+
+    function openEditModal(data) {
+        if (!editModal || !editIframe || !data || !data.edit_url) return;
+        if (modal) modal.hide();
+        reloadAfterSave = false;
+        if (editSubtitle) {
+            editSubtitle.textContent = data.voucher
+                ? ('Voucher ' + data.voucher)
+                : ('Entry #' + (data.id || ''));
+        }
+        showEditLoading(true);
+        editIframe.onload = function () {
+            showEditLoading(false);
+        };
+        editIframe.src = data.edit_url;
+        editModal.show();
+    }
+
+    function closeEditModal(reload) {
+        if (editModal) editModal.hide();
+        if (editIframe) {
+            editIframe.onload = null;
+            editIframe.src = 'about:blank';
+        }
+        showEditLoading(true);
+        if (reload) {
+            window.location.reload();
+        }
+    }
+
+    if (editModalEl) {
+        editModalEl.addEventListener('hidden.bs.modal', function () {
+            if (editIframe) {
+                editIframe.onload = null;
+                editIframe.src = 'about:blank';
+            }
+            showEditLoading(true);
+            if (reloadAfterSave) {
+                reloadAfterSave = false;
+                window.location.reload();
+            }
+        });
+    }
+
     function parsePayload(el) {
         try {
             return JSON.parse(el.getAttribute('data-daybook-entry') || '') || {};
@@ -90,12 +150,33 @@
     }
 
     document.addEventListener('click', function (e) {
+        var editBtn = e.target.closest('[data-daybook-edit]');
+        if (editBtn) {
+            var editData = parsePayload(editBtn);
+            if (!editData) return;
+            e.preventDefault();
+            e.stopPropagation();
+            openEditModal(editData);
+            return;
+        }
+
         var btn = e.target.closest('[data-daybook-entry]');
-        if (!btn) return;
+        if (!btn || btn.hasAttribute('data-daybook-edit')) return;
         var data = parsePayload(btn);
         if (!data) return;
         e.preventDefault();
         openFromPayload(data);
+    });
+
+    window.addEventListener('message', function (e) {
+        if (e.origin !== window.location.origin) return;
+        var msg = e.data || {};
+        if (msg.type === 'daybook-entry-saved') {
+            reloadAfterSave = true;
+            closeEditModal(true);
+        } else if (msg.type === 'daybook-entry-edit-cancel') {
+            closeEditModal(false);
+        }
     });
 })();
 </script>

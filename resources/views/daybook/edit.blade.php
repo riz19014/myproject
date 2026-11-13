@@ -1,4 +1,5 @@
-@extends('layouts.app')
+@php($daybookEmbed = !empty($daybookEmbed))
+@extends($daybookEmbed ? 'layouts.embed' : 'layouts.app')
 
 @section('title', 'Edit daybook entry')
 
@@ -14,13 +15,20 @@
     <div class="daybook-page-heading mb-3">
         <div class="daybook-card-heading align-items-center">
             <div class="daybook-card-heading__title mb-0">
-                <h1 class="daybook-card-title mb-0">Edit entry #{{ $entry->id }}</h1>
+                <h1 class="daybook-card-title mb-0">
+                    Edit entry #{{ $entry->id }}
+                    @if($entry->voucher_no)
+                        <span class="text-muted fw-normal">· Voucher {{ $entry->getVoucherNumber() }}</span>
+                    @endif
+                </h1>
                 <p class="text-muted small mb-0 mt-2">{{ $entry->entry_date->format('l, j M Y') }}</p>
             </div>
-            <div class="daybook-card-heading__actions">
-                <a href="{{ route('daybook.index', ['date' => $entry->entry_date->toDateString()]) }}" class="btn btn-outline-theme btn-sm">Back to daybook</a>
-                <a href="{{ route('daybook.show', $entry) }}" class="btn btn-outline-theme btn-sm">View entry</a>
-            </div>
+            @unless($daybookEmbed)
+                <div class="daybook-card-heading__actions">
+                    <a href="{{ route('daybook.index', ['date' => $entry->entry_date->toDateString()]) }}" class="btn btn-outline-theme btn-sm">Back to daybook</a>
+                    <a href="{{ route('daybook.show', $entry) }}" class="btn btn-outline-theme btn-sm">View entry</a>
+                </div>
+            @endunless
         </div>
     </div>
 
@@ -32,6 +40,7 @@
                     'daybookFormAction' => route('daybook.update', $entry),
                     'daybookFormUsePut' => true,
                     'daybookReturnDate' => null,
+                    'daybookEmbed' => $daybookEmbed,
                     'daybookProjectsJson' => $daybookProjectsJson,
                     'daybookProjectIdDefault' => $daybookProjectIdDefault ?? '',
                     'daybookPartyIdDefault' => $daybookPartyIdDefault ?? '',
@@ -49,7 +58,7 @@
                     'daybookSoldAreaUnitDefault' => $daybookSoldAreaUnitDefault ?? 'marla',
                 ])
             </div>
-            <div class="daybook-form-inner pt-0 pb-4">
+            <div class="daybook-form-inner pt-0 pb-4 d-flex flex-wrap gap-2 align-items-center">
                 <button type="submit" form="daybook-entry-form" class="daybook-save-record text-nowrap" id="daybook-save-record-btn" aria-label="Save changes">
                     <span class="daybook-save-record__idle">
                         <i class="bi bi-floppy2 app-sidebar-logout__icon" aria-hidden="true"></i>
@@ -60,6 +69,9 @@
                         <span>Saving…</span>
                     </span>
                 </button>
+                @if($daybookEmbed)
+                    <button type="button" class="btn btn-outline-theme" id="daybook-embed-cancel-btn">Cancel</button>
+                @endif
             </div>
         </div>
     </div>
@@ -73,4 +85,30 @@
 @push('scripts')
 @include('partials.party-form-field-scripts')
 @include('daybook.partials.entry-form-scripts')
+@if($daybookEmbed)
+<script>
+(function () {
+    function notifyParent(type) {
+        try {
+            window.parent.postMessage({
+                type: type,
+                id: {{ (int) $entry->id }},
+                voucher: @json($entry->voucher_no !== null ? $entry->getVoucherNumber() : '')
+            }, window.location.origin);
+        } catch (e) {}
+    }
+
+    var cancelBtn = document.getElementById('daybook-embed-cancel-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+            notifyParent('daybook-entry-edit-cancel');
+        });
+    }
+
+    @if(!empty($daybookEmbedSaved))
+    notifyParent('daybook-entry-saved');
+    @endif
+})();
+</script>
+@endif
 @endpush

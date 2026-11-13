@@ -77,4 +77,62 @@
             grid-template-columns: 1fr;
         }
     }
+
+    .daybook-voucher-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+    }
+    .daybook-voucher-edit-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.55rem;
+        height: 1.55rem;
+        padding: 0;
+        border-radius: 0.35rem;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: #fff;
+        color: #475569;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .daybook-voucher-edit-btn:hover,
+    .daybook-voucher-edit-btn:focus {
+        color: #ea580c;
+        border-color: rgba(234, 88, 12, 0.35);
+        background: #fff7ed;
+    }
+    .daybook-voucher-edit-btn .bi {
+        font-size: 0.85rem;
+    }
+
+    #daybookEntryEditModal {
+        z-index: 1090;
+    }
+    .daybook-entry-edit-modal-dialog {
+        max-width: min(1120px, calc(100vw - 1.25rem));
+        height: calc(100vh - 2rem);
+        margin: 1rem auto;
+    }
+    .daybook-entry-edit-modal-content {
+        height: 100%;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    }
+    .daybook-entry-edit-modal-content .modal-body {
+        height: calc(100% - 3.25rem);
+        overflow: hidden;
+        background: #f8fafc;
+    }
+    .daybook-edit-modal-iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #f8fafc;
+        display: block;
+    }
 </style>
