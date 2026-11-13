@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
 
         $pdfViews = [
             'daybook.ledger-pdf',
+            'daybook.ledger-summary-pdf',
             'daybook.report-pdf',
             'purchases.ledger-pdf',
             'purchases.lines-pdf',

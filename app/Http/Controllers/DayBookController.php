@@ -1543,6 +1543,356 @@ class DayBookController extends Controller
         return $pdf->download($filename);
     }
 
+    /**
+     * Party ledger summary: list projects for the party, click one to view its ledger; print one or all.
+     */
+    public function ledgerSummary(Request $request)
+    {
+        $parties = Party::query()->orderBy('name')->get();
+        $fromRaw = $request->input('from');
+        $toRaw = $request->input('to');
+        $hasFromInput = $fromRaw !== null && $fromRaw !== '';
+        $hasToInput = $toRaw !== null && $toRaw !== '';
+
+        $defaultRange = $this->normalizeLedgerDates(null, null);
+        $emptyPayload = [
+            'from' => $defaultRange['from'],
+            'to' => $defaultRange['to'],
+            'ledger_from_input' => '',
+            'ledger_to_input' => '',
+            'party_id' => null,
+            'project_id' => null,
+            'selectedParty' => null,
+            'selectedProject' => null,
+            'parties' => $parties,
+            'projectSummaries' => [],
+            'ledgerRows' => [],
+            'grandCashIn' => 0.0,
+            'grandCashOut' => 0.0,
+            'ledgerFooter' => [],
+            'summary_ready' => false,
+            'ledger_ready' => false,
+        ];
+
+        if (! $request->filled('_summary')) {
+            return view('daybook.ledger-summary', $emptyPayload);
+        }
+
+        $validated = $request->validate([
+            'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
+            'project_id' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ], [], ['party_id' => 'party', 'project_id' => 'project']);
+
+        $partyId = (int) $validated['party_id'];
+        $projectKey = array_key_exists('project_id', $validated) && $validated['project_id'] !== null && $validated['project_id'] !== ''
+            ? (int) $validated['project_id']
+            : null;
+
+        $ledger_from_input = '';
+        $ledger_to_input = '';
+        if (! $hasFromInput && ! $hasToInput) {
+            $earliest = $this->earliestPartyEntryDate($partyId);
+            $from = $earliest ?? Carbon::today();
+            $to = Carbon::today();
+            if ($from->gt($to)) {
+                $from = $to->copy();
+            }
+            $maxDays = 366 * 40;
+            if ($from->diffInDays($to) > $maxDays) {
+                $from = $to->copy()->subDays($maxDays);
+            }
+        } else {
+            $range = $this->ledgerDateRangeFromRequest($request);
+            $from = $range['from'];
+            $to = $range['to'];
+            $ledger_from_input = $range['from_input'];
+            $ledger_to_input = $range['to_input'];
+        }
+
+        $selectedParty = Party::query()->findOrFail($partyId);
+        $projectSummaries = $this->partyProjectLedgerSummaries($from, $to, $partyId);
+
+        $selectedProject = null;
+        $ledgerRows = [];
+        $grandCashIn = 0.0;
+        $grandCashOut = 0.0;
+        $ledgerFooter = [];
+        $ledgerReady = false;
+
+        if ($projectKey !== null) {
+            $match = collect($projectSummaries)->firstWhere('project_id', $projectKey);
+            if ($match === null) {
+                throw ValidationException::withMessages([
+                    'project_id' => 'That project has no ledger entries for this party in the selected range.',
+                ]);
+            }
+            $selectedProject = $match;
+            [$ledgerRows, $grandCashIn, $grandCashOut] = $this->ledgerStatementRowsForPartyProject(
+                $from,
+                $to,
+                $partyId,
+                $projectKey === 0 ? null : $projectKey
+            );
+            $ledgerFooter = $this->ledgerTableFooterRows(0.0, $grandCashIn, $grandCashOut, $ledgerRows);
+            $ledgerReady = true;
+        }
+
+        return view('daybook.ledger-summary', [
+            'from' => $from,
+            'to' => $to,
+            'ledger_from_input' => $ledger_from_input,
+            'ledger_to_input' => $ledger_to_input,
+            'party_id' => $partyId,
+            'project_id' => $projectKey,
+            'selectedParty' => $selectedParty,
+            'selectedProject' => $selectedProject,
+            'parties' => $parties,
+            'projectSummaries' => $projectSummaries,
+            'ledgerRows' => $ledgerRows,
+            'grandCashIn' => $grandCashIn,
+            'grandCashOut' => $grandCashOut,
+            'ledgerFooter' => $ledgerFooter,
+            'summary_ready' => true,
+            'ledger_ready' => $ledgerReady,
+        ]);
+    }
+
+    public function ledgerSummaryPdf(Request $request)
+    {
+        $fromRaw = $request->input('from');
+        $toRaw = $request->input('to');
+        $request->merge([
+            'from' => ($fromRaw !== null && $fromRaw !== '') ? $fromRaw : null,
+            'to' => ($toRaw !== null && $toRaw !== '') ? $toRaw : null,
+        ]);
+
+        $validated = $request->validate([
+            'party_id' => ['required', 'integer', Rule::exists('parties', 'id')],
+            'project_id' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ], [], ['party_id' => 'party', 'project_id' => 'project']);
+
+        $partyId = (int) $validated['party_id'];
+        $hasFromInput = $fromRaw !== null && $fromRaw !== '';
+        $hasToInput = $toRaw !== null && $toRaw !== '';
+        $projectKey = array_key_exists('project_id', $validated) && $validated['project_id'] !== null && $validated['project_id'] !== ''
+            ? (int) $validated['project_id']
+            : null;
+
+        if (! $hasFromInput && ! $hasToInput) {
+            $earliest = $this->earliestPartyEntryDate($partyId);
+            $from = $earliest ?? Carbon::today();
+            $to = Carbon::today();
+            if ($from->gt($to)) {
+                $from = $to->copy();
+            }
+            $maxDays = 366 * 40;
+            if ($from->diffInDays($to) > $maxDays) {
+                $from = $to->copy()->subDays($maxDays);
+            }
+        } else {
+            $dates = $this->normalizeLedgerDates($validated['from'] ?? null, $validated['to'] ?? null);
+            $from = $dates['from'];
+            $to = $dates['to'];
+        }
+
+        $selectedParty = Party::query()->findOrFail($partyId);
+        $projectSummaries = $this->partyProjectLedgerSummaries($from, $to, $partyId);
+
+        if ($projectKey !== null) {
+            $projectSummaries = array_values(array_filter(
+                $projectSummaries,
+                fn (array $row) => (int) $row['project_id'] === $projectKey
+            ));
+            if ($projectSummaries === []) {
+                abort(404, 'No ledger for that project and party.');
+            }
+        }
+
+        $sections = [];
+        foreach ($projectSummaries as $summary) {
+            $pid = (int) $summary['project_id'];
+            [$rows, $cashIn, $cashOut] = $this->ledgerStatementRowsForPartyProject(
+                $from,
+                $to,
+                $partyId,
+                $pid === 0 ? null : $pid
+            );
+            $sections[] = [
+                'summary' => $summary,
+                'ledgerRows' => $rows,
+                'grandCashIn' => $cashIn,
+                'grandCashOut' => $cashOut,
+                'ledgerFooter' => $this->ledgerTableFooterRows(0.0, $cashIn, $cashOut, $rows),
+            ];
+        }
+
+        $generatedAt = now();
+        $pdf = Pdf::loadView('daybook.ledger-summary-pdf', [
+            'from' => $from,
+            'to' => $to,
+            'selectedParty' => $selectedParty,
+            'sections' => $sections,
+            'print_all' => $projectKey === null,
+            'generatedAt' => $generatedAt,
+        ]);
+        $pdf->setPaper('a4', 'portrait');
+
+        $slug = $from->format('Y-m-d').'_to_'.$to->format('Y-m-d');
+        $filename = $projectKey !== null
+            ? 'ledger-summary-party-'.$partyId.'-project-'.$projectKey.'-'.$slug.'.pdf'
+            : 'ledger-summary-party-'.$partyId.'-all-projects-'.$slug.'.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Projects linked to this party via daybook entries and/or party–project pivot, with period totals.
+     *
+     * @return list<array{project_id: int, project_name: string, project_is_dha: bool, project_status: string, project_status_label: string, land_type: string, entries_count: int, cash_in: float, cash_out: float, net: float}>
+     */
+    private function partyProjectLedgerSummaries(Carbon $from, Carbon $to, int $partyId): array
+    {
+        $fromStr = $from->toDateString();
+        $toStr = $to->toDateString();
+
+        $agg = DayBookEntry::query()
+            ->where('link_type', DayBookEntry::LINK_PARTY)
+            ->where('link_id', $partyId)
+            ->whereBetween('entry_date', [$fromStr, $toStr])
+            ->selectRaw('project_id')
+            ->selectRaw('COUNT(*) as entries_count')
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as cash_in', [DayBookEntry::TYPE_CASH_IN])
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as cash_out', [DayBookEntry::TYPE_CASH_OUT])
+            ->groupBy('project_id')
+            ->get()
+            ->keyBy(fn ($row) => $row->project_id === null ? 0 : (int) $row->project_id);
+
+        $projectIds = $agg->keys()->filter(fn ($id) => (int) $id > 0)->map(fn ($id) => (int) $id)->values()->all();
+
+        $attachedIds = DB::table('party_project')
+            ->where('party_id', $partyId)
+            ->pluck('project_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $allProjectIds = array_values(array_unique(array_merge($projectIds, $attachedIds)));
+        $projects = Project::query()
+            ->with('landType')
+            ->whereIn('id', $allProjectIds)
+            ->orderBy('name')
+            ->get()
+            ->keyBy('id');
+
+        $rows = [];
+        foreach ($projects as $project) {
+            $stats = $agg->get($project->id);
+            $cashIn = $stats ? (float) $stats->cash_in : 0.0;
+            $cashOut = $stats ? (float) $stats->cash_out : 0.0;
+            $status = $project->status ?: Project::STATUS_IN_PROGRESS;
+            $rows[] = [
+                'project_id' => (int) $project->id,
+                'project_name' => $project->name,
+                'project_is_dha' => $project->isDha(),
+                'project_status' => $status,
+                'project_status_label' => $project->statusLabel(),
+                'land_type' => $project->landType?->name ?? '',
+                'entries_count' => $stats ? (int) $stats->entries_count : 0,
+                'cash_in' => $cashIn,
+                'cash_out' => $cashOut,
+                'net' => $cashIn - $cashOut,
+            ];
+        }
+
+        if ($agg->has(0)) {
+            $stats = $agg->get(0);
+            $cashIn = (float) $stats->cash_in;
+            $cashOut = (float) $stats->cash_out;
+            $rows[] = [
+                'project_id' => 0,
+                'project_name' => 'No project',
+                'project_is_dha' => false,
+                'project_status' => '',
+                'project_status_label' => '',
+                'land_type' => '',
+                'entries_count' => (int) $stats->entries_count,
+                'cash_in' => $cashIn,
+                'cash_out' => $cashOut,
+                'net' => $cashIn - $cashOut,
+            ];
+        }
+
+        usort($rows, function (array $a, array $b) {
+            if ($a['project_id'] === 0) {
+                return 1;
+            }
+            if ($b['project_id'] === 0) {
+                return -1;
+            }
+
+            return strcasecmp($a['project_name'], $b['project_name']);
+        });
+
+        return $rows;
+    }
+
+    /**
+     * Party + optional project ledger rows (running balance starts at 0 for the project slice).
+     *
+     * @return array{0: list<array<string, mixed>>, 1: float, 2: float}
+     */
+    private function ledgerStatementRowsForPartyProject(Carbon $from, Carbon $to, int $partyId, ?int $projectId): array
+    {
+        $running = 0.0;
+        $rows = [];
+        $cashIn = 0.0;
+        $cashOut = 0.0;
+
+        $query = DayBookEntry::query()
+            ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
+            ->where('link_type', DayBookEntry::LINK_PARTY)
+            ->where('link_id', $partyId)
+            ->with(['paidByParty', 'project', 'purchaseFile', 'partySubCategory.category'])
+            ->orderBy('entry_date')
+            ->orderBy('id');
+
+        if ($projectId === null) {
+            $query->whereNull('project_id');
+        } else {
+            $query->where('project_id', $projectId);
+        }
+
+        foreach ($query->get() as $e) {
+            if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                $running += (float) $e->amount;
+                $cashIn += (float) $e->amount;
+                $amountStr = '+Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment in';
+            } else {
+                $running -= (float) $e->amount;
+                $cashOut += (float) $e->amount;
+                $amountStr = '-Rs '.number_format((float) $e->amount, 0);
+                $typeLabel = 'Payment out';
+            }
+
+            $rows[] = [
+                'date' => $e->entry_date->format('d M Y'),
+                'payment' => $typeLabel,
+                'settlement' => $e->getSettlementWithPaidByLabel(),
+                'amount' => $this->ledgerStatementAmountCell($amountStr),
+                'description' => $e->description ?: '—',
+                'description_tags' => $e->ledgerDescriptionDetailTags(),
+                'balance' => $running,
+                'balance_display' => $this->formatLedgerBalanceCell($running),
+            ];
+        }
+
+        return [$rows, $cashIn, $cashOut];
+    }
+
     public function reportPdf(Request $request)
     {
         $day = $request->filled('date')
