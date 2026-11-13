@@ -172,7 +172,18 @@
                     <td>{{ $r['date'] }}</td>
                     <td>{{ $r['payment'] }}</td>
                     <td style="font-size:8px;">{{ $r['settlement'] ?? '—' }}</td>
-                    <td>{{ $r['description'] }}</td>
+                    <td>
+                        {{ $r['description'] }}
+                        @if(!empty($r['description_tags']))
+                            <div style="margin-top:2px;font-size:7.5px;color:#64748b;line-height:1.35;">
+                                @foreach($r['description_tags'] as $tag)
+                                    <span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 4px;border:1px solid #e2e8f0;border-radius:2px;background:#f8fafc;">
+                                        <strong>{{ $tag['label'] }}:</strong> {{ $tag['value'] }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </td>
                     <td class="amt">{{ $r['amount'] }}</td>
                     <td class="amt">{{ $r['balance_display'] }}</td>
                 </tr>

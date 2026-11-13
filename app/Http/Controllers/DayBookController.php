@@ -368,7 +368,7 @@ class DayBookController extends Controller
      * Flat rows for party ledger: date, payment, settlement, amount, description, balance.
      * Running balance starts at opening (from date) and follows party-linked entries in date order.
      *
-     * @return list<array{date: string, payment: string, settlement: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
+     * @return list<array{date: string, payment: string, settlement: string, amount: string, description: string, description_tags: list<array{label: string, value: string}>, balance: float, balance_display: string, is_meta?: bool}>
      */
     private function ledgerStatementRows(Carbon $from, Carbon $to, int $partyId): array
     {
@@ -380,7 +380,7 @@ class DayBookController extends Controller
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
             ->where('link_type', DayBookEntry::LINK_PARTY)
             ->where('link_id', $partyId)
-            ->with('paidByParty')
+            ->with(['paidByParty', 'project', 'purchaseFile', 'partySubCategory.category'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -402,6 +402,7 @@ class DayBookController extends Controller
                 'settlement' => $e->getSettlementWithPaidByLabel(),
                 'amount' => $this->ledgerStatementAmountCell($amountStr),
                 'description' => $e->description ?: '—',
+                'description_tags' => $e->ledgerDescriptionDetailTags(),
                 'balance' => $running,
                 'balance_display' => $this->formatLedgerBalanceCell($running),
             ];
@@ -413,7 +414,7 @@ class DayBookController extends Controller
     /**
      * All daybook entries in range (every link type), chronological, with running balance from opening + petty on from-date.
      *
-     * @return list<array{date: string, payment: string, settlement: string, amount: string, description: string, balance: float, balance_display: string, is_meta?: bool}>
+     * @return list<array{date: string, payment: string, settlement: string, amount: string, description: string, description_tags: list<array{label: string, value: string}>, balance: float, balance_display: string, is_meta?: bool}>
      */
     private function ledgerStatementRowsDateWise(Carbon $from, Carbon $to): array
     {
@@ -424,7 +425,7 @@ class DayBookController extends Controller
 
         $entries = DayBookEntry::query()
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
-            ->with('paidByParty')
+            ->with(['paidByParty', 'project', 'purchaseFile', 'partySubCategory.category'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -452,6 +453,7 @@ class DayBookController extends Controller
                 'settlement' => $e->getSettlementWithPaidByLabel(),
                 'amount' => $this->ledgerStatementAmountCell($amountStr),
                 'description' => $desc,
+                'description_tags' => $e->ledgerDescriptionDetailTags(),
                 'balance' => $running,
                 'balance_display' => $this->formatLedgerBalanceCell($running),
             ];

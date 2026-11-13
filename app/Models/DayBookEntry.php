@@ -268,6 +268,40 @@ class DayBookEntry extends Model
     }
 
     /**
+     * Compact detail tags for daybook ledger description (account, file, project, etc.).
+     * Bank/ref stay in Settlement only — not repeated here.
+     *
+     * @return list<array{label: string, value: string}>
+     */
+    public function ledgerDescriptionDetailTags(): array
+    {
+        $tags = [];
+
+        // Bank / cheque ref stay in the Settlement column — omit here to avoid duplication.
+
+        $account = $this->getPartySubCategoryLabel();
+        if ($account !== '—') {
+            $tags[] = ['label' => 'Account', 'value' => $account];
+        }
+
+        $fileName = trim((string) ($this->purchaseFile?->file_name ?? ''));
+        if ($fileName !== '') {
+            $tags[] = ['label' => 'File', 'value' => $fileName];
+        }
+
+        $projectName = trim((string) ($this->project?->name ?? ''));
+        if ($projectName !== '') {
+            $tags[] = ['label' => 'Project', 'value' => $projectName];
+        }
+
+        if ($this->hasFileSaleArea()) {
+            $tags[] = ['label' => 'Sold area', 'value' => $this->getSoldAreaLabel()];
+        }
+
+        return $tags;
+    }
+
+    /**
      * Compact payment settlement lines for purchase file ledger (PDF / UI).
      *
      * @return list<array{kind: string, text: string}>

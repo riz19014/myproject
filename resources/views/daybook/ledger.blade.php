@@ -36,6 +36,33 @@
         .daybook-ledger-statement tfoot .ledger-footer-line + .ledger-footer-line {
             margin-top: 0.2rem;
         }
+        .daybook-ledger-desc-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            margin-top: 0.3rem;
+        }
+        .daybook-ledger-desc-tags .ledger-desc-tag {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.2rem;
+            max-width: 100%;
+            padding: 0.1rem 0.4rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.25rem;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.7rem;
+            line-height: 1.35;
+            white-space: normal;
+        }
+        .daybook-ledger-desc-tags .ledger-desc-tag__label {
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            font-size: 0.62rem;
+        }
     </style>
 @endpush
 
@@ -168,7 +195,19 @@
                             <td>{{ $r['date'] }}</td>
                             <td>{{ $r['payment'] }}</td>
                             <td class="small">{{ $r['settlement'] ?? '—' }}</td>
-                            <td>{{ $r['description'] }}</td>
+                            <td>
+                                <div>{{ $r['description'] }}</div>
+                                @if(!empty($r['description_tags']))
+                                    <div class="daybook-ledger-desc-tags">
+                                        @foreach($r['description_tags'] as $tag)
+                                            <span class="ledger-desc-tag">
+                                                <span class="ledger-desc-tag__label">{{ $tag['label'] }}</span>
+                                                <span>{{ $tag['value'] }}</span>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </td>
                             <td class="text-end font-monospace">{{ $r['amount'] }}</td>
                             <td class="text-end font-monospace">{{ $r['balance_display'] }}</td>
                         </tr>
