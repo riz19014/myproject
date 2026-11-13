@@ -158,18 +158,20 @@
     <table class="ledger-table">
         <thead>
             <tr>
-                <th style="width:9%">Date</th>
-                <th style="width:10%">Payment</th>
-                <th style="width:20%">Settlement</th>
+                <th style="width:8%">Date</th>
+                <th style="width:8%">Voucher</th>
+                <th style="width:9%">Payment</th>
+                <th style="width:18%">Settlement</th>
                 <th>Description</th>
-                <th class="amt" style="width:12%">Amount (Rs.)</th>
-                <th class="amt" style="width:12%">Balance (Rs.)</th>
+                <th class="amt" style="width:11%">Amount (Rs.)</th>
+                <th class="amt" style="width:11%">Balance (Rs.)</th>
             </tr>
         </thead>
         <tbody>
             @forelse($ledgerRows as $r)
                 <tr @if(!empty($r['is_meta'])) class="meta" @endif>
                     <td>{{ $r['date'] }}</td>
+                    <td style="font-family:DejaVu Sans,sans-serif;">{{ !empty($r['voucher']) ? $r['voucher'] : '—' }}</td>
                     <td>{{ $r['payment'] }}</td>
                     <td style="font-size:8px;">{{ $r['settlement'] ?? '—' }}</td>
                     <td>
@@ -189,7 +191,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" style="text-align:center;color:#64748b;padding:16px;">
+                    <td colspan="7" style="text-align:center;color:#64748b;padding:16px;">
                         No entries in this range{{ !empty($selectedParty) ? ' for this party' : '' }}.
                     </td>
                 </tr>
@@ -198,7 +200,7 @@
         @if(count($ledgerFooter))
         <tfoot>
             <tr>
-                <td colspan="4" class="ledger-footer-spacer"></td>
+                <td colspan="5" class="ledger-footer-spacer"></td>
                 <td colspan="2" class="ledger-footer-totals">
                     @foreach($ledgerFooter as $line)
                         <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>

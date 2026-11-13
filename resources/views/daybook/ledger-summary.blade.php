@@ -106,6 +106,9 @@
             background: #f0fdf4;
             color: #15803d;
         }
+    </style>
+    @include('daybook.partials.entry-detail-modal-styles')
+    <style>
         @media print {
             .no-print { display: none !important; }
             .app-sidebar, .app-topbar { display: none !important; }
@@ -320,8 +323,9 @@
                 <thead class="text-nowrap">
                     <tr class="table-dark">
                         <th scope="col" style="width:9%">Date</th>
+                        <th scope="col" style="width:9%">Voucher</th>
                         <th scope="col" style="width:10%">Payment</th>
-                        <th scope="col" style="width:18%">Settlement</th>
+                        <th scope="col" style="width:16%">Settlement</th>
                         <th scope="col">Description</th>
                         <th scope="col" class="text-end" style="width:11%">Amount (Rs.)</th>
                         <th scope="col" class="text-end" style="width:11%">Balance (Rs.)</th>
@@ -331,6 +335,20 @@
                     @forelse($ledgerRows as $r)
                         <tr>
                             <td>{{ $r['date'] }}</td>
+                            <td class="text-nowrap">
+                                @if(!empty($r['voucher']) && !empty($r['entry_modal']))
+                                    <button
+                                        type="button"
+                                        class="daybook-voucher-chip font-monospace"
+                                        data-daybook-entry="{{ json_encode($r['entry_modal'], JSON_HEX_APOS | JSON_HEX_QUOT) }}"
+                                        title="View voucher details"
+                                    >{{ $r['voucher'] }}</button>
+                                @elseif(!empty($r['voucher']))
+                                    <span class="daybook-voucher-chip font-monospace">{{ $r['voucher'] }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
                             <td>{{ $r['payment'] }}</td>
                             <td class="small">{{ $r['settlement'] ?? '—' }}</td>
                             <td>
@@ -351,14 +369,14 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-muted text-center py-4">No entries for this project.</td>
+                            <td colspan="7" class="text-muted text-center py-4">No entries for this project.</td>
                         </tr>
                     @endforelse
                 </tbody>
                 @if(count($ledgerFooter))
                 <tfoot>
                     <tr class="border-top border-2">
-                        <td colspan="4" class="border-end-0 bg-transparent"></td>
+                        <td colspan="5" class="border-end-0 bg-transparent"></td>
                         <td colspan="2" class="ledger-footer-totals text-end border-start">
                             @foreach($ledgerFooter as $line)
                                 <div class="ledger-footer-line"><strong>{{ $line['label'] }}:</strong> {{ $line['value'] }}</div>
@@ -372,9 +390,12 @@
     </div>
 </div>
 @endif
+
+@include('daybook.partials.entry-detail-modal')
 @endsection
 
 @push('scripts')
+@include('daybook.partials.entry-detail-modal-scripts')
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script>
 (function () {

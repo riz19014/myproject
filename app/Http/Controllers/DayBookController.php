@@ -380,7 +380,7 @@ class DayBookController extends Controller
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
             ->where('link_type', DayBookEntry::LINK_PARTY)
             ->where('link_id', $partyId)
-            ->with(['paidByParty', 'project', 'purchaseFile', 'partySubCategory.category'])
+            ->with(['paidByParty', 'project.landType', 'purchaseFile', 'partySubCategory.category', 'subCategory.category'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -396,16 +396,7 @@ class DayBookController extends Controller
                 $typeLabel = 'Payment out';
             }
 
-            $rows[] = [
-                'date' => $e->entry_date->format('d M Y'),
-                'payment' => $typeLabel,
-                'settlement' => $e->getSettlementWithPaidByLabel(),
-                'amount' => $this->ledgerStatementAmountCell($amountStr),
-                'description' => $e->description ?: '—',
-                'description_tags' => $e->ledgerDescriptionDetailTags(),
-                'balance' => $running,
-                'balance_display' => $this->formatLedgerBalanceCell($running),
-            ];
+            $rows[] = $this->ledgerStatementRowFromEntry($e, $running, $amountStr, $typeLabel);
         }
 
         return $rows;
@@ -425,7 +416,7 @@ class DayBookController extends Controller
 
         $entries = DayBookEntry::query()
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
-            ->with(['paidByParty', 'project', 'purchaseFile', 'partySubCategory.category'])
+            ->with(['paidByParty', 'project.landType', 'purchaseFile', 'partySubCategory.category', 'subCategory.category'])
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
@@ -447,16 +438,7 @@ class DayBookController extends Controller
                 $desc .= ' · '.$linkLabel;
             }
 
-            $rows[] = [
-                'date' => $e->entry_date->format('d M Y'),
-                'payment' => $typeLabel,
-                'settlement' => $e->getSettlementWithPaidByLabel(),
-                'amount' => $this->ledgerStatementAmountCell($amountStr),
-                'description' => $desc,
-                'description_tags' => $e->ledgerDescriptionDetailTags(),
-                'balance' => $running,
-                'balance_display' => $this->formatLedgerBalanceCell($running),
-            ];
+            $rows[] = $this->ledgerStatementRowFromEntry($e, $running, $amountStr, $typeLabel, $desc);
         }
 
         return $rows;
@@ -1855,7 +1837,7 @@ class DayBookController extends Controller
             ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
             ->where('link_type', DayBookEntry::LINK_PARTY)
             ->where('link_id', $partyId)
-            ->with(['paidByParty', 'project', 'purchaseFile', 'partySubCategory.category'])
+            ->with(['paidByParty', 'project.landType', 'purchaseFile', 'partySubCategory.category', 'subCategory.category'])
             ->orderBy('entry_date')
             ->orderBy('id');
 
@@ -1878,19 +1860,82 @@ class DayBookController extends Controller
                 $typeLabel = 'Payment out';
             }
 
-            $rows[] = [
-                'date' => $e->entry_date->format('d M Y'),
-                'payment' => $typeLabel,
-                'settlement' => $e->getSettlementWithPaidByLabel(),
-                'amount' => $this->ledgerStatementAmountCell($amountStr),
-                'description' => $e->description ?: '—',
-                'description_tags' => $e->ledgerDescriptionDetailTags(),
-                'balance' => $running,
-                'balance_display' => $this->formatLedgerBalanceCell($running),
-            ];
+            $rows[] = $this->ledgerStatementRowFromEntry($e, $running, $amountStr, $typeLabel);
         }
 
         return [$rows, $cashIn, $cashOut];
+    }
+
+    /**
+     * Shared ledger statement row + voucher / entry-modal payload.
+     *
+     * @return array<string, mixed>
+     */
+    private function ledgerStatementRowFromEntry(
+        DayBookEntry $e,
+        float $running,
+        string $amountStr,
+        string $typeLabel,
+        ?string $description = null
+    ): array {
+        $isCashIn = $e->type === DayBookEntry::TYPE_CASH_IN;
+        $voucherDisplay = $e->voucher_no !== null ? $e->getVoucherNumber() : '';
+        $createdAtPk = $e->created_at
+            ? $e->created_at->copy()->timezone('Asia/Karachi')
+            : null;
+        $desc = $description ?? ($e->description ?: '—');
+        $project = $e->project;
+        $subCat = $e->getPartySubCategoryLabel();
+        $categoryName = $e->partySubCategory?->category?->name ?? '';
+
+        // Keep voucher out of description tags — it has its own column.
+        $descriptionTags = array_values(array_filter(
+            $e->ledgerDescriptionDetailTags(),
+            function (array $tag): bool {
+                $label = strtolower(trim((string) ($tag['label'] ?? '')));
+
+                return ! in_array($label, ['voucher', 'voucher no', 'voucher no.', 'voucher#'], true);
+            }
+        ));
+
+        return [
+            'date' => $e->entry_date->format('d M Y'),
+            'voucher' => $voucherDisplay,
+            'payment' => $typeLabel,
+            'settlement' => $e->getSettlementWithPaidByLabel(),
+            'amount' => $this->ledgerStatementAmountCell($amountStr),
+            'description' => $desc,
+            'description_tags' => $descriptionTags,
+            'balance' => $running,
+            'balance_display' => $this->formatLedgerBalanceCell($running),
+            'entry_modal' => [
+                'id' => $e->id,
+                'url' => route('daybook.show', $e),
+                'voucher_url' => route('daybook.voucher', $e),
+                'voucher' => $voucherDisplay,
+                'date' => $e->entry_date->format('j M Y'),
+                'created_at' => $createdAtPk ? $createdAtPk->format('j M Y, h:i A') : '—',
+                'type_label' => $typeLabel,
+                'is_cash_in' => $isCashIn,
+                'amount' => number_format((float) $e->amount, 0),
+                'settlement' => $e->getSettlementLabel(),
+                'paid_by' => $e->getPaidByLabel(),
+                'description' => $e->description ?: '—',
+                'link_label' => $e->getLinkLabel(),
+                'project_name' => $project?->name ?? '',
+                'project_is_dha' => $project?->isDha() ?? false,
+                'land_type' => $project?->landType?->name ?? '',
+                'purchase_file' => $e->purchaseFile?->file_name ?? '',
+                'sold_area' => $e->getSoldAreaLabel(),
+                'category' => $categoryName,
+                'sub_category' => $subCat,
+                'is_factory' => $e->isFactoryExpense(),
+                'factory_sub_category' => $e->getFactorySubCategoryLabel(),
+                'unit' => $e->unit ?? '',
+                'quantity' => $e->quantity !== null ? number_format((int) $e->quantity) : '',
+                'unit_price' => $e->unit_price !== null ? number_format((float) $e->unit_price, 2) : '',
+            ],
+        ];
     }
 
     public function reportPdf(Request $request)
