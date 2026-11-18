@@ -33,9 +33,31 @@ class User extends Authenticatable
         'phone',
         'cnic',
         'type',
+        'society_role',
         'password',
         'is_active',
     ];
+
+    public const SOCIETY_ROLE_VIEWER = 'viewer';
+
+    public const SOCIETY_ROLE_OPERATOR = 'operator';
+
+    public const SOCIETY_ROLE_MANAGER = 'manager';
+
+    public const SOCIETY_ROLE_APPROVER = 'approver';
+
+    /**
+     * @return array<string, string>
+     */
+    public static function societyRoleLabels(): array
+    {
+        return [
+            self::SOCIETY_ROLE_VIEWER => 'Viewer',
+            self::SOCIETY_ROLE_OPERATOR => 'Operator',
+            self::SOCIETY_ROLE_MANAGER => 'Manager',
+            self::SOCIETY_ROLE_APPROVER => 'Approver',
+        ];
+    }
 
     /**
      * @return list<string>
@@ -68,6 +90,48 @@ class User extends Authenticatable
     public function typeLabel(): string
     {
         return self::typeLabels()[$this->type] ?? ucfirst((string) $this->type);
+    }
+
+    public function isElevatedAdmin(): bool
+    {
+        return in_array($this->type, [
+            self::TYPE_ADMIN,
+            self::TYPE_OWNER,
+            self::TYPE_SUPER_ADMIN,
+        ], true);
+    }
+
+    public function effectiveSocietyRole(): string
+    {
+        if ($this->isElevatedAdmin()) {
+            return self::SOCIETY_ROLE_APPROVER;
+        }
+
+        if ($this->society_role) {
+            return (string) $this->society_role;
+        }
+
+        return match ($this->type) {
+            self::TYPE_ACCOUNTANT => self::SOCIETY_ROLE_MANAGER,
+            default => self::SOCIETY_ROLE_OPERATOR,
+        };
+    }
+
+    public function canManageSociety(): bool
+    {
+        return in_array($this->effectiveSocietyRole(), [
+            self::SOCIETY_ROLE_OPERATOR,
+            self::SOCIETY_ROLE_MANAGER,
+            self::SOCIETY_ROLE_APPROVER,
+        ], true);
+    }
+
+    public function canApproveSociety(): bool
+    {
+        return in_array($this->effectiveSocietyRole(), [
+            self::SOCIETY_ROLE_MANAGER,
+            self::SOCIETY_ROLE_APPROVER,
+        ], true) || $this->isElevatedAdmin();
     }
 
     /**

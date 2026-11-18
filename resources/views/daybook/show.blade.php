@@ -14,6 +14,7 @@
 
 @php($isCashIn = $entry->type === 'cash_in')
 @php($isFactory = $entry->isFactoryExpense())
+@php($isAdjustment = ! $entry->affectsCash())
 
 <div class="row g-4">
     <div class="col-12 col-xl-8">
@@ -25,8 +26,8 @@
                         <span class="font-monospace fw-semibold fs-5">{{ $entry->getVoucherNumber() }}</span>
                     </div>
                     <div class="text-end">
-                        <span class="badge rounded-pill {{ $isCashIn ? 'text-bg-success' : 'text-bg-danger' }} px-3 py-2">
-                            {{ $isCashIn ? 'Payment in' : 'Payment out' }}
+                        <span class="badge rounded-pill {{ $isAdjustment ? 'text-bg-warning' : ($isCashIn ? 'text-bg-success' : 'text-bg-danger') }} px-3 py-2">
+                            {{ $isAdjustment ? 'Adjustment' : ($isCashIn ? 'Payment in' : 'Payment out') }}
                         </span>
                         <div class="fs-4 fw-bold mt-2 {{ $isCashIn ? 'text-success' : 'text-danger' }}">
                             Rs {{ number_format($entry->amount, 2) }}

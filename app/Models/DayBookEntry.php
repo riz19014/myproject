@@ -28,6 +28,7 @@ class DayBookEntry extends Model
         'link_id',
         'project_id',
         'purchase_file_id',
+        'plot_booking_id',
         'sold_area_marla',
         'sold_area_qty',
         'sold_area_unit',
@@ -53,6 +54,11 @@ class DayBookEntry extends Model
     public function purchaseFile(): BelongsTo
     {
         return $this->belongsTo(PurchaseFile::class);
+    }
+
+    public function plotBooking(): BelongsTo
+    {
+        return $this->belongsTo(PlotBooking::class);
     }
 
     public function partySubCategory(): BelongsTo
@@ -105,6 +111,8 @@ class DayBookEntry extends Model
 
     public const PAYMENT_CASH_DEPOSIT = 'cash_deposit';
 
+    public const PAYMENT_ADJUSTMENT = 'adjustment';
+
     public const LINK_OFFICE = 'office';
 
     public const LINK_PROJECT = 'project';
@@ -131,6 +139,36 @@ class DayBookEntry extends Model
                         ->where('link_id', $project->id);
                 });
         });
+    }
+
+    /**
+     * Land purchase / acquisition payments (purchase file or land link).
+     */
+    public function isLandAcquisitionPayment(): bool
+    {
+        return $this->purchase_file_id !== null
+            || $this->link_type === self::LINK_LAND;
+    }
+
+    public function scopeLandAcquisition(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->whereNotNull('purchase_file_id')
+                ->orWhere('link_type', self::LINK_LAND);
+        });
+    }
+
+    /**
+     * Development / operating expense — project cash-out that is not land acquisition.
+     */
+    public function scopeExcludingLandAcquisition(Builder $query): Builder
+    {
+        return $query
+            ->whereNull('purchase_file_id')
+            ->where(function ($q) {
+                $q->whereNull('link_type')
+                    ->orWhere('link_type', '!=', self::LINK_LAND);
+            });
     }
 
     public function getLinkModel(): ?Model
@@ -220,8 +258,18 @@ class DayBookEntry extends Model
             self::PAYMENT_CASH_DEPOSIT => 'Cash Deposit to Bank'
                 .($this->payment_bank ? ' · Bank: '.$this->payment_bank : '')
                 .($this->payment_reference ? ' · Ref. '.$this->payment_reference : ''),
+            self::PAYMENT_ADJUSTMENT => 'Adjustment',
             default => (string) $method,
         };
+    }
+
+    /**
+     * Whether this line moves the cash drawer / daily cash closing.
+     * Adjustment is a book settlement only (party/project ledger), not cash.
+     */
+    public function affectsCash(): bool
+    {
+        return $this->payment_method !== self::PAYMENT_ADJUSTMENT;
     }
 
     public function getPaidByLabel(): string
@@ -317,6 +365,7 @@ class DayBookEntry extends Model
             self::PAYMENT_CHEQUE => 'Cheque',
             self::PAYMENT_PAYORDER => 'Pay Order',
             self::PAYMENT_CASH_DEPOSIT => 'Cash Deposit to Bank',
+            self::PAYMENT_ADJUSTMENT => 'Adjustment',
             null, '' => $this->type === self::TYPE_CASH_IN ? null : 'Cash',
             default => ucfirst(str_replace('_', ' ', (string) $method)),
         };

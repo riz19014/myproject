@@ -64,6 +64,10 @@
         background: rgba(168, 85, 247, 0.12);
         color: #7e22ce;
     }
+    .project-hub-link__icon--files {
+        background: rgba(14, 165, 233, 0.12);
+        color: #0369a1;
+    }
     .project-hub-link__title {
         font-size: 1.125rem;
         font-weight: 600;
@@ -102,7 +106,7 @@
 </header>
 
 <div class="row g-3 g-lg-4 mb-4">
-    <div class="col-md-6 @if($project->isDha()) col-lg-3 @else col-lg-4 @endif">
+    <div class="col-md-6 col-lg-3">
         <a href="{{ route('projects.partners', $project) }}" class="project-hub-link">
             <span class="project-hub-link__icon project-hub-link__icon--partners" aria-hidden="true">
                 <i class="bi bi-people"></i>
@@ -140,6 +144,87 @@
             </span>
             <span class="project-hub-link__title">Files sale</span>
             <p class="project-hub-link__desc">Sale files for this project — direct plot sales and exemption calculator.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    @else
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.dashboard', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--sale" aria-hidden="true">
+                <i class="bi bi-speedometer2"></i>
+            </span>
+            <span class="project-hub-link__title">Society dashboard</span>
+            <p class="project-hub-link__desc">Land mix, plots, cash, development progress, and profitability snapshot.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.acquisition', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--purchase" aria-hidden="true">
+                <i class="bi bi-bag-check"></i>
+            </span>
+            <span class="project-hub-link__title">Land acquisition</span>
+            <p class="project-hub-link__desc">Purchased acres, ownership files, registry docs, and purchase costs.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.master-plan', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--partners" aria-hidden="true">
+                <i class="bi bi-grid-3x3-gap"></i>
+            </span>
+            <span class="project-hub-link__title">Master plan</span>
+            <p class="project-hub-link__desc">Allocate land to plots, roads, parks, amenities, wastage — with AKMS reconcile.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.blocks', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--sale" aria-hidden="true">
+                <i class="bi bi-house"></i>
+            </span>
+            <span class="project-hub-link__title">Blocks &amp; plots</span>
+            <p class="project-hub-link__desc">Sectors, plot generation, sizes, categories, and availability.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.development', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--purchase" aria-hidden="true">
+                <i class="bi bi-cone-striped"></i>
+            </span>
+            <span class="project-hub-link__title">Development</span>
+            <p class="project-hub-link__desc">Roads, sewerage, BOQ, contractors, and project progress.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.budgets', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--partners" aria-hidden="true">
+                <i class="bi bi-wallet2"></i>
+            </span>
+            <span class="project-hub-link__title">Budgets</span>
+            <p class="project-hub-link__desc">Estimated vs actual costs linked to daybook vouchers.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.sales', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--sale" aria-hidden="true">
+                <i class="bi bi-receipt"></i>
+            </span>
+            <span class="project-hub-link__title">Plot sales</span>
+            <p class="project-hub-link__desc">Bookings, installments, receipts, cancellations, and transfers.</p>
+            <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="{{ route('society.reports', $project) }}" class="project-hub-link">
+            <span class="project-hub-link__icon project-hub-link__icon--files" aria-hidden="true">
+                <i class="bi bi-graph-up"></i>
+            </span>
+            <span class="project-hub-link__title">Reports</span>
+            <p class="project-hub-link__desc">Investment, revenue, outstanding, and project profitability.</p>
             <span class="project-hub-link__arrow">Open <i class="bi bi-chevron-right" aria-hidden="true"></i></span>
         </a>
     </div>

@@ -14,13 +14,17 @@ use App\Models\PartySubCategory;
 use App\Models\Plot;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\PlotBooking;
+use App\Models\ProjectPlot;
 use App\Models\PurchaseFile;
 use App\Models\FileSaleRecord;
 use App\Models\Sale;
+use App\Models\SaleParticipant;
 use App\Models\Setting;
 use App\Support\DaybookVoucher;
 use App\Support\FileSaleRecordService;
 use App\Support\LandMeasure;
+use App\Support\SocietyLandSaleFile;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -70,6 +74,9 @@ class DayBookController extends Controller
 
         $running = $openingCarried + $petty;
         foreach ($entries as $e) {
+            if (! $e->affectsCash()) {
+                continue;
+            }
             if ($e->type === DayBookEntry::TYPE_CASH_IN) {
                 $running += (float) $e->amount;
             } else {
@@ -278,26 +285,40 @@ class DayBookController extends Controller
         $cashIn = (float) DayBookEntry::query()
             ->whereDate('entry_date', $day)
             ->where('type', DayBookEntry::TYPE_CASH_IN)
+            ->where(function ($q) {
+                $q->whereNull('payment_method')
+                    ->orWhere('payment_method', '!=', DayBookEntry::PAYMENT_ADJUSTMENT);
+            })
             ->sum('amount');
         $cashOut = (float) DayBookEntry::query()
             ->whereDate('entry_date', $day)
             ->where('type', DayBookEntry::TYPE_CASH_OUT)
+            ->where(function ($q) {
+                $q->whereNull('payment_method')
+                    ->orWhere('payment_method', '!=', DayBookEntry::PAYMENT_ADJUSTMENT);
+            })
             ->sum('amount');
 
         $running = $openingAmount + $pettyCashAmount;
         $tableRows = [];
         foreach ($entries as $e) {
-            $signedDelta = $e->type === DayBookEntry::TYPE_CASH_IN
-                ? (float) $e->amount
-                : -(float) $e->amount;
+            $affectsCash = $e->affectsCash();
+            $signedDelta = $affectsCash
+                ? ($e->type === DayBookEntry::TYPE_CASH_IN ? (float) $e->amount : -(float) $e->amount)
+                : 0.0;
+            if ($affectsCash) {
+                if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                    $running += (float) $e->amount;
+                } else {
+                    $running -= (float) $e->amount;
+                }
+            }
             if ($e->type === DayBookEntry::TYPE_CASH_IN) {
-                $running += (float) $e->amount;
                 $amountStr = '+Rs '.number_format((float) $e->amount, 0);
-                $typeLabel = 'Payment in';
+                $typeLabel = $affectsCash ? 'Payment in' : 'Adjustment in';
             } else {
-                $running -= (float) $e->amount;
                 $amountStr = '-Rs '.number_format((float) $e->amount, 0);
-                $typeLabel = 'Payment out';
+                $typeLabel = $affectsCash ? 'Payment out' : 'Adjustment';
             }
             $tableRows[] = [
                 'description' => $e->description ?: '—',
@@ -423,14 +444,20 @@ class DayBookController extends Controller
 
         $rows = [];
         foreach ($entries as $e) {
+            $affectsCash = $e->affectsCash();
+            if ($affectsCash) {
+                if ($e->type === DayBookEntry::TYPE_CASH_IN) {
+                    $running += (float) $e->amount;
+                } else {
+                    $running -= (float) $e->amount;
+                }
+            }
             if ($e->type === DayBookEntry::TYPE_CASH_IN) {
-                $running += (float) $e->amount;
                 $amountStr = '+Rs '.number_format((float) $e->amount, 0);
-                $typeLabel = 'Payment in';
+                $typeLabel = $affectsCash ? 'Payment in' : 'Adjustment in';
             } else {
-                $running -= (float) $e->amount;
                 $amountStr = '-Rs '.number_format((float) $e->amount, 0);
-                $typeLabel = 'Payment out';
+                $typeLabel = $affectsCash ? 'Payment out' : 'Adjustment';
             }
             $linkLabel = $e->getLinkLabel();
             $desc = ($e->description ?: '—');
@@ -657,14 +684,25 @@ class DayBookController extends Controller
         $cashIn = (float) DayBookEntry::query()
             ->whereDate('entry_date', $day)
             ->where('type', DayBookEntry::TYPE_CASH_IN)
+            ->where(function ($q) {
+                $q->whereNull('payment_method')
+                    ->orWhere('payment_method', '!=', DayBookEntry::PAYMENT_ADJUSTMENT);
+            })
             ->sum('amount');
         $cashOut = (float) DayBookEntry::query()
             ->whereDate('entry_date', $day)
             ->where('type', DayBookEntry::TYPE_CASH_OUT)
+            ->where(function ($q) {
+                $q->whereNull('payment_method')
+                    ->orWhere('payment_method', '!=', DayBookEntry::PAYMENT_ADJUSTMENT);
+            })
             ->sum('amount');
 
         $running = $openingAmount + $pettyCashAmount;
         foreach ($entries as $e) {
+            if (! $e->affectsCash()) {
+                continue;
+            }
             if ($e->type === DayBookEntry::TYPE_CASH_IN) {
                 $running += (float) $e->amount;
             } else {
@@ -1188,6 +1226,11 @@ class DayBookController extends Controller
                 'parties',
                 'purchaseFiles' => fn ($q) => $q->orderBy('file_name')->with(['purchaseItems.party', 'fileSaleLand', 'sales']),
                 'projectFiles' => fn ($q) => $q->orderBy('file_number')->with('sales'),
+                'societyPlots' => fn ($q) => $q->with('block')->orderBy('plot_number'),
+                'plotBookings' => fn ($q) => $q
+                    ->whereNotIn('status', [PlotBooking::STATUS_CANCELLED, PlotBooking::STATUS_TRANSFERRED])
+                    ->with(['plot', 'party', 'customer'])
+                    ->orderBy('id'),
             ])
             ->get()
             ->map(function (Project $p) use ($excludeDaybookEntryId) {
@@ -1199,7 +1242,7 @@ class DayBookController extends Controller
                     ->values()
                     ->all();
 
-                $plotFiles = $p->projectFiles
+                $legacyPlotFiles = $p->projectFiles
                     ->map(function (ProjectFile $f) {
                         $total = (float) $f->land_area_marla;
                         $remaining = $f->remainingMarla();
@@ -1207,16 +1250,98 @@ class DayBookController extends Controller
 
                         return [
                             'id' => $f->id,
+                            'source' => 'project_file',
                             'label' => $f->file_number,
                             'file_number' => $f->file_number,
                             'project_id' => $f->project_id,
                             'total_marla' => $total,
                             'sold_marla' => $sold,
                             'remaining_marla' => $remaining,
+                            'area_acre' => (int) ($f->area_acre ?? 0),
+                            'area_kanal' => (int) ($f->area_kanal ?? 0),
+                            'area_marla' => (int) ($f->area_marla ?? 0),
+                            'area_sqft' => (int) ($f->area_sqft ?? 0),
                             'total_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
                             'sold_label' => $sold > 0 ? LandMeasure::formatAkmsLabelFromMarla($sold) : '—',
                             'remaining_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : '—',
                             'is_fully_sold' => $remaining <= 1e-6 && $total > 1e-6,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $societyPlots = $p->societyPlots
+                    ->map(function (ProjectPlot $plot) {
+                        $total = (float) $plot->land_area_marla;
+                        $soldOut = in_array($plot->status, [
+                            ProjectPlot::STATUS_SOLD,
+                            ProjectPlot::STATUS_BOOKED,
+                        ], true);
+                        $remaining = $soldOut ? 0.0 : $total;
+                        $sold = $soldOut ? $total : 0.0;
+                        $block = $plot->block?->name;
+                        $label = 'Plot '.$plot->plot_number
+                            .($block ? ' · '.$block : '')
+                            .' · '.LandMeasure::formatAkmsLabelFromMarla($total);
+
+                        return [
+                            'id' => $plot->id,
+                            'source' => 'society_plot',
+                            'label' => $label,
+                            'file_number' => $plot->plot_number,
+                            'project_id' => $plot->project_id,
+                            'total_marla' => $total,
+                            'sold_marla' => $sold,
+                            'remaining_marla' => $remaining,
+                            'area_acre' => (int) $plot->area_acre,
+                            'area_kanal' => (int) $plot->area_kanal,
+                            'area_marla' => (int) $plot->area_marla,
+                            'area_sqft' => (int) $plot->area_sqft,
+                            'total_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
+                            'sold_label' => $sold > 0 ? LandMeasure::formatAkmsLabelFromMarla($sold) : '—',
+                            'remaining_label' => $remaining > 0 ? LandMeasure::formatAkmsLabelFromMarla($remaining) : ($soldOut ? 'Sold' : '—'),
+                            'is_fully_sold' => $soldOut || ($remaining <= 1e-6 && $total > 1e-6),
+                            'status' => $plot->status,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                // Prefer society inventory for non-DHA; keep legacy project_files as fallback.
+                $plotFiles = $societyPlots !== []
+                    ? $societyPlots
+                    : $legacyPlotFiles;
+
+                $societySaleFiles = $p->plotBookings
+                    ->map(function (PlotBooking $booking) {
+                        $plot = $booking->plot;
+                        $fileNo = $plot?->plot_number ?? ('#'.$booking->id);
+                        $buyer = $booking->party?->name ?: ($booking->customer?->name ?? '—');
+                        $areaLabel = $plot
+                            ? LandMeasure::formatAkmsLabelFromMarla((float) $plot->land_area_marla)
+                            : '—';
+                        $received = $booking->fileReceivedAmount();
+                        $outstanding = $booking->fileOutstandingAmount();
+                        $total = (float) $booking->total_price;
+
+                        return [
+                            'id' => $booking->id,
+                            'source' => 'society_booking',
+                            'plot_booking_id' => $booking->id,
+                            'label' => 'File '.$fileNo.' · '.$buyer.' · '.$areaLabel,
+                            'file_number' => $fileNo,
+                            'party_id' => $booking->party_id,
+                            'customer_id' => $booking->customer_id,
+                            'project_id' => $booking->project_id,
+                            'sale_price' => $total,
+                            'received' => $received,
+                            'outstanding' => $outstanding,
+                            'total_label' => 'Rs '.number_format($total, 0),
+                            'sold_label' => 'Rs '.number_format($received, 0),
+                            'remaining_label' => 'Rs '.number_format($outstanding, 0),
+                            'status' => $booking->statusLabel(),
+                            'is_fully_sold' => $outstanding <= 0.01,
+                            'is_file_sale' => false,
                         ];
                     })
                     ->values()
@@ -1234,6 +1359,7 @@ class DayBookController extends Controller
                             'id' => $f['id'],
                             'label' => $f['label'],
                         ])->values()->all(),
+                        'society_sale_files' => $societySaleFiles,
                         'plot_files' => $plotFiles,
                     ],
                     LandMeasure::projectPartyAreaPayload($p)
@@ -2131,19 +2257,21 @@ class DayBookController extends Controller
     }
 
     /**
-     * Record a non-DHA direct plot sale from the daybook Sale wizard (JSON).
+     * Record a non-DHA land/plot sale from the daybook Sale wizard (JSON).
+     * Free-form area + party → Sale + society customer file (plot SF-### + booking + payment sheet).
      */
     public function storePlotSale(Request $request)
     {
         $validated = $request->validate([
             'project_id' => ['required', 'integer', 'exists:projects,id'],
-            'project_file_id' => ['required', 'integer', 'exists:project_files,id'],
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'party_id' => ['required', 'integer', 'exists:parties,id'],
             'area_acre' => ['required', 'integer', 'min:0'],
             'area_kanal' => ['required', 'integer', 'min:0'],
             'area_marla' => ['required', 'integer', 'min:0'],
             'area_sqft' => ['required', 'integer', 'min:0'],
             'total_amount' => ['required', 'numeric', 'min:0.01'],
+            'booking_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         /** @var Project $project */
@@ -2154,83 +2282,59 @@ class DayBookController extends Controller
             ]);
         }
 
-        /** @var ProjectFile|null $projectFile */
-        $projectFile = null;
-        $sale = null;
-
-        DB::transaction(function () use ($validated, $project, &$projectFile, &$sale) {
-            $projectFile = ProjectFile::query()
-                ->whereKey((int) $validated['project_file_id'])
-                ->where('project_id', $project->id)
-                ->with('sales')
-                ->lockForUpdate()
-                ->first();
-
-            if (! $projectFile) {
-                throw ValidationException::withMessages([
-                    'project_file_id' => 'The selected plot file does not belong to this project.',
-                ]);
-            }
-
-            $marla = LandMeasure::marlaFromAkms(
-                (int) $validated['area_acre'],
-                (int) $validated['area_kanal'],
-                (int) $validated['area_marla'],
-                (int) $validated['area_sqft']
-            );
-            if ($marla <= 0) {
-                throw ValidationException::withMessages([
-                    'area_acre' => 'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.',
-                ]);
-            }
-
-            $remaining = $projectFile->remainingMarla();
-            if ($marla > $remaining + 0.0001) {
-                throw ValidationException::withMessages([
-                    'area_acre' => 'Plot size exceeds remaining file land ('.LandMeasure::formatAkmsLabelFromMarla($remaining).').',
-                ]);
-            }
-
-            $sale = Sale::create([
-                'project_id' => $project->id,
-                'project_file_id' => $projectFile->id,
-                'sale_type' => Sale::TYPE_DIRECT,
-                'customer_id' => (int) $validated['customer_id'],
-                'area_acre' => (int) $validated['area_acre'],
-                'area_kanal' => (int) $validated['area_kanal'],
-                'area_marla' => (int) $validated['area_marla'],
-                'area_sqft' => (int) $validated['area_sqft'],
-                'land_area_marla' => round($marla, 4),
-                'total_amount' => round((float) $validated['total_amount'], 2),
+        $marla = LandMeasure::marlaFromAkms(
+            (int) $validated['area_acre'],
+            (int) $validated['area_kanal'],
+            (int) $validated['area_marla'],
+            (int) $validated['area_sqft']
+        );
+        if ($marla <= 0) {
+            throw ValidationException::withMessages([
+                'area_acre' => 'Enter at least one positive whole number in Acre, Kanal, Marla, or Sq ft.',
             ]);
-        });
+        }
 
-        $projectFile->load('sales');
-        $total = (float) $projectFile->land_area_marla;
-        $remainingAfter = $projectFile->remainingMarla();
-        $soldAfter = max(0.0, $total - $remainingAfter);
+        $total = round((float) $validated['total_amount'], 2);
+
+        // Receipts / installment schedule are managed later on Society Sales.
+        $created = SocietyLandSaleFile::createFromDaybookSale($project, [
+            'party_id' => (int) $validated['party_id'],
+            'area_acre' => (int) $validated['area_acre'],
+            'area_kanal' => (int) $validated['area_kanal'],
+            'area_marla' => (int) $validated['area_marla'],
+            'area_sqft' => (int) $validated['area_sqft'],
+            'land_area_marla' => $marla,
+            'total_amount' => $total,
+            'received_amount' => 0,
+            'installment_count' => 1,
+            'first_due_date' => null,
+            'booking_date' => $validated['booking_date'] ?? now()->toDateString(),
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $sale = $created['sale'];
+        $booking = $created['booking'];
+        $plot = $created['plot'];
+        $customer = $created['customer'];
+        $areaLabel = LandMeasure::formatAkmsLabelFromMarla((float) $sale->land_area_marla);
 
         return response()->json([
             'ok' => true,
-            'message' => 'Plot sale recorded.',
+            'message' => 'Sale recorded. Society customer file '.$plot->plot_number.' created.',
             'sale' => [
                 'id' => $sale->id,
                 'total_amount' => (float) $sale->total_amount,
                 'land_area_marla' => (float) $sale->land_area_marla,
-                'area_label' => LandMeasure::formatAkmsLabelFromMarla((float) $sale->land_area_marla),
-            ],
-            'plot_file' => [
-                'id' => $projectFile->id,
-                'label' => $projectFile->file_number,
-                'file_number' => $projectFile->file_number,
-                'project_id' => $projectFile->project_id,
-                'total_marla' => $total,
-                'sold_marla' => $soldAfter,
-                'remaining_marla' => $remainingAfter,
-                'total_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($total) : '—',
-                'sold_label' => $soldAfter > 0 ? LandMeasure::formatAkmsLabelFromMarla($soldAfter) : '—',
-                'remaining_label' => $total > 0 ? LandMeasure::formatAkmsLabelFromMarla($remainingAfter) : '—',
-                'is_fully_sold' => $remainingAfter <= 1e-6 && $total > 1e-6,
+                'area_label' => $areaLabel,
+                'party_id' => (int) $validated['party_id'],
+                'customer_id' => $customer->id,
+                'customer_name' => $customer->name,
+                'project_plot_id' => $plot->id,
+                'plot_number' => $plot->plot_number,
+                'plot_booking_id' => $booking->id,
+                'received_amount' => (float) $booking->booking_amount,
+                'outstanding' => $booking->outstanding(),
+                'society_sales_url' => route('society.sales', $project),
             ],
         ]);
     }
@@ -2278,7 +2382,7 @@ class DayBookController extends Controller
     private function normalizePaymentSettlement(array $validated): array
     {
         $method = $validated['payment_method'] ?? null;
-        if ($method === DayBookEntry::PAYMENT_CASH) {
+        if ($method === DayBookEntry::PAYMENT_CASH || $method === DayBookEntry::PAYMENT_ADJUSTMENT) {
             $validated['payment_bank'] = null;
             $validated['payment_reference'] = null;
         } elseif ($method === DayBookEntry::PAYMENT_ONLINE) {
@@ -2289,6 +2393,71 @@ class DayBookController extends Controller
         $validated['paid_by_party_id'] = ! empty($paidByPartyId) ? (int) $paidByPartyId : null;
 
         return $validated;
+    }
+
+    /**
+     * Keep / resolve society file link on the daybook line.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function resolvePlotBookingOnEntry(array $validated): array
+    {
+        $bookingId = ! empty($validated['plot_booking_id']) ? (int) $validated['plot_booking_id'] : null;
+        if ($bookingId) {
+            $booking = PlotBooking::query()->find($bookingId);
+            if (! $booking) {
+                $validated['plot_booking_id'] = null;
+
+                return $validated;
+            }
+            if (! empty($validated['project_id']) && (int) $booking->project_id !== (int) $validated['project_id']) {
+                $validated['plot_booking_id'] = null;
+            }
+
+            return $validated;
+        }
+
+        // Fallback: single active society file for this project + party.
+        if (($validated['type'] ?? null) === DayBookEntry::TYPE_CASH_IN
+            && ($validated['link_type'] ?? null) === DayBookEntry::LINK_PARTY
+            && ! empty($validated['link_id'])
+            && ! empty($validated['project_id'])
+        ) {
+            $matches = PlotBooking::query()
+                ->where('project_id', (int) $validated['project_id'])
+                ->where('party_id', (int) $validated['link_id'])
+                ->whereIn('status', [PlotBooking::STATUS_ACTIVE, PlotBooking::STATUS_BOOKED])
+                ->orderByDesc('id')
+                ->limit(2)
+                ->get();
+            if ($matches->count() === 1) {
+                $validated['plot_booking_id'] = $matches->first()->id;
+            }
+        }
+
+        return $validated;
+    }
+
+    /**
+     * Mirror daybook cash-in onto the society file (received + installment remaining).
+     */
+    private function syncPlotBookingReceiptFromEntry(DayBookEntry $entry): void
+    {
+        if ($entry->type !== DayBookEntry::TYPE_CASH_IN || ! $entry->plot_booking_id) {
+            return;
+        }
+
+        $booking = PlotBooking::query()->whereKey($entry->plot_booking_id)->first();
+        if (! $booking) {
+            return;
+        }
+
+        if (! $booking->booking_day_book_entry_id) {
+            $booking->update(['booking_day_book_entry_id' => $entry->id]);
+        }
+
+        $booking->syncFromDaybookReceipts();
     }
 
     public function create()
@@ -2322,6 +2491,7 @@ class DayBookController extends Controller
                     DayBookEntry::PAYMENT_CHEQUE,
                     DayBookEntry::PAYMENT_PAYORDER,
                     DayBookEntry::PAYMENT_CASH_DEPOSIT,
+                    DayBookEntry::PAYMENT_ADJUSTMENT,
                 ])],
                 'payment_bank' => Rule::when(
                     in_array($request->input('payment_method'), [
@@ -2345,6 +2515,7 @@ class DayBookController extends Controller
                 'paid_by_party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
+                'plot_booking_id' => ['nullable', 'integer', Rule::exists('plot_bookings', 'id')],
                 'sold_area_qty' => ['nullable', 'numeric', 'min:0'],
                 'sold_area_unit' => ['nullable', 'string', Rule::in(['marla', 'kanal', 'acre', 'sqft'])],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
@@ -2395,6 +2566,9 @@ class DayBookController extends Controller
         if (empty($validated['party_sub_category_id'])) {
             $validated['party_sub_category_id'] = null;
         }
+        if (empty($validated['plot_booking_id'])) {
+            $validated['plot_booking_id'] = null;
+        }
 
         $isConstructionBuilder = ! empty($contextProjectId) && $request->boolean('construction_builder');
 
@@ -2435,9 +2609,11 @@ class DayBookController extends Controller
         $entry = DB::transaction(function () use ($validated, $contextProjectId) {
             $validated = $this->applyPurchaseFileToEntry($validated, $contextProjectId);
             $validated = $this->normalizePaymentSettlement($validated);
+            $validated = $this->resolvePlotBookingOnEntry($validated);
 
             $entry = DayBookEntry::create($validated);
             DaybookVoucher::assignIfMissing($entry);
+            $this->syncPlotBookingReceiptFromEntry($entry);
 
             return $entry;
         });
@@ -2535,6 +2711,7 @@ class DayBookController extends Controller
                     DayBookEntry::PAYMENT_CHEQUE,
                     DayBookEntry::PAYMENT_PAYORDER,
                     DayBookEntry::PAYMENT_CASH_DEPOSIT,
+                    DayBookEntry::PAYMENT_ADJUSTMENT,
                 ])],
                 'payment_bank' => Rule::when(
                     in_array($request->input('payment_method'), [
@@ -2558,6 +2735,7 @@ class DayBookController extends Controller
                 'paid_by_party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
                 'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')],
                 'purchase_file_id' => ['nullable', 'integer', Rule::exists('purchase_files', 'id')],
+                'plot_booking_id' => ['nullable', 'integer', Rule::exists('plot_bookings', 'id')],
                 'sold_area_qty' => ['nullable', 'numeric', 'min:0'],
                 'sold_area_unit' => ['nullable', 'string', Rule::in(['marla', 'kanal', 'acre', 'sqft'])],
                 'party_id' => ['nullable', 'integer', Rule::exists('parties', 'id')],
@@ -2608,6 +2786,9 @@ class DayBookController extends Controller
         if (empty($validated['party_sub_category_id'])) {
             $validated['party_sub_category_id'] = null;
         }
+        if (empty($validated['plot_booking_id'])) {
+            $validated['plot_booking_id'] = null;
+        }
 
         $isConstructionBuilder = ! empty($contextProjectId) && $request->boolean('construction_builder');
 
@@ -2648,7 +2829,9 @@ class DayBookController extends Controller
         DB::transaction(function () use ($validated, $contextProjectId, $entry) {
             $validated = $this->applyPurchaseFileToEntry($validated, $contextProjectId, (int) $entry->id);
             $validated = $this->normalizePaymentSettlement($validated);
+            $validated = $this->resolvePlotBookingOnEntry($validated);
             $entry->update($validated);
+            $this->syncPlotBookingReceiptFromEntry($entry->fresh());
         });
 
         if ($request->boolean('embed')) {

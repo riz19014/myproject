@@ -48,6 +48,7 @@ class UserController extends Controller
             ? CnicFormat::digits($validated['cnic'])
             : null;
         $validated['type'] = $validated['type'] ?? User::TYPE_ACCOUNTANT;
+        $validated['society_role'] = ! empty($validated['society_role']) ? $validated['society_role'] : null;
 
         User::create($validated);
 
@@ -91,6 +92,7 @@ class UserController extends Controller
         $validated['cnic'] = isset($validated['cnic']) && $validated['cnic'] !== ''
             ? CnicFormat::digits($validated['cnic'])
             : null;
+        $validated['society_role'] = ! empty($validated['society_role']) ? $validated['society_role'] : null;
 
         if (! empty($validated['password'])) {
             $validated['password'] = $validated['password'];
@@ -134,6 +136,10 @@ class UserController extends Controller
                     : null,
             ]);
         }
+
+        if ($request->has('society_role') && $request->input('society_role') === '') {
+            $request->merge(['society_role' => null]);
+        }
     }
 
     /**
@@ -152,6 +158,7 @@ class UserController extends Controller
             'phone' => ['nullable', 'string', 'regex:/^\d{11}$/'],
             'cnic' => ['nullable', 'string', 'regex:/^\d{13}$/'],
             'type' => ['required', 'string', Rule::in(User::types())],
+            'society_role' => ['nullable', 'string', Rule::in(array_keys(User::societyRoleLabels()))],
             'password' => $user
                 ? ['nullable', 'string', Password::defaults()]
                 : ['required', 'string', Password::defaults()],

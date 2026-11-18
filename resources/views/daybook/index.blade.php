@@ -231,7 +231,9 @@
                             <td class="daybook-id-cell">{{ $loop->iteration }}</td>
                             <td>{{ $e->description ?: '—' }}</td>
                             <td>
-                                @if($e->type === 'cash_in')
+                                @if(! $e->affectsCash())
+                                    <span class="daybook-pill daybook-pill--out">Adjustment</span>
+                                @elseif($e->type === 'cash_in')
                                     <span class="daybook-pill daybook-pill--in">Payment in</span>
                                 @else
                                     <span class="daybook-pill daybook-pill--out">Payment out</span>

@@ -100,19 +100,39 @@
         toggleResetBtn(partyResetBtn, String(partyHidden.value || '').trim() !== '');
     }
 
+    function plotBookingHiddenEl() {
+        return document.getElementById('daybook_form_plot_booking_id');
+    }
+
+    function selectedSocietyBookingId() {
+        var el = plotBookingHiddenEl();
+        return el ? String(el.value || '').trim() : '';
+    }
+
+    function clearSocietyBookingSelection() {
+        var el = plotBookingHiddenEl();
+        if (el) el.value = '';
+    }
+
     function syncFileResetVisibility() {
         if (!fileResetBtn || !purchaseFileHidden) return;
         var hasProject = projectHidden && String(projectHidden.value || '').trim() !== '';
-        var hasFile = hasProject && purchaseFileSearch && !purchaseFileSearch.disabled && String(purchaseFileHidden.value || '').trim() !== '';
+        var hasPurchaseFile = String(purchaseFileHidden.value || '').trim() !== '';
+        var hasSocietyFile = selectedSocietyBookingId() !== '';
+        var hasFile = hasProject && purchaseFileSearch && !purchaseFileSearch.disabled && (hasPurchaseFile || hasSocietyFile);
         toggleResetBtn(fileResetBtn, hasFile);
     }
 
     function syncFileCreateVisibility() {
         if (!fileCreateBtn) return;
         var hasProject = projectHidden && String(projectHidden.value || '').trim() !== '';
-        fileCreateBtn.classList.toggle('d-none', !hasProject);
-        fileCreateBtn.disabled = !hasProject;
-        fileCreateBtn.setAttribute('aria-hidden', hasProject ? 'false' : 'true');
+        var project = hasProject
+            ? formProjectRows.find(function (r) { return String(r.id) === String(projectHidden.value); })
+            : null;
+        var showCreate = hasProject && projectIsDha(project);
+        fileCreateBtn.classList.toggle('d-none', !showCreate);
+        fileCreateBtn.disabled = !showCreate;
+        fileCreateBtn.setAttribute('aria-hidden', showCreate ? 'false' : 'true');
     }
 
     function syncSubResetVisibility() {
@@ -170,6 +190,13 @@
 
     function saleFileLabel(file) {
         if (!file) return '';
+        if (file.source === 'society_booking') {
+            var label = file.label || ('File #' + file.id);
+            if (file.outstanding != null) {
+                label += ' · Due Rs ' + Math.round(Number(file.outstanding) || 0).toLocaleString('en-PK');
+            }
+            return label;
+        }
         var label = file.label || file.file_name || ('File #' + file.id);
         if (file.is_fully_sold) {
             label += ' — Fully Sold';
@@ -177,6 +204,28 @@
             label += ' (Avail: ' + file.remaining_label + ')';
         }
         return label;
+    }
+
+    function applySocietyBookingSelection(row) {
+        clearSocietyBookingSelection();
+        if (purchaseFileHidden) purchaseFileHidden.value = '';
+        if (!row || row.source !== 'society_booking') return;
+        var bookingEl = plotBookingHiddenEl();
+        if (bookingEl) bookingEl.value = String(row.id);
+        if (row.party_id) {
+            var partyHiddenEl = document.getElementById('daybook_form_party_id');
+            var partySearchEl = document.getElementById('daybook_form_party_search');
+            var partyRow = (window.__daybookFormPartyRows || []).find(function (r) {
+                return String(r.id) === String(row.party_id);
+            });
+            if (partyHiddenEl) partyHiddenEl.value = String(row.party_id);
+            if (partySearchEl && partyRow) {
+                partySearchEl.value = partyRow.label || partyRow.name || '';
+            }
+            if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') {
+                window.__daybookSyncAllFieldResetVisibility();
+            }
+        }
     }
 
     function hidePurchaseFileList() {
@@ -216,10 +265,14 @@
             return;
         }
         rows.forEach(function (row) {
-            var selectedId = String(purchaseFileHidden.value || '').trim();
+            var selectedPurchaseId = String(purchaseFileHidden.value || '').trim();
+            var selectedBookingId = selectedSocietyBookingId();
+            var isSociety = row.source === 'society_booking';
             var isFullySold = !!row.is_fully_sold;
-            var isSelected = selectedId !== '' && String(row.id) === selectedId;
-            if (isFullySold && !isSelected) {
+            var isSelected = isSociety
+                ? (selectedBookingId !== '' && String(row.id) === selectedBookingId)
+                : (selectedPurchaseId !== '' && String(row.id) === selectedPurchaseId);
+            if (isFullySold && !isSelected && !isSociety) {
                 var liDisabled = document.createElement('li');
                 liDisabled.setAttribute('role', 'presentation');
                 liDisabled.className = 'daybook-form-combo-empty';
@@ -238,7 +291,12 @@
                 e.preventDefault();
             });
             btn.addEventListener('click', function () {
-                purchaseFileHidden.value = String(row.id);
+                if (isSociety) {
+                    applySocietyBookingSelection(row);
+                } else {
+                    clearSocietyBookingSelection();
+                    purchaseFileHidden.value = String(row.id);
+                }
                 purchaseFileSearch.value = saleFileLabel(row);
                 clearSoldAreaInputs();
                 syncSaleFileMeta(currentSaleFile());
@@ -256,15 +314,21 @@
         renderPurchaseFileList(filterSaleFileRows(purchaseFileSearch.value));
     }
 
-    function syncPurchaseFileSelect(projectId, selectedFileId) {
+    function syncPurchaseFileSelect(projectId, selectedFileId, selectedBookingId) {
         if (!purchaseFileHidden || !purchaseFileSearch) return;
         var pid = String(projectId || '').trim();
         var selected = String(selectedFileId != null ? selectedFileId : '').trim();
+        var selectedBooking = String(
+            selectedBookingId != null && selectedBookingId !== ''
+                ? selectedBookingId
+                : selectedSocietyBookingId()
+        ).trim();
         hidePurchaseFileList();
 
         if (!pid) {
             currentSaleFileRows = [];
             purchaseFileHidden.value = '';
+            clearSocietyBookingSelection();
             purchaseFileSearch.value = '';
             purchaseFileSearch.placeholder = 'Select project first…';
             purchaseFileSearch.disabled = true;
@@ -275,22 +339,40 @@
         }
 
         var project = formProjectRows.find(function (r) { return String(r.id) === pid; });
-        currentSaleFileRows = (project && (project.sale_files || project.purchase_files))
-            ? (project.sale_files || project.purchase_files).slice()
-            : [];
+        if (project && !projectIsDha(project) && Array.isArray(project.society_sale_files)) {
+            currentSaleFileRows = project.society_sale_files.slice();
+        } else {
+            currentSaleFileRows = (project && (project.sale_files || project.purchase_files))
+                ? (project.sale_files || project.purchase_files).slice()
+                : [];
+            clearSocietyBookingSelection();
+        }
 
         purchaseFileSearch.disabled = false;
-        purchaseFileSearch.placeholder = currentSaleFileRows.length ? 'Search sale file…' : 'No sale files for this project';
+        purchaseFileSearch.placeholder = currentSaleFileRows.length
+            ? (project && !projectIsDha(project) ? 'Search society sales file…' : 'Search sale file…')
+            : 'No sale files for this project';
 
-        var match = selected
-            ? currentSaleFileRows.find(function (f) { return String(f.id) === selected; })
-            : null;
+        var match = null;
+        if (selectedBooking) {
+            match = currentSaleFileRows.find(function (f) {
+                return f.source === 'society_booking' && String(f.id) === selectedBooking;
+            }) || null;
+        }
+        if (!match && selected) {
+            match = currentSaleFileRows.find(function (f) { return String(f.id) === selected; }) || null;
+        }
 
-        if (match) {
+        if (match && match.source === 'society_booking') {
+            applySocietyBookingSelection(match);
+            purchaseFileSearch.value = saleFileLabel(match);
+        } else if (match) {
+            clearSocietyBookingSelection();
             purchaseFileHidden.value = String(match.id);
             purchaseFileSearch.value = saleFileLabel(match);
         } else {
             purchaseFileHidden.value = '';
+            if (!selectedBooking) clearSocietyBookingSelection();
             purchaseFileSearch.value = '';
         }
 
@@ -312,7 +394,18 @@
         projectHidden.value = String(project.id);
         projectSearch.value = projectLabeledName(project);
         clearSoldAreaInputs();
-        syncPurchaseFileSelect(project.id, payload.purchaseFileId || '');
+        if (payload.societySaleFile && !projectIsDha(project)) {
+            if (!Array.isArray(project.society_sale_files)) project.society_sale_files = [];
+            var exists = project.society_sale_files.some(function (f) {
+                return String(f.id) === String(payload.societySaleFile.id);
+            });
+            if (!exists) project.society_sale_files.push(payload.societySaleFile);
+        }
+        syncPurchaseFileSelect(
+            project.id,
+            payload.purchaseFileId || '',
+            payload.plotBookingId || ''
+        );
         syncProjectResetVisibility();
         if (typeof window.__daybookSyncFactoryMode === 'function') window.__daybookSyncFactoryMode();
         if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') window.__daybookSyncAllFieldResetVisibility();
@@ -344,14 +437,38 @@
             if (descEl) descEl.value = String(payload.description);
         }
 
+        if (payload.partyId != null && payload.partyId !== '') {
+            var partyHiddenEl = document.getElementById('daybook_form_party_id');
+            var partySearchEl = document.getElementById('daybook_form_party_search');
+            var partyRow = (window.__daybookFormPartyRows || []).find(function (r) {
+                return String(r.id) === String(payload.partyId);
+            });
+            if (partyHiddenEl) partyHiddenEl.value = String(payload.partyId);
+            if (partySearchEl && partyRow) {
+                partySearchEl.value = partyRow.label || partyRow.name || '';
+                partySearchEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (typeof window.__daybookSyncAllFieldResetVisibility === 'function') {
+                window.__daybookSyncAllFieldResetVisibility();
+            }
+        }
+
         return true;
     };
 
     function currentSaleFile() {
-        if (!purchaseFileHidden || !projectHidden) return null;
+        if (!projectHidden) return null;
         var pid = String(projectHidden.value || '').trim();
+        if (!pid) return null;
+        var bookingId = selectedSocietyBookingId();
+        if (bookingId) {
+            return currentSaleFileRows.find(function (f) {
+                return f.source === 'society_booking' && String(f.id) === bookingId;
+            }) || null;
+        }
+        if (!purchaseFileHidden) return null;
         var fid = String(purchaseFileHidden.value || '').trim();
-        if (!pid || !fid) return null;
+        if (!fid) return null;
         return currentSaleFileRows.find(function (f) { return String(f.id) === fid; }) || null;
     }
 
@@ -374,6 +491,28 @@
             }
             return;
         }
+
+        if (file.source === 'society_booking') {
+            meta.classList.remove('d-none');
+            areaWrap.classList.add('d-none');
+            clearSoldAreaInputs();
+            var remLabel = document.getElementById('daybook_sale_file_remaining_label');
+            var totLabel = document.getElementById('daybook_sale_file_totals_label');
+            if (remLabel) remLabel.textContent = 'Outstanding:';
+            if (totLabel) totLabel.textContent = 'Sale / Received:';
+            if (remainingEl) remainingEl.textContent = file.remaining_label || '—';
+            if (totalsEl) {
+                totalsEl.textContent = (file.total_label || '—') + ' / ' + (file.sold_label || '—');
+            }
+            if (statusEl) statusEl.textContent = file.status || '—';
+            if (sellersWrap) sellersWrap.classList.add('d-none');
+            return;
+        }
+
+        var remLabelDefault = document.getElementById('daybook_sale_file_remaining_label');
+        var totLabelDefault = document.getElementById('daybook_sale_file_totals_label');
+        if (remLabelDefault) remLabelDefault.textContent = 'Available:';
+        if (totLabelDefault) totLabelDefault.textContent = 'Total / Sold:';
 
         if (!file.is_file_sale) {
             meta.classList.add('d-none');
@@ -810,6 +949,7 @@
         fileResetBtn.addEventListener('click', function () {
             if (!purchaseFileSearch.disabled) {
                 purchaseFileHidden.value = '';
+                clearSocietyBookingSelection();
                 purchaseFileSearch.value = '';
             }
             clearSoldAreaInputs();
@@ -2604,6 +2744,11 @@
     var itemList = document.getElementById('daybook_sale_item_listbox');
     var itemWrap = itemSearch ? itemSearch.closest('.daybook-form-combo') : null;
 
+    var partyHidden = document.getElementById('daybook_sale_party_id');
+    var partySearch = document.getElementById('daybook_sale_party_search');
+    var partyList = document.getElementById('daybook_sale_party_listbox');
+    var partyWrap = partySearch ? partySearch.closest('.daybook-form-combo') : null;
+
     var errEl = document.getElementById('daybook_sale_wizard_error');
     var subtitleEl = document.getElementById('daybook_sale_wizard_subtitle');
     var step2Label = document.getElementById('daybook_sale_step2_label');
@@ -2701,11 +2846,13 @@
         var plotQty = document.getElementById('daybook_sale_plot_qty');
         var componentEl = document.getElementById('daybook_sale_component');
         var plotTypeEl = document.getElementById('daybook_sale_plot_type');
-        var customer = document.getElementById('daybook_sale_customer_id');
         var acre = document.getElementById('daybook_sale_plot_acre');
         var kanal = document.getElementById('daybook_sale_plot_kanal');
         var marla = document.getElementById('daybook_sale_plot_marla');
         var sqft = document.getElementById('daybook_sale_plot_sqft');
+        var plotRate = document.getElementById('daybook_sale_plot_rate');
+        var plotRateKanal = document.getElementById('daybook_sale_plot_rate_kanal');
+        var plotRateAcre = document.getElementById('daybook_sale_plot_rate_acre');
         var plotAmount = document.getElementById('daybook_sale_plot_amount');
         if (fileAmount) fileAmount.value = '';
         if (fileNote) fileNote.value = '';
@@ -2717,17 +2864,23 @@
         if (plotQty) plotQty.value = '1';
         if (componentEl) componentEl.value = '';
         if (plotTypeEl) plotTypeEl.value = '';
-        if (customer) customer.value = '';
-        if (acre) acre.value = '0';
-        if (kanal) kanal.value = '0';
-        if (marla) marla.value = '0';
-        if (sqft) sqft.value = '0';
+        if (partyHidden) partyHidden.value = '';
+        if (partySearch) partySearch.value = '';
+        if (acre) acre.value = '';
+        if (kanal) kanal.value = '';
+        if (marla) marla.value = '';
+        if (sqft) sqft.value = '';
+        if (plotRate) plotRate.value = '';
+        if (plotRateKanal) plotRateKanal.value = '';
+        if (plotRateAcre) plotRateAcre.value = '';
         if (plotAmount) plotAmount.value = '';
         updateSaleAmountWords(fileAmount);
         updateSaleAmountWords(plotAmount);
+        if (typeof syncPlotSaleAmountFromRate === 'function') syncPlotSaleAmountFromRate();
         clearFileDetailsUi();
         hideList(projectList, projectSearch, projectWrap);
         hideList(itemList, itemSearch, itemWrap);
+        hideList(partyList, partySearch, partyWrap);
         showError('');
         renderStep();
     }
@@ -2763,16 +2916,170 @@
         updateSaleAmountWords(el);
     });
 
+    var plotAmountManual = false;
+    var plotRateSyncing = false;
+
+    function plotAkmsNum(id) {
+        var el = document.getElementById(id);
+        if (!el) return 0;
+        var v = String(el.value || '').trim();
+        if (v === '') return 0;
+        var n = parseInt(v, 10);
+        return isNaN(n) || n < 0 ? 0 : n;
+    }
+
+    function plotSaleTotalMarla() {
+        return plotAkmsNum('daybook_sale_plot_acre') * 160
+            + plotAkmsNum('daybook_sale_plot_kanal') * 20
+            + plotAkmsNum('daybook_sale_plot_marla')
+            + plotAkmsNum('daybook_sale_plot_sqft') / 225;
+    }
+
+    function formatPlotSaleMarlaHint(totalMarla) {
+        var eps = 1e-6;
+        if (totalMarla <= eps) return 'Total land: —';
+        var whole = Math.floor(totalMarla + eps);
+        var a = Math.floor(whole / 160);
+        var r = whole - a * 160;
+        var k = Math.floor(r / 20);
+        var m = r - k * 20;
+        var frac = totalMarla - whole;
+        if (frac < 0) frac = 0;
+        var sqft = frac > eps ? Math.round(frac * 225) : 0;
+        return 'Total land: A ' + a + ' — K ' + k + ' — M ' + m + ' — SQFT ' + sqft
+            + '  (' + (Math.round(totalMarla * 10000) / 10000) + ' marla)';
+    }
+
+    function parsePlotRateValue(el) {
+        if (!el) return NaN;
+        var rate = parseFloat(String(el.value || '').replace(/,/g, ''));
+        return isFinite(rate) ? rate : NaN;
+    }
+
+    function setPlotRateField(el, value) {
+        if (!el) return;
+        if (!isFinite(value) || value <= 0) {
+            el.value = '';
+            return;
+        }
+        el.value = (Math.round(value * 100) / 100).toFixed(2);
+    }
+
+    /** Keep per marla / kanal / acre rates aligned (1 kanal = 20 marla, 1 acre = 160 marla). */
+    function syncPlotSaleRateFields(sourceUnit) {
+        var marlaEl = document.getElementById('daybook_sale_plot_rate');
+        var kanalEl = document.getElementById('daybook_sale_plot_rate_kanal');
+        var acreEl = document.getElementById('daybook_sale_plot_rate_acre');
+        if (!marlaEl) return NaN;
+
+        var marlaRate = NaN;
+        if (sourceUnit === 'kanal') {
+            var kanalRate = parsePlotRateValue(kanalEl);
+            marlaRate = isFinite(kanalRate) && kanalRate > 0 ? (kanalRate / 20) : NaN;
+        } else if (sourceUnit === 'acre') {
+            var acreRate = parsePlotRateValue(acreEl);
+            marlaRate = isFinite(acreRate) && acreRate > 0 ? (acreRate / 160) : NaN;
+        } else {
+            marlaRate = parsePlotRateValue(marlaEl);
+        }
+
+        plotRateSyncing = true;
+        try {
+            if (!isFinite(marlaRate) || marlaRate <= 0) {
+                if (sourceUnit !== 'marla') setPlotRateField(marlaEl, NaN);
+                if (sourceUnit !== 'kanal') setPlotRateField(kanalEl, NaN);
+                if (sourceUnit !== 'acre') setPlotRateField(acreEl, NaN);
+                return NaN;
+            }
+            if (sourceUnit !== 'marla') setPlotRateField(marlaEl, marlaRate);
+            if (sourceUnit !== 'kanal') setPlotRateField(kanalEl, marlaRate * 20);
+            if (sourceUnit !== 'acre') setPlotRateField(acreEl, marlaRate * 160);
+            return marlaRate;
+        } finally {
+            plotRateSyncing = false;
+        }
+    }
+
+    function syncPlotSaleAmountFromRate() {
+        var rateEl = document.getElementById('daybook_sale_plot_rate');
+        var amountEl = document.getElementById('daybook_sale_plot_amount');
+        var hintEl = document.getElementById('daybook_sale_plot_area_hint');
+        var totalMarla = plotSaleTotalMarla();
+        if (hintEl) hintEl.textContent = formatPlotSaleMarlaHint(totalMarla);
+        if (!rateEl || !amountEl) return;
+        var rate = parsePlotRateValue(rateEl);
+        if (!isFinite(rate) || rate <= 0 || totalMarla <= 0) {
+            if (!plotAmountManual) {
+                amountEl.value = '';
+                updateSaleAmountWords(amountEl);
+            }
+            return;
+        }
+        if (plotAmountManual) return;
+        var amount = Math.round(totalMarla * rate * 100) / 100;
+        amountEl.value = amount.toFixed(2);
+        updateSaleAmountWords(amountEl);
+    }
+
+    (function bindPlotSaleRateCalc() {
+        ['daybook_sale_plot_acre', 'daybook_sale_plot_kanal', 'daybook_sale_plot_marla', 'daybook_sale_plot_sqft'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', function () {
+                plotAmountManual = false;
+                syncPlotSaleAmountFromRate();
+            });
+            el.addEventListener('change', function () {
+                plotAmountManual = false;
+                syncPlotSaleAmountFromRate();
+            });
+        });
+
+        document.querySelectorAll('.daybook-sale-plot-rate').forEach(function (el) {
+            el.addEventListener('input', function () {
+                if (plotRateSyncing) return;
+                plotAmountManual = false;
+                syncPlotSaleRateFields(el.getAttribute('data-rate-unit') || 'marla');
+                syncPlotSaleAmountFromRate();
+            });
+            el.addEventListener('change', function () {
+                if (plotRateSyncing) return;
+                plotAmountManual = false;
+                syncPlotSaleRateFields(el.getAttribute('data-rate-unit') || 'marla');
+                syncPlotSaleAmountFromRate();
+            });
+        });
+
+        var amountEl = document.getElementById('daybook_sale_plot_amount');
+        if (amountEl) {
+            amountEl.addEventListener('input', function () {
+                plotAmountManual = true;
+            });
+        }
+    })();
+
     function syncModeLabels() {
         var dha = isDha(selectedProject);
-        if (step2Label) step2Label.textContent = dha ? 'File' : 'Plot';
-        if (itemLabel) itemLabel.textContent = dha ? 'Sale file' : 'Plot file';
+        if (step2Label) step2Label.textContent = dha ? 'File' : 'Area';
+        if (itemLabel) itemLabel.textContent = dha ? 'Sale file' : 'Area (optional step skipped)';
         if (modeBadge) {
-            modeBadge.textContent = dha ? 'File sale (DHA)' : 'Plot sale';
+            modeBadge.textContent = dha ? 'File sale (DHA)' : 'Open land sale';
             modeBadge.className = 'daybook-sale-mode-badge ' + (dha ? 'is-dha' : 'is-plot');
         }
         if (itemSearch) {
-            itemSearch.placeholder = dha ? 'Search sale file…' : 'Search plot file…';
+            itemSearch.placeholder = dha ? 'Search sale file…' : 'Not used for non-DHA';
+        }
+        // Hide step-2 chrome for non-DHA free sale
+        modalEl.querySelectorAll('.daybook-sale-steps__item[data-step="2"], .daybook-sale-steps__connector').forEach(function (el, idx) {
+            // Keep first connector before step 2 and step 2 itself hidden for non-DHA
+            if (el.classList.contains('daybook-sale-steps__item') && el.getAttribute('data-step') === '2') {
+                el.classList.toggle('d-none', !dha && !!selectedProject);
+            }
+        });
+        var connectors = modalEl.querySelectorAll('.daybook-sale-steps__connector');
+        if (connectors.length >= 1) {
+            // First connector sits between 1 and 2 — hide when skipping step 2
+            connectors[0].classList.toggle('d-none', !dha && !!selectedProject);
         }
     }
 
@@ -3232,11 +3539,9 @@
             if (strongs[2]) strongs[2].textContent = avail;
         }
         if (plotSum) {
-            plotSum.innerHTML = 'Project: <strong></strong> · Plot file: <strong></strong> · Available: <strong></strong>';
+            plotSum.innerHTML = 'Project: <strong></strong> · Enter any area you want to sell';
             var ps = plotSum.querySelectorAll('strong');
             if (ps[0]) ps[0].textContent = projName;
-            if (ps[1]) ps[1].textContent = itemName;
-            if (ps[2]) ps[2].textContent = selectedItem ? (selectedItem.remaining_label || '—') : '—';
         }
     }
 
@@ -3252,20 +3557,25 @@
         });
         if (backBtn) backBtn.disabled = busy || step <= 1;
         if (primaryLabel) {
-            primaryLabel.textContent = step < 3 ? 'Next' : (isDha(selectedProject) ? 'Save file sale' : 'Save plot sale');
+            var dhaNow = isDha(selectedProject);
+            if (step === 1) primaryLabel.textContent = 'Next';
+            else if (step === 2) primaryLabel.textContent = 'Next';
+            else primaryLabel.textContent = dhaNow ? 'Save file sale' : 'Save sale';
         }
         if (subtitleEl) {
             if (step === 1) subtitleEl.textContent = 'Select a project to begin.';
-            else if (step === 2) subtitleEl.textContent = isDha(selectedProject)
-                ? 'Choose a sale file for this DHA project.'
-                : 'Choose a plot file for this non-DHA project.';
+            else if (step === 2) subtitleEl.textContent = 'Choose a sale file for this DHA project.';
             else subtitleEl.textContent = isDha(selectedProject)
                 ? 'Confirm stamp, purchaser, and formula plot size.'
-                : 'Enter customer, plot size, and amount.';
+                : 'Choose buyer party, enter any area (A/K/M/Sqft), and amount.';
         }
         syncModeLabels();
         syncItemMeta(selectedItem);
         syncDetailsSummaries();
+    }
+
+    function partyRows() {
+        return Array.isArray(window.__daybookFormPartyRows) ? window.__daybookFormPartyRows : [];
     }
 
     function filterProjects(q) {
@@ -3283,6 +3593,15 @@
         return itemRows.filter(function (row) {
             var label = (row.label || row.file_name || row.file_number || '').toLowerCase();
             return label.indexOf(nq) !== -1;
+        });
+    }
+
+    function filterParties(q) {
+        var nq = (q || '').toLowerCase().trim();
+        var rows = partyRows();
+        if (!nq) return rows.slice();
+        return rows.filter(function (row) {
+            return (row.label || row.name || '').toLowerCase().indexOf(nq) !== -1;
         });
     }
 
@@ -3307,7 +3626,7 @@
             appendProjectNameNode(btn, row);
             var hint = document.createElement('span');
             hint.className = 'daybook-sale-option-hint';
-            hint.textContent = isDha(row) ? 'File sale' : 'Plot sale';
+            hint.textContent = isDha(row) ? 'File sale' : 'Open land sale';
             btn.appendChild(hint);
             btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
             btn.addEventListener('click', function () {
@@ -3337,7 +3656,7 @@
             empty.setAttribute('role', 'presentation');
             empty.textContent = itemRows.length
                 ? 'No matches.'
-                : (isDha(selectedProject) ? 'No purchase files on this project.' : 'No plot files on this project.');
+                : (isDha(selectedProject) ? 'No purchase files on this project.' : 'No available plots on this project. Import or create plots first.');
             itemList.appendChild(empty);
             showList(itemList, itemSearch, itemWrap);
             return;
@@ -3374,6 +3693,38 @@
         showList(itemList, itemSearch, itemWrap);
     }
 
+    function renderPartyList(rows) {
+        if (!partyList) return;
+        partyList.innerHTML = '';
+        if (!rows.length) {
+            var empty = document.createElement('li');
+            empty.className = 'daybook-form-combo-empty';
+            empty.setAttribute('role', 'presentation');
+            empty.textContent = partyRows().length ? 'No parties match.' : 'No parties yet.';
+            partyList.appendChild(empty);
+            showList(partyList, partySearch, partyWrap);
+            return;
+        }
+        rows.forEach(function (row) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'none');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('role', 'option');
+            btn.textContent = row.label || row.name || ('#' + row.id);
+            btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            btn.addEventListener('click', function () {
+                if (partyHidden) partyHidden.value = String(row.id);
+                if (partySearch) partySearch.value = row.label || row.name || '';
+                hideList(partyList, partySearch, partyWrap);
+                showError('');
+            });
+            li.appendChild(btn);
+            partyList.appendChild(li);
+        });
+        showList(partyList, partySearch, partyWrap);
+    }
+
     function goNext() {
         showError('');
         if (step === 1) {
@@ -3384,11 +3735,37 @@
                 showError('Select a project first.');
                 return;
             }
-            loadItemRows();
             selectedItem = null;
             if (itemHidden) itemHidden.value = '';
             if (itemSearch) itemSearch.value = '';
             syncItemMeta(null);
+
+            // Non-DHA: skip file/plot pick — sell any area you enter
+            if (!isDha(selectedProject)) {
+                var acreEl = document.getElementById('daybook_sale_plot_acre');
+                var kanalEl = document.getElementById('daybook_sale_plot_kanal');
+                var marlaEl = document.getElementById('daybook_sale_plot_marla');
+                var sqftEl = document.getElementById('daybook_sale_plot_sqft');
+                var rateEl = document.getElementById('daybook_sale_plot_rate');
+                var rateKanalEl = document.getElementById('daybook_sale_plot_rate_kanal');
+                var rateAcreEl = document.getElementById('daybook_sale_plot_rate_acre');
+                var amountEl = document.getElementById('daybook_sale_plot_amount');
+                if (acreEl) acreEl.value = '';
+                if (kanalEl) kanalEl.value = '';
+                if (marlaEl) marlaEl.value = '';
+                if (sqftEl) sqftEl.value = '';
+                if (rateEl) rateEl.value = '';
+                if (rateKanalEl) rateKanalEl.value = '';
+                if (rateAcreEl) rateAcreEl.value = '';
+                if (amountEl) amountEl.value = '';
+                plotAmountManual = false;
+                syncPlotSaleAmountFromRate();
+                step = 3;
+                renderStep();
+                return;
+            }
+
+            loadItemRows();
             step = 2;
             renderStep();
             return;
@@ -3396,28 +3773,23 @@
         if (step === 2) {
             selectedItem = currentItem() || selectedItem;
             if (!selectedItem) {
-                showError(isDha(selectedProject) ? 'Select a sale file.' : 'Select a plot file.');
+                showError('Select a sale file.');
                 return;
             }
             if (selectedItem.is_fully_sold) {
                 showError('This item is fully sold.');
                 return;
             }
-            if (isDha(selectedProject) && selectedItem.is_file_sale === false) {
+            if (selectedItem.is_file_sale === false) {
                 showError('Move this file to File Sale first before recording a file sale here.');
                 return;
             }
-            if (isDha(selectedProject)) {
-                loadFileDetails().then(function () {
-                    step = 3;
-                    renderStep();
-                }).catch(function (err) {
-                    showError((err && err.message) ? err.message : 'Could not load file details.');
-                });
-                return;
-            }
-            step = 3;
-            renderStep();
+            loadFileDetails().then(function () {
+                step = 3;
+                renderStep();
+            }).catch(function (err) {
+                showError((err && err.message) ? err.message : 'Could not load file details.');
+            });
             return;
         }
         if (step === 3) {
@@ -3432,6 +3804,12 @@
     function goBack() {
         showError('');
         if (step <= 1) return;
+        // Non-DHA: details → project (skip hidden step 2)
+        if (!isDha(selectedProject) && step === 3) {
+            step = 1;
+            renderStep();
+            return;
+        }
         step -= 1;
         renderStep();
     }
@@ -3580,20 +3958,20 @@
     }
 
     function savePlotSale() {
-        var customerEl = document.getElementById('daybook_sale_customer_id');
         var acreEl = document.getElementById('daybook_sale_plot_acre');
         var kanalEl = document.getElementById('daybook_sale_plot_kanal');
         var marlaEl = document.getElementById('daybook_sale_plot_marla');
         var sqftEl = document.getElementById('daybook_sale_plot_sqft');
         var amountEl = document.getElementById('daybook_sale_plot_amount');
-        var customerId = customerEl ? customerEl.value : '';
+        var partyId = partyHidden ? String(partyHidden.value || '').trim() : '';
         var acre = acreEl ? parseInt(acreEl.value, 10) || 0 : 0;
         var kanal = kanalEl ? parseInt(kanalEl.value, 10) || 0 : 0;
         var marla = marlaEl ? parseInt(marlaEl.value, 10) || 0 : 0;
         var sqft = sqftEl ? parseInt(sqftEl.value, 10) || 0 : 0;
         var amount = amountEl ? parseFloat(amountEl.value) : 0;
-        if (!customerId) {
-            showError('Select a customer.');
+        if (!partyId) {
+            showError('Select a buyer party.');
+            if (partySearch) partySearch.focus();
             return;
         }
         if (acre + kanal + marla + sqft <= 0) {
@@ -3605,6 +3983,20 @@
             return;
         }
 
+        var body = {
+            project_id: selectedProject.id,
+            party_id: parseInt(partyId, 10),
+            area_acre: acre,
+            area_kanal: kanal,
+            area_marla: marla,
+            area_sqft: sqft,
+            total_amount: amount,
+            booking_date: (function () {
+                var dateInput = document.getElementById('entry_date');
+                return dateInput && dateInput.value ? dateInput.value : null;
+            })()
+        };
+
         setBusy(true);
         showError('');
         fetch(@json(route('daybook.sale.plot')), {
@@ -3615,16 +4007,7 @@
                 'X-CSRF-TOKEN': csrfToken,
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({
-                project_id: selectedProject.id,
-                project_file_id: selectedItem.id,
-                customer_id: parseInt(customerId, 10),
-                area_acre: acre,
-                area_kanal: kanal,
-                area_marla: marla,
-                area_sqft: sqft,
-                total_amount: amount
-            })
+            body: JSON.stringify(body)
         }).then(function (res) {
             return res.json().then(function (data) {
                 return { ok: res.ok, status: res.status, data: data };
@@ -3632,7 +4015,7 @@
         }).then(function (result) {
             setBusy(false);
             if (!result.ok) {
-                var msg = 'Could not save plot sale.';
+                var msg = 'Could not save sale.';
                 if (result.data && result.data.errors) {
                     var firstKey = Object.keys(result.data.errors)[0];
                     if (firstKey && result.data.errors[firstKey] && result.data.errors[firstKey][0]) {
@@ -3645,36 +4028,51 @@
                 return;
             }
 
-            // Refresh plot file remaining in memory
-            if (result.data && result.data.plot_file && selectedProject && Array.isArray(selectedProject.plot_files)) {
-                var updated = result.data.plot_file;
-                var idx = selectedProject.plot_files.findIndex(function (f) { return String(f.id) === String(updated.id); });
-                if (idx >= 0) selectedProject.plot_files[idx] = updated;
-                else selectedProject.plot_files.push(updated);
-            }
+            var saleInfo = result.data && result.data.sale ? result.data.sale : {};
+            var partyRow = partyRows().find(function (r) { return String(r.id) === String(partyId); });
+            var partyName = partyRow
+                ? (partyRow.label || partyRow.name || '')
+                : (partySearch ? String(partySearch.value || '').trim() : '');
+            var areaLabel = saleInfo.area_label || '';
+            var plotNo = saleInfo.plot_number || '';
+            var desc = 'Land sale — ' + (selectedProject.label || '') +
+                (plotNo ? ' · File ' + plotNo : '') +
+                (partyName ? ' · ' + partyName : '') +
+                (areaLabel ? ' · ' + areaLabel : '');
 
-            var customerName = '';
-            if (customerEl && customerEl.selectedIndex >= 0) {
-                customerName = customerEl.options[customerEl.selectedIndex].text || '';
-            }
-            var areaParts = [];
-            if (acre) areaParts.push(acre + ' acre');
-            if (kanal) areaParts.push(kanal + ' kanal');
-            if (marla) areaParts.push(marla + ' marla');
-            if (sqft) areaParts.push(sqft + ' sqft');
-            var desc = 'Plot sale — ' + (selectedItem.label || selectedItem.file_number || '') +
-                (customerName ? ' · ' + customerName : '') +
-                (areaParts.length ? ' · ' + areaParts.join(' ') : '');
+            var societySaleFile = saleInfo.plot_booking_id ? {
+                id: saleInfo.plot_booking_id,
+                source: 'society_booking',
+                plot_booking_id: saleInfo.plot_booking_id,
+                label: 'File ' + (saleInfo.plot_number || '') +
+                    (partyName ? ' · ' + partyName : '') +
+                    (areaLabel ? ' · ' + areaLabel : ''),
+                file_number: saleInfo.plot_number || '',
+                party_id: parseInt(partyId, 10),
+                project_id: selectedProject.id,
+                sale_price: amount,
+                received: Number(saleInfo.received_amount || 0),
+                outstanding: Number(saleInfo.outstanding != null ? saleInfo.outstanding : amount),
+                total_label: 'Rs ' + Math.round(amount).toLocaleString('en-PK'),
+                sold_label: 'Rs ' + Math.round(Number(saleInfo.received_amount || 0)).toLocaleString('en-PK'),
+                remaining_label: 'Rs ' + Math.round(Number(saleInfo.outstanding != null ? saleInfo.outstanding : amount)).toLocaleString('en-PK'),
+                status: 'Active',
+                is_fully_sold: false,
+                is_file_sale: false
+            } : null;
 
             var applied = typeof window.__daybookApplySaleToForm === 'function' && window.__daybookApplySaleToForm({
                 projectId: selectedProject.id,
                 purchaseFileId: null,
+                partyId: parseInt(partyId, 10),
+                plotBookingId: saleInfo.plot_booking_id || null,
+                societySaleFile: societySaleFile,
                 amount: amount.toFixed(2),
                 description: desc,
                 type: 'cash_in'
             });
             if (!applied) {
-                showError('Plot sale saved, but could not fill the entry form.');
+                showError('Sale and society file saved, but could not fill the entry form.');
                 return;
             }
             modal.hide();
@@ -3682,7 +4080,7 @@
             if (amountField) amountField.focus();
         }).catch(function () {
             setBusy(false);
-            showError('Network error while saving plot sale.');
+            showError('Network error while saving sale.');
         });
     }
 
@@ -3698,6 +4096,7 @@
         setBusy(false);
         hideList(projectList, projectSearch, projectWrap);
         hideList(itemList, itemSearch, itemWrap);
+        hideList(partyList, partySearch, partyWrap);
     });
 
     if (backBtn) backBtn.addEventListener('click', goBack);
@@ -3752,9 +4151,26 @@
         });
     }
 
+    if (partySearch) {
+        partySearch.addEventListener('focus', function () {
+            renderPartyList(filterParties(partySearch.value));
+        });
+        partySearch.addEventListener('input', function () {
+            if (partyHidden) partyHidden.value = '';
+            renderPartyList(filterParties(partySearch.value));
+        });
+        partySearch.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                hideList(partyList, partySearch, partyWrap);
+            }
+        });
+    }
+
     document.addEventListener('click', function (e) {
         if (projectWrap && !projectWrap.contains(e.target)) hideList(projectList, projectSearch, projectWrap);
         if (itemWrap && !itemWrap.contains(e.target)) hideList(itemList, itemSearch, itemWrap);
+        if (partyWrap && !partyWrap.contains(e.target)) hideList(partyList, partySearch, partyWrap);
     });
 })();
 </script>

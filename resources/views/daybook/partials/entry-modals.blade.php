@@ -464,47 +464,70 @@
 
                     <div id="daybook_sale_details_plot" class="daybook-sale-card d-none">
                         <div class="daybook-sale-card__head">
-                            <h3 class="daybook-sale-card__title">Plot sale details</h3>
+                            <h3 class="daybook-sale-card__title">Land sale details</h3>
                             <p class="daybook-sale-card__hint mb-0" id="daybook_sale_plot_summary">—</p>
                         </div>
                         <div class="row g-3 g-lg-4">
-                            <div class="col-12 col-lg-6">
-                                <label class="daybook-modal-label" for="daybook_sale_customer_id">Customer <span class="text-danger">*</span></label>
-                                <select class="form-select form-select-theme form-select-lg" id="daybook_sale_customer_id">
-                                    <option value="">Select customer</option>
-                                    @foreach(($customers ?? collect()) as $customer)
-                                        <option value="{{ $customer->id }}">{{ $customer->name }}</option>
-                                    @endforeach
-                                </select>
-                                @if(($customers ?? collect())->isEmpty())
-                                    <div class="form-text">No customers yet. <a href="{{ route('customers.create') }}" target="_blank" rel="noopener">Add a customer</a> first.</div>
+                            <div class="col-12">
+                                <label class="daybook-modal-label" for="daybook_sale_party_search">Buyer party <span class="text-danger">*</span></label>
+                                <div class="daybook-form-combo daybook-sale-combo mb-0">
+                                    <input type="hidden" id="daybook_sale_party_id" value="">
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-theme form-control-lg"
+                                        id="daybook_sale_party_search"
+                                        placeholder="Search party…"
+                                        autocomplete="off"
+                                        role="combobox"
+                                        aria-expanded="false"
+                                        aria-controls="daybook_sale_party_listbox"
+                                        aria-autocomplete="list"
+                                    >
+                                    <ul class="daybook-form-combo-list d-none" id="daybook_sale_party_listbox" role="listbox" hidden></ul>
+                                </div>
+                                @if(($parties ?? collect())->isEmpty())
+                                    <div class="form-text">No parties yet. Create a party from Daybook or <a href="{{ route('parties.create') }}" target="_blank" rel="noopener">Parties</a>.</div>
                                 @endif
                             </div>
-                            <div class="col-12 col-lg-6">
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_acre">Acre</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-akms" id="daybook_sale_plot_acre" min="0" step="1" inputmode="numeric" placeholder="—" value="">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_kanal">Kanal</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-akms" id="daybook_sale_plot_kanal" min="0" step="1" inputmode="numeric" placeholder="—" value="">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_marla">Marla</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-akms" id="daybook_sale_plot_marla" min="0" step="1" inputmode="numeric" placeholder="—" value="">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_sqft">Sq ft</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-akms" id="daybook_sale_plot_sqft" min="0" step="1" inputmode="numeric" placeholder="—" value="">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_rate">Per marla (Rs) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-rate" id="daybook_sale_plot_rate" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 500000" autocomplete="off" data-rate-unit="marla">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_rate_kanal">Per kanal (Rs)</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-rate" id="daybook_sale_plot_rate_kanal" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 10000000" autocomplete="off" data-rate-unit="kanal">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="daybook-modal-label" for="daybook_sale_plot_rate_acre">Per acre (Rs)</label>
+                                <input type="number" class="form-control form-control-theme form-control-lg daybook-sale-plot-rate" id="daybook_sale_plot_rate_acre" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 80000000" autocomplete="off" data-rate-unit="acre">
+                                <div class="form-text" id="daybook_sale_plot_area_hint">Total land: —</div>
+                            </div>
+                            <div class="col-12">
                                 <label class="daybook-modal-label daybook-sale-amount-label" for="daybook_sale_plot_amount">
                                     <span>Amount (Rs) <span class="text-danger">*</span></span>
                                     <span class="daybook-sale-amount-words" id="daybook_sale_plot_amount_words" aria-live="polite"></span>
                                 </label>
-                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="daybook-modal-label" for="daybook_sale_plot_acre">Acre</label>
-                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_acre" value="0" min="0" step="1">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="daybook-modal-label" for="daybook_sale_plot_kanal">Kanal</label>
-                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_kanal" value="0" min="0" step="1">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="daybook-modal-label" for="daybook_sale_plot_marla">Marla</label>
-                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_marla" value="0" min="0" step="1">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="daybook-modal-label" for="daybook_sale_plot_sqft">Sq ft</label>
-                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_sqft" value="0" min="0" step="1">
+                                <input type="number" class="form-control form-control-theme form-control-lg" id="daybook_sale_plot_amount" min="0.01" step="0.01" inputmode="decimal" placeholder="Auto from rate × area" autocomplete="off">
+                                <div class="form-text">Rates stay in sync (1 kanal = 20 marla, 1 acre = 160 marla). Amount = area × per marla (editable).</div>
                             </div>
                         </div>
-                        <p class="daybook-sale-card__foot mb-0">Saves the plot sale, then fills the entry as <strong>Payment in</strong>. Choose party and save after.</p>
+                        <p class="daybook-sale-card__foot mb-0">Creates a <strong>society sales file</strong>, then fills Daybook as <strong>Payment in</strong>. Manage receipts and installments on Society Sales.</p>
                     </div>
                 </div>
 

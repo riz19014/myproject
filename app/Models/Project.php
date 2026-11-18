@@ -155,4 +155,44 @@ class Project extends Model
     {
         return $this->hasMany(ProjectSaleExemptionSnapshot::class)->latest();
     }
+
+    public function landAllocations(): HasMany
+    {
+        return $this->hasMany(ProjectLandAllocation::class);
+    }
+
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(ProjectBlock::class)->orderBy('sort_order')->orderBy('name');
+    }
+
+    public function societyPlots(): HasMany
+    {
+        return $this->hasMany(ProjectPlot::class)->orderBy('plot_number');
+    }
+
+    public function budgets(): HasMany
+    {
+        return $this->hasMany(ProjectBudget::class)->orderBy('category');
+    }
+
+    public function developmentPackages(): HasMany
+    {
+        return $this->hasMany(DevelopmentPackage::class)->orderBy('name');
+    }
+
+    public function plotBookings(): HasMany
+    {
+        return $this->hasMany(PlotBooking::class)->latest('booking_date');
+    }
+
+    public function societyApprovals(): HasMany
+    {
+        return $this->hasMany(SocietyApprovalRequest::class)->latest();
+    }
+
+    public function isSociety(): bool
+    {
+        return ! $this->isDha();
+    }
 }

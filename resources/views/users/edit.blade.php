@@ -72,6 +72,18 @@
 
             <div class="row">
                 <div class="col-md-4 mb-3">
+                    <label for="society_role" class="form-label">Society role</label>
+                    <select class="form-select form-select-theme @error('society_role') is-invalid @enderror" id="society_role" name="society_role">
+                        <option value="">— Default from type —</option>
+                        @foreach(\App\Models\User::societyRoleLabels() as $value => $label)
+                            <option value="{{ $value }}" @selected(old('society_role', $user->society_role) === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('society_role')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="col-md-4 mb-3">
                     <div class="form-check mt-4">
                         <input class="form-check-input" type="checkbox" id="is_active" name="is_active" value="1" {{ old('is_active', $user->is_active) ? 'checked' : '' }}>
                         <label class="form-check-label" for="is_active">Active</label>

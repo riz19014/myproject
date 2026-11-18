@@ -10,6 +10,7 @@
     @if(!empty($daybookEmbed))
         <input type="hidden" name="embed" value="1">
     @endif
+    <input type="hidden" name="plot_booking_id" id="daybook_form_plot_booking_id" value="{{ old('plot_booking_id', $daybookPlotBookingIdDefault ?? '') }}">
 
     <div class="daybook-panel">
         <div class="row g-4">
@@ -45,7 +46,7 @@
                 @enderror
                 <div class="mt-2" id="daybook_form_file_wrap">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                        <label class="form-label daybook-label mb-0" for="daybook_form_purchase_file_search">Sale file <span class="text-muted fw-normal">(optional)</span></label>
+                        <label class="form-label daybook-label mb-0" for="daybook_form_purchase_file_search">Sale file <span class="text-muted fw-normal">(optional — DHA file or society SF file)</span></label>
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             <button type="button" class="btn btn-sm btn-outline-theme daybook-field-add-btn px-2 py-0 d-none" id="daybook_form_file_create" aria-label="Create sale file" title="Create sale file" disabled><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                             <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-none" id="daybook_form_file_reset" aria-label="Clear sale file">Reset</button>
@@ -71,8 +72,8 @@
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
                     <div id="daybook_sale_file_meta" class="small text-muted mt-2 d-none">
-                        <div><span class="fw-semibold text-body">Available:</span> <span id="daybook_sale_file_remaining">—</span></div>
-                        <div><span class="fw-semibold text-body">Total / Sold:</span> <span id="daybook_sale_file_totals">—</span></div>
+                        <div><span class="fw-semibold text-body" id="daybook_sale_file_remaining_label">Available:</span> <span id="daybook_sale_file_remaining">—</span></div>
+                        <div><span class="fw-semibold text-body" id="daybook_sale_file_totals_label">Total / Sold:</span> <span id="daybook_sale_file_totals">—</span></div>
                         <div><span class="fw-semibold text-body">Status:</span> <span id="daybook_sale_file_status">—</span></div>
                         <div id="daybook_sale_file_sellers_wrap" class="d-none"><span class="fw-semibold text-body">Sellers:</span> <span id="daybook_sale_file_sellers">—</span></div>
                     </div>
@@ -352,6 +353,7 @@
                     <option value="cheque" @selected($daybookPaymentMethodOld === 'cheque')>Cheque</option>
                     <option value="payorder" @selected($daybookPaymentMethodOld === 'payorder')>Pay order</option>
                     <option value="cash_deposit" @selected($daybookPaymentMethodOld === 'cash_deposit')>Cash Deposit to Bank</option>
+                    <option value="adjustment" @selected($daybookPaymentMethodOld === 'adjustment')>Adjustment</option>
                 </select>
                 @error('payment_method')
                     <div class="invalid-feedback d-block">{{ $message }}</div>

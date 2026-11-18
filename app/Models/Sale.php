@@ -19,6 +19,7 @@ class Sale extends Model
     protected $fillable = [
         'project_id',
         'project_file_id',
+        'project_plot_id',
         'purchase_file_id',
         'sale_land_moza_keys',
         'sale_type',
@@ -51,6 +52,11 @@ class Sale extends Model
     public function projectFile(): BelongsTo
     {
         return $this->belongsTo(ProjectFile::class);
+    }
+
+    public function projectPlot(): BelongsTo
+    {
+        return $this->belongsTo(ProjectPlot::class);
     }
 
     public function purchaseFile(): BelongsTo
